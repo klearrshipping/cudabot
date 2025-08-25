@@ -1,0 +1,162 @@
+{
+  "metadata": {
+    "generated_at": "2025-08-17T08:36:22.874356",
+    "source": "test_extraction",
+    "database_operations": false
+  },
+  "extracted_data": {
+    "invoice": {
+      "supplier": {
+        "name": "Amazon.com",
+        "contact": {}
+      },
+      "buyer": {
+        "name": "Rafer Johnson",
+        "address": "7500 NW 81ST PL STE 2, MIAMI, FL 33166-2180, United States",
+        "contact": {}
+      },
+      "invoice_details": {
+        "date": "October 10, 2024",
+        "order_number": "113-7256182-4008214"
+      },
+      "items": [
+        {
+          "description": "EF ECOFLOW Solar Generator DELTA 2 Max 2048Wh with 4X100W 12V Solar Panels, High Efficiency Monocrystalline PV Modules, 2400W LFP Portable Power Station, AC + Solar Fast Dual Charging For Camping RV",
+          "quantity": 1.0,
+          "unit_price": 1399.0,
+          "total_price": 1399.0
+        }
+      ],
+      "totals": {
+        "subtotal": 1399.0,
+        "shipping_handling": 0.0,
+        "tax": 97.93,
+        "total_amount": 1496.93
+      },
+      "shipping": {
+        "method": "Standard Shipping",
+        "delivery_date": "October 11, 2024"
+      },
+      "payment_terms": {
+        "method": "Mastercard ending in 3804"
+      },
+      "currency": "USD",
+      "document_type": "invoice",
+      "extraction_confidence": "high",
+      "_metadata": {
+        "extraction_timestamp": "2025-08-17T08:36:01.220314",
+        "source_file": "C:\\Users\\rafer\\Downloads\\Amazon.com - Order 113-7256182-4008214 (1) (1).pdf",
+        "processor": "claude_sonnet_4_via_openrouter",
+        "model": "anthropic/claude-sonnet-4",
+        "processing_method": "pdf_to_image_conversion"
+      }
+    },
+    "bill_of_lading": {
+      "reported_date": "13/01/2025",
+      "consignee_name": "RAFER JOHNSON",
+      "consignee_address": "34 ROEHHAMPTON CLOSE, KINGSTON 19, JAMAICA",
+      "consignee_tel#": null,
+      "shipper": "AMAZON",
+      "shipper_address": "104 WILLIAMSON STREET, FORT MILL, SC 29715. UNITED STATES OF AMERICA",
+      "master_bill_of_lading": "SMLU8375131A",
+      "voyage_number": "SGM19",
+      "bill_of_lading": "RBL161959",
+      "last_departure_date": "11/01/2025",
+      "port_of_origin": "MIAMI, UNITED STATES OF",
+      "port_of_loading": "MIAMI, UNITED STATES OF AMERICA",
+      "port_of_destination": "KINGSTON, JAMAICA",
+      "vessel": "SEABOARD GEMINI / SGM19",
+      "manifest/registration_#": "JMALB 2025 32",
+      "Wharfinger": "JMALB",
+      "vessel_flag": "LIBERIA",
+      "berth": "B1",
+      "container": "TCNU9472148",
+      "weight": "78.93 KGM",
+      "package_type": "BX",
+      "measure": "8.74 MTQ",
+      "commodity": "2 CTNS STC: SOLAR GENERATOR X20250109665963 MARKS:",
+      "charges": [
+        {
+          "charge_type": "FREIGHT",
+          "currency": "USD",
+          "prepaid_amount": ".00",
+          "collect_amount": "211.71",
+          "local_prepaid_amount": ".00",
+          "local_collect_amount": ".00"
+        },
+        {
+          "charge_type": "(PSS )",
+          "currency": "JMD",
+          "prepaid_amount": ".00",
+          "collect_amount": ".00",
+          "local_prepaid_amount": ".00",
+          "local_collect_amount": "1000.00"
+        },
+        {
+          "charge_type": "HANDLING",
+          "currency": "JMD",
+          "prepaid_amount": ".00",
+          "collect_amount": ".00",
+          "local_prepaid_amount": ".00",
+          "local_collect_amount": "1200.00"
+        },
+        {
+          "charge_type": "WHARFAGE",
+          "currency": "JMD",
+          "prepaid_amount": ".00",
+          "collect_amount": ".00",
+          "local_prepaid_amount": ".00",
+          "local_collect_amount": "700.00"
+        },
+        {
+          "charge_type": "AGENCY FEE",
+          "currency": "JMD",
+          "prepaid_amount": ".00",
+          "collect_amount": ".00",
+          "local_prepaid_amount": ".00",
+          "local_collect_amount": "1000.00"
+        },
+        {
+          "charge_type": "GCT",
+          "currency": "JMD",
+          "prepaid_amount": ".00",
+          "collect_amount": ".00",
+          "local_prepaid_amount": ".00",
+          "local_collect_amount": "150.00"
+        },
+        {
+          "charge_type": "STRIPPING",
+          "currency": "JMD",
+          "prepaid_amount": ".00",
+          "collect_amount": ".00",
+          "local_prepaid_amount": ".00",
+          "local_collect_amount": "1700.00"
+        },
+        {
+          "charge_type": "BILL OF LADING DOCUMENTATION FEE",
+          "currency": "JMD",
+          "prepaid_amount": ".00",
+          "collect_amount": ".00",
+          "local_prepaid_amount": ".00",
+          "local_collect_amount": "350.00"
+        }
+      ],
+      "_metadata": {
+        "extraction_timestamp": "2025-08-17T08:36:22.871836",
+        "source_file": "C:\\Users\\rafer\\Downloads\\arrival-notice - 2025-01-15T122540.415.pdf",
+        "processor": "claude_sonnet_4_via_openrouter",
+        "model": "anthropic/claude-sonnet-4",
+        "document_type": "Arrival Notice",
+        "processing_method": "pdf_to_image_conversion"
+      }
+    }
+  },
+  "esad_structure": {
+    "document_type": "eSAD",
+    "processing_status": "extracted",
+    "field_count": {
+      "invoice_fields": 11,
+      "bol_fields": 25
+    }
+  }
+}

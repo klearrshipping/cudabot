@@ -1,0 +1,25 @@
+﻿code,description,financial_transaction_id
+1,Outright purchase or sale,1
+2,"Sale, after approval or trial",1
+3,Barter trade (Compensation in kind),1
+4,Financing Lease (Hire-purchase),1
+9,Other,1
+1,Return of Goods,2
+2,Replacement of returned goods,2
+3,Replacement for goods not returned,2
+9,Other type of replacement ,2
+1,Transfer of goods - Aid program,3
+2,Other aid shipments - Public Admin,3
+3,Other aid shipments - Private Organisations,3
+1,Goods returned to member state,4
+2,Goods not returned to member state,4
+1,Goods returned to member state,5
+2,Goods not returned to member state,5
+1,For Repair/Maintenance - With Compensation,6
+2,After Repair Maintenance - With compensation,6
+3,For Repair/Maintenance - No Compensation,6
+4,After Repair Maintenance - No compensation,6
+0,Joint intergovernmental programme,7
+1,"Rent, operate lease over 24 months",8
+2,Stock movement - No compensation,8
+9,Other ,9

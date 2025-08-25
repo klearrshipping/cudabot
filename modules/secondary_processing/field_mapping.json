@@ -1,0 +1,288 @@
+{
+  "field_script_mapping": {
+    "Office code": {
+      "script": "esad_office.py",
+      "input_field": "office_code",
+      "output_field": "office_code_processed",
+      "description": "Processes office codes using office reference data"
+    },
+    "Manifest": {
+      "script": "esad_manifest.py",
+      "input_field": "manifest_registration_number",
+      "output_field": "manifest_processed",
+      "description": "Processes manifest numbers and validates format"
+    },
+    "Regime Type": {
+      "script": "esad_regime.py",
+      "input_field": "regime_type",
+      "output_field": "regime_type_processed",
+      "description": "Processes regime types using regime reference data"
+    },
+    "Exporter/Consignor Name/Company": {
+      "script": null,
+      "input_field": "shipper",
+      "output_field": "exporter_name_processed",
+      "description": "No further processing needed - use raw value"
+    },
+    "Exporter/Consignor Address": {
+      "script": "esad_address.py",
+      "input_field": "shipper_address",
+      "output_field": "exporter_address_processed",
+      "description": "Processes exporter address for country validation and formatting"
+    },
+    "Total packages": {
+      "script": null,
+      "input_field": "package_count",
+      "output_field": "total_packages_processed",
+      "description": "No further processing needed - extracted directly from documents"
+    },
+    "Commercial reference number": {
+      "script": "esad_ref_number.py",
+      "input_field": "order_id",
+      "output_field": "commercial_ref_processed",
+      "description": "Processes commercial reference numbers using order ID from our system"
+    },
+    "Importer/Consignee Name/Company": {
+      "script": null,
+      "input_field": "consignee_name",
+      "output_field": "importer_name_processed",
+      "description": "No further processing needed - use raw value"
+    },
+    "Importer/Consignee Address": {
+      "script": "esad_address.py",
+      "input_field": "consignee_address",
+      "output_field": "importer_address_processed",
+      "description": "Processes importer address for country validation and formatting"
+    },
+    "Country Last Consignment": {
+      "script": "esad_country.py",
+      "input_field": "port_of_loading",
+      "output_field": "last_consignment_country_processed",
+      "description": "Processes country information from ports"
+    },
+    "Trading Country": {
+      "script": "esad_country.py",
+      "input_field": "trading_country",
+      "output_field": "trading_country_processed",
+      "description": "Processes trading country information"
+    },
+    "Country of export": {
+      "script": "esad_country.py",
+      "input_field": "port_of_origin",
+      "output_field": "export_country_processed",
+      "description": "Processes export country information"
+    },
+    "Delivery terms": {
+      "script": "esad_incoterms.py",
+      "input_field": "delivery_terms",
+      "output_field": "delivery_terms_processed",
+      "description": "Processes INCOTERMS and delivery terms"
+    },
+    "Applicable place": {
+      "script": "esad_location.py",
+      "input_field": "port_of_destination",
+      "output_field": "loading_location_processed",
+      "description": "Processes applicable place information using loading location"
+    },
+    "Currency code": {
+      "script": "esad_currency.py",
+      "input_field": "currency",
+      "output_field": "currency_code_processed",
+      "description": "Processes currency codes and validates"
+    },
+    "Amount": {
+      "script": "esad_cif.py",
+      "input_field": "total_amount",
+      "output_field": "cif_value",
+      "description": "Returns the calculated CIF value from the esad_cif processor"
+    },
+    "Nature of Transaction": {
+      "script": "esad_trans_type.py",
+      "input_field": "transaction_type",
+      "output_field": "transaction_type_processed",
+      "description": "Processes transaction types using financial codes"
+    },
+    "Mode of transport at the border": {
+      "script": "esad_transport_mode.py",
+      "input_field": "transport_mode",
+      "output_field": "transport_mode_processed",
+      "description": "Processes transport mode information using transport_mode.csv reference data"
+    },
+    "Place of Loading/Unloading": {
+      "script": "esad_location.py",
+      "input_field": "bol_data",
+      "output_field": "box_27_value",
+      "description": "Processes port information for Box Field 27, returns LOCODE based on import/export scenario"
+    },
+    "Location of goods": {
+      "script": "esad_location.py",
+      "input_field": "location_of_goods",
+      "output_field": "goods_location_processed",
+      "description": "Processes goods location information"
+    },
+    "Marks and numbers of packages": {
+      "script": "esad_marks.py",
+      "input_field": "marks_numbers",
+      "output_field": "marks_processed",
+      "description": "Processes package marks and numbers"
+    },
+    "No. of packages": {
+      "script": null,
+      "input_field": "package_count",
+      "output_field": "package_count_processed",
+      "description": "No further processing needed - extracted directly from documents"
+    },
+    "Kind of packages": {
+      "script": "esad_pkg.py",
+      "input_field": "kind_of_packages",
+      "output_field": "package_type_processed",
+      "description": "Processes package types using reference data"
+    },
+    "Commercial description": {
+      "script": "esad_product.py",
+      "input_field": "commodity_description",
+      "output_field": "commercial_description_processed",
+      "description": "Processes commodity descriptions"
+    },
+    "Commodity code": {
+      "script": "esad_product.py",
+      "input_field": "commodity_code",
+      "output_field": "commodity_code_processed",
+      "description": "Processes commodity codes using CPC reference data"
+    },
+    "Country Origin Code": {
+      "script": "esad_country.py",
+      "input_field": "country_of_origin",
+      "output_field": "origin_country_processed",
+      "description": "Processes country of origin codes"
+    },
+    "Gross Weight (kg)": {
+      "script": "esad_weight.py",
+      "input_field": "gross_weight",
+      "output_field": "gross_weight_processed",
+      "description": "Processes and validates gross weights"
+    },
+    "Net Weight (kg)": {
+      "script": "esad_weight.py",
+      "input_field": "net_weight",
+      "output_field": "net_weight_processed",
+      "description": "Processes and validates net weights"
+    },
+    "Transport document/Previous Document": {
+      "script": "esad_document.py",
+      "input_field": "transport_document",
+      "output_field": "transport_doc_processed",
+      "description": "Processes transport document references"
+    },
+    "Procedure": {
+      "script": "esad_procedure.py",
+      "input_field": "procedure_code",
+      "output_field": "procedure_processed",
+      "description": "Processes customs procedure codes"
+    },
+    "Statistical Units": {
+      "script": null,
+      "input_field": "statistical_units",
+      "output_field": "statistical_units_processed",
+      "description": "Default statistical unit KGM (kilograms) for weight measurements - value inserted directly"
+    },
+    "Invoice value (goods only)": {
+      "script": "esad_cif.py",
+      "input_field": "invoice_value_goods_only",
+      "output_field": "invoice_value_processed",
+      "description": "Processes invoice value excluding freight and insurance for CIF calculations"
+    },
+    "Invoice total (including freight)": {
+      "script": "esad_cif.py",
+      "input_field": "invoice_total_with_freight",
+      "output_field": "invoice_total_processed",
+      "description": "Processes invoice total that may include freight for disaggregation analysis"
+    },
+    "Freight charges (BOL)": {
+      "script": "esad_cif.py",
+      "input_field": "freight_charges_bol",
+      "output_field": "freight_charges_processed",
+      "description": "Processes freight charges from Bill of Lading for CIF calculations"
+    },
+    "Freight charges (invoice)": {
+      "script": "esad_cif.py",
+      "input_field": "freight_charges_invoice",
+      "output_field": "freight_charges_invoice_processed",
+      "description": "Processes freight charges from invoice if separately listed"
+    },
+    "Insurance charges": {
+      "script": "esad_cif.py",
+      "input_field": "insurance_charges",
+      "output_field": "insurance_charges_processed",
+      "description": "Processes insurance charges for CIF calculations"
+    },
+    "Other charges (BOL)": {
+      "script": "esad_cif.py",
+      "input_field": "other_charges_bol",
+      "output_field": "other_charges_processed",
+      "description": "Processes other BOL charges for complete cost analysis"
+    }
+  },
+  "script_metadata": {
+    "esad_office.py": {
+      "description": "Processes office codes using office reference data",
+      "input_fields": ["office_code"],
+      "output_fields": ["office_code_processed"],
+      "dependencies": ["office.csv"]
+    },
+    "esad_manifest.py": {
+      "description": "Processes manifest numbers and validates format",
+      "input_fields": ["manifest_registration_number"],
+      "output_fields": ["manifest_processed"],
+      "dependencies": []
+    },
+    "esad_regime.py": {
+      "description": "Processes regime types using regime reference data",
+      "input_fields": ["regime_type"],
+      "output_fields": ["regime_type_processed"],
+      "dependencies": ["regime_types.csv"]
+    },
+    "esad_address.py": {
+      "description": "Processes address information for validation and formatting",
+      "input_fields": ["shipper_address", "consignee_address"],
+      "output_fields": ["exporter_address_processed", "importer_address_processed"],
+      "dependencies": ["country.csv"]
+    },
+    "esad_pkg.py": {
+      "description": "Processes package information using package type reference data",
+      "input_fields": ["kind_of_packages"],
+      "output_fields": ["package_type_processed"],
+      "dependencies": ["package_type.csv"]
+    },
+    "esad_country.py": {
+      "description": "Processes country information using country reference data",
+      "input_fields": ["port_of_loading", "trading_country", "port_of_origin", "country_of_origin"],
+      "output_fields": ["last_consignment_country_processed", "trading_country_processed", "export_country_processed", "origin_country_processed"],
+      "dependencies": ["country.csv"]
+    },
+    "esad_trans_type.py": {
+      "description": "Processes transaction types using financial transaction reference data",
+      "input_fields": ["transaction_type"],
+      "output_fields": ["transaction_type_processed"],
+      "dependencies": ["financial_transaction_final.csv"]
+    },
+    "esad_product.py": {
+      "description": "Processes commodity information using CPC reference data",
+      "input_fields": ["commodity_description", "commodity_code"],
+      "output_fields": ["commercial_description_processed", "commodity_code_processed"],
+      "dependencies": ["cpc_codes.csv"]
+    },
+    "esad_weight.py": {
+      "description": "Processes and validates weight information",
+      "input_fields": ["gross_weight", "net_weight"],
+      "output_fields": ["gross_weight_processed", "net_weight_processed"],
+      "dependencies": []
+    },
+    "esad_ref_number.py": {
+      "description": "Processes commercial reference numbers using order ID from our system",
+      "input_fields": ["order_id"],
+      "output_fields": ["commercial_ref_processed"],
+      "dependencies": []
+    }
+  }
+}

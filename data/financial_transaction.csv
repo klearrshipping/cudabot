@@ -1,0 +1,10 @@
+﻿id,code,description
+,1,Purchase or Sale
+,2,Return of goods free of charge
+,3,Transfer of goods - No compensation
+,4,For (Inward) Processing - Contract
+,5,After (Outward) Processing - Contract
+,6,Repairs & Maintenance
+,7,Joint intergovernment programme
+,8,Contract - No separate invoicing
+,9,Other 

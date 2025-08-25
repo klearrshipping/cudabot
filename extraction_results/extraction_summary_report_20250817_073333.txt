@@ -1,0 +1,41 @@
+📊 DOCUMENT EXTRACTION TEST REPORT
+============================================================
+Generated: 2025-08-17 07:33:33
+
+📋 SUMMARY TABLE
+------------------------------------------------------------
+Model                     Success    Time       Status
+------------------------------------------------------------
+claude_sonnet_4           Yes        4.93s      ✅ PASS
+gpt_5                     Yes        3.55s      ✅ PASS
+gpt_5_mini                Yes        3.70s      ✅ PASS
+gpt_5_nano                Yes        9.08s      ✅ PASS
+gemini_2_5_pro            Yes        8.64s      ✅ PASS
+llama_3_2_11b_vision      Yes        8.64s      ✅ PASS
+
+🔍 ESAD FIELDS PREVIEW
+============================================================
+
+🧠 claude_sonnet_4:
+----------------------------------------
+   error: 'ESADFieldPopulator' object has no attribute 'populate_esad_fields'
+
+🧠 gpt_5:
+----------------------------------------
+   error: 'ESADFieldPopulator' object has no attribute 'populate_esad_fields'
+
+🧠 gpt_5_mini:
+----------------------------------------
+   error: 'ESADFieldPopulator' object has no attribute 'populate_esad_fields'
+
+🧠 gpt_5_nano:
+----------------------------------------
+   error: 'ESADFieldPopulator' object has no attribute 'populate_esad_fields'
+
+🧠 gemini_2_5_pro:
+----------------------------------------
+   error: 'ESADFieldPopulator' object has no attribute 'populate_esad_fields'
+
+🧠 llama_3_2_11b_vision:
+----------------------------------------
+   error: 'ESADFieldPopulator' object has no attribute 'populate_esad_fields'

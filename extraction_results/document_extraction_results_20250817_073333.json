@@ -1,0 +1,122 @@
+{
+  "claude_sonnet_4": {
+    "model_name": "claude_sonnet_4",
+    "model_id": "anthropic/claude-sonnet-4",
+    "start_time": "2025-08-17T07:32:43.160764",
+    "processing_time": 4.933695554733276,
+    "invoice_extraction": {
+      "error": "'InvoiceExtractor' object has no attribute 'extract_invoice_data'"
+    },
+    "bol_extraction": {
+      "error": "'FlexibleFormExtractor' object has no attribute 'extract_form_data'"
+    },
+    "document_processing": {
+      "error": "'DocumentProcessor' object has no attribute 'process_invoice'"
+    },
+    "esad_fields": {
+      "error": "'ESADFieldPopulator' object has no attribute 'populate_esad_fields'"
+    },
+    "success": true,
+    "error": null
+  },
+  "gpt_5": {
+    "model_name": "gpt_5",
+    "model_id": "openai/gpt-5",
+    "start_time": "2025-08-17T07:32:50.110131",
+    "processing_time": 3.5465457439422607,
+    "invoice_extraction": {
+      "error": "'InvoiceExtractor' object has no attribute 'extract_invoice_data'"
+    },
+    "bol_extraction": {
+      "error": "'FlexibleFormExtractor' object has no attribute 'extract_form_data'"
+    },
+    "document_processing": {
+      "error": "'DocumentProcessor' object has no attribute 'process_invoice'"
+    },
+    "esad_fields": {
+      "error": "'ESADFieldPopulator' object has no attribute 'populate_esad_fields'"
+    },
+    "success": true,
+    "error": null
+  },
+  "gpt_5_mini": {
+    "model_name": "gpt_5_mini",
+    "model_id": "openai/gpt-5-mini",
+    "start_time": "2025-08-17T07:32:55.664750",
+    "processing_time": 3.6970345973968506,
+    "invoice_extraction": {
+      "error": "'InvoiceExtractor' object has no attribute 'extract_invoice_data'"
+    },
+    "bol_extraction": {
+      "error": "'FlexibleFormExtractor' object has no attribute 'extract_form_data'"
+    },
+    "document_processing": {
+      "error": "'DocumentProcessor' object has no attribute 'process_invoice'"
+    },
+    "esad_fields": {
+      "error": "'ESADFieldPopulator' object has no attribute 'populate_esad_fields'"
+    },
+    "success": true,
+    "error": null
+  },
+  "gpt_5_nano": {
+    "model_name": "gpt_5_nano",
+    "model_id": "openai/gpt-5-nano",
+    "start_time": "2025-08-17T07:33:01.362419",
+    "processing_time": 9.082887649536133,
+    "invoice_extraction": {
+      "error": "'InvoiceExtractor' object has no attribute 'extract_invoice_data'"
+    },
+    "bol_extraction": {
+      "error": "'FlexibleFormExtractor' object has no attribute 'extract_form_data'"
+    },
+    "document_processing": {
+      "error": "'DocumentProcessor' object has no attribute 'process_invoice'"
+    },
+    "esad_fields": {
+      "error": "'ESADFieldPopulator' object has no attribute 'populate_esad_fields'"
+    },
+    "success": true,
+    "error": null
+  },
+  "gemini_2_5_pro": {
+    "model_name": "gemini_2_5_pro",
+    "model_id": "google/gemini-2.5-pro",
+    "start_time": "2025-08-17T07:33:12.445909",
+    "processing_time": 8.635725736618042,
+    "invoice_extraction": {
+      "error": "'InvoiceExtractor' object has no attribute 'extract_invoice_data'"
+    },
+    "bol_extraction": {
+      "error": "'FlexibleFormExtractor' object has no attribute 'extract_form_data'"
+    },
+    "document_processing": {
+      "error": "'DocumentProcessor' object has no attribute 'process_invoice'"
+    },
+    "esad_fields": {
+      "error": "'ESADFieldPopulator' object has no attribute 'populate_esad_fields'"
+    },
+    "success": true,
+    "error": null
+  },
+  "llama_3_2_11b_vision": {
+    "model_name": "llama_3_2_11b_vision",
+    "model_id": "meta-llama/llama-3.2-11b-vision-instruct",
+    "start_time": "2025-08-17T07:33:23.088796",
+    "processing_time": 8.643527269363403,
+    "invoice_extraction": {
+      "error": "'InvoiceExtractor' object has no attribute 'extract_invoice_data'"
+    },
+    "bol_extraction": {
+      "error": "'FlexibleFormExtractor' object has no attribute 'extract_form_data'"
+    },
+    "document_processing": {
+      "error": "'DocumentProcessor' object has no attribute 'process_invoice'"
+    },
+    "esad_fields": {
+      "error": "'ESADFieldPopulator' object has no attribute 'populate_esad_fields'"
+    },
+    "success": true,
+    "error": null
+  }
+}

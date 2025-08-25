@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customs Declaration Upload</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            color: #333;
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 1.1rem;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+
+        .file-input-wrapper {
+            position: relative;
+            display: inline-block;
+            width: 100%;
+        }
+
+        .file-input {
+            width: 100%;
+            padding: 15px;
+            border: 2px dashed #ddd;
+            border-radius: 10px;
+            background: #f8f9fa;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 1rem;
+        }
+
+        .file-input:hover {
+            border-color: #667eea;
+            background: #f0f2ff;
+        }
+
+        .file-input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .required {
+            color: #e74c3c;
+            font-weight: bold;
+        }
+
+        .optional {
+            color: #7f8c8d;
+            font-style: italic;
+        }
+
+        .submit-btn {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.2rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 20px;
+        }
+
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .submit-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .status {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 10px;
+            display: none;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .file-info {
+            margin-top: 10px;
+            padding: 10px;
+            background: #e8f5e8;
+            border-radius: 5px;
+            font-size: 0.9rem;
+            color: #2d5a2d;
+            display: none;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: #f0f0f0;
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 10px;
+            display: none;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📋 Customs Declaration</h1>
+            <p>Upload your documents to process customs declaration</p>
+        </div>
+
+        <form id="uploadForm">
+            <div class="form-group">
+                <label for="invoice">Invoice Document <span class="required">*</span></label>
+                <div class="file-input-wrapper">
+                    <input type="file" id="invoice" name="invoice" class="file-input" accept=".pdf,.jpg,.jpeg,.png,.tiff,.tif" required>
+                </div>
+                <div class="file-info" id="invoiceInfo"></div>
+            </div>
+
+            <div class="form-group">
+                <label for="billOfLading">Bill of Lading <span class="required">*</span></label>
+                <div class="file-input-wrapper">
+                    <input type="file" id="billOfLading" name="billOfLading" class="file-input" accept=".pdf,.jpg,.jpeg,.png,.tiff,.tif" required>
+                </div>
+                <div class="file-info" id="billOfLadingInfo"></div>
+            </div>
+
+            <div class="form-group">
+                <label for="arrivalNotice">Arrival Notice <span class="optional">(Optional)</span></label>
+                <div class="file-input-wrapper">
+                    <input type="file" id="arrivalNotice" name="arrivalNotice" class="file-input" accept=".pdf,.jpg,.jpeg,.png,.tiff,.tif">
+                </div>
+                <div class="file-info" id="arrivalNoticeInfo"></div>
+            </div>
+
+            <button type="submit" class="submit-btn" id="submitBtn">
+                📤 Upload Documents
+            </button>
+        </form>
+
+        <div class="progress-bar" id="progressBar">
+            <div class="progress-fill" id="progressFill"></div>
+        </div>
+
+        <div class="status" id="status"></div>
+    </div>
+
+    <script>
+        // File input handling
+        const fileInputs = document.querySelectorAll('.file-input');
+        const submitBtn = document.getElementById('submitBtn');
+        const status = document.getElementById('status');
+        const progressBar = document.getElementById('progressBar');
+        const progressFill = document.getElementById('progressFill');
+
+        fileInputs.forEach(input => {
+            input.addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                const fileInfo = document.getElementById(e.target.id + 'Info');
+                
+                if (file) {
+                    const fileSize = (file.size / (1024 * 1024)).toFixed(2);
+                    fileInfo.innerHTML = `
+                        <strong>Selected:</strong> ${file.name}<br>
+                        <strong>Size:</strong> ${fileSize} MB<br>
+                        <strong>Type:</strong> ${file.type || 'Unknown'}
+                    `;
+                    fileInfo.style.display = 'block';
+                } else {
+                    fileInfo.style.display = 'none';
+                }
+                
+                validateForm();
+            });
+        });
+
+        function validateForm() {
+            const invoice = document.getElementById('invoice').files[0];
+            const billOfLading = document.getElementById('billOfLading').files[0];
+            
+            if (invoice && billOfLading) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = '📤 Upload Documents';
+            } else {
+                submitBtn.disabled = true;
+                submitBtn.textContent = '⚠️ Please select required documents';
+            }
+        }
+
+        // Form submission
+        document.getElementById('uploadForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData();
+            const invoice = document.getElementById('invoice').files[0];
+            const billOfLading = document.getElementById('billOfLading').files[0];
+            const arrivalNotice = document.getElementById('arrivalNotice').files[0];
+
+            if (!invoice || !billOfLading) {
+                showStatus('Please select both invoice and bill of lading documents.', 'error');
+                return;
+            }
+
+            // Add files to FormData
+            formData.append('invoice', invoice);
+            formData.append('bill_of_lading', billOfLading);
+            if (arrivalNotice) {
+                formData.append('arrival_notice', arrivalNotice);
+            }
+            
+            // Add form data
+            formData.append('client_id', '1'); // Default client ID
+            formData.append('description', 'Customs declaration upload');
+
+            // Show progress
+            submitBtn.disabled = true;
+            submitBtn.textContent = '⏳ Uploading...';
+            progressBar.style.display = 'block';
+            status.style.display = 'none';
+
+            try {
+                // Show progress animation
+                let progress = 0;
+                const progressInterval = setInterval(() => {
+                    progress += 5;
+                    progressFill.style.width = Math.min(progress, 90) + '%';
+                }, 100);
+
+                console.log('Making API request to /api/upload-documents...');
+                
+                // Make actual API call
+                const response = await fetch('/api/upload-documents', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                clearInterval(progressInterval);
+                progressFill.style.width = '100%';
+
+                console.log('Response status:', response.status);
+                console.log('Response ok:', response.ok);
+
+                if (response.ok) {
+                    const result = await response.json();
+                    console.log('Success result:', result);
+                    showStatus(`✅ ${result.message}\nOrder: ${result.order.order_number}\nDocuments: ${result.documents_uploaded.join(', ')}`, 'success');
+                } else {
+                    const error = await response.json();
+                    console.log('Error result:', error);
+                    showStatus(`❌ Upload failed: ${error.detail}`, 'error');
+                }
+
+            } catch (error) {
+                console.error('Fetch error:', error);
+                showStatus('Upload failed: ' + error.message, 'error');
+            } finally {
+                resetForm();
+            }
+        });
+
+
+
+        function showStatus(message, type) {
+            status.textContent = message;
+            status.className = `status ${type}`;
+            status.style.display = 'block';
+        }
+
+        function resetForm() {
+            submitBtn.disabled = false;
+            submitBtn.textContent = '📤 Upload Documents';
+            progressBar.style.display = 'none';
+            progressFill.style.width = '0%';
+        }
+
+        // Initial validation
+        validateForm();
+    </script>
+</body>
+</html> 

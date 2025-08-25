@@ -1,0 +1,17 @@
+# Core dependencies
+requests>=2.31.0
+python-dotenv>=1.0.0
+fastapi>=0.104.0
+uvicorn>=0.24.0
+python-multipart>=0.0.6
+
+# PDF processing dependencies
+PyMuPDF>=1.23.0  # Primary PDF-to-image converter
+pdf2image>=1.16.0  # Fallback PDF-to-image converter
+Pillow>=10.0.0  # Image processing for pdf2image fallback
+
+# Supabase
+supabase>=2.0.0
+
+# Optional: Alternative PDF processing
+# pypdf2>=3.0.0  # Alternative PDF reader if needed

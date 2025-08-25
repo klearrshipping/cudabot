@@ -1,0 +1,41 @@
+📊 DOCUMENT EXTRACTION TEST REPORT
+============================================================
+Generated: 2025-08-17 07:50:20
+
+📋 SUMMARY TABLE
+------------------------------------------------------------
+Model                     Success    Time       Status
+------------------------------------------------------------
+claude_sonnet_4           Yes        60.52s     ✅ PASS
+gpt_5                     Yes        64.67s     ✅ PASS
+gpt_5_mini                Yes        74.52s     ✅ PASS
+gpt_5_nano                Yes        66.08s     ✅ PASS
+gemini_2_5_pro            Yes        64.18s     ✅ PASS
+llama_3_2_11b_vision      Yes        72.26s     ✅ PASS
+
+🔍 ESAD FIELDS PREVIEW
+============================================================
+
+🧠 claude_sonnet_4:
+----------------------------------------
+   error: ESADFieldPopulator.populate_fields() got an unexpected keyword argument 'bill_of_lading'
+
+🧠 gpt_5:
+----------------------------------------
+   error: ESADFieldPopulator.populate_fields() got an unexpected keyword argument 'bill_of_lading'
+
+🧠 gpt_5_mini:
+----------------------------------------
+   error: ESADFieldPopulator.populate_fields() got an unexpected keyword argument 'bill_of_lading'
+
+🧠 gpt_5_nano:
+----------------------------------------
+   error: ESADFieldPopulator.populate_fields() got an unexpected keyword argument 'bill_of_lading'
+
+🧠 gemini_2_5_pro:
+----------------------------------------
+   error: ESADFieldPopulator.populate_fields() got an unexpected keyword argument 'bill_of_lading'
+
+🧠 llama_3_2_11b_vision:
+----------------------------------------
+   error: ESADFieldPopulator.populate_fields() got an unexpected keyword argument 'bill_of_lading'

@@ -1,0 +1,82 @@
+id,regime_type,cpc,description,detail
+1,BG4,4000,Commercial Import,BG4 - 4000: Commercial Import
+2,BG4,4500,Non-Commercial,BG4 - 4500: Non-commercial passenger baggage
+3,BG4,4600,Passenger Baggage,BG4 - 4600: Passenger baggage - Non-commercial
+4,BG4,4900,Commercial Import –With Uplift Applied,BG4 - 4900: Commercial import by unregistered taxpayer  (GCT ).
+5,EX10,9391,Export from Free Zone after processing,EX10 - 9391: Export from a Special Economic Zone (SEZ) after Processing
+6,EX11,9500,Destruction of goods,EX11 - 9500: Destruction of goods
+7,EX2,1000,Export (Permanent),EX1 - 1000: Permanent Export for resale in a foreign market
+8,EX2,2000,Temporary Export for Return in Same State,EX2 - 2000: Temporary Export to be returned in same state
+9,EX2,2100,"Temporary Export for Repair, Restoration or Improvement",EX2 - 2100: Temporary Export to be returned after repairs or restoration in a foreign country.
+10,EX2,2171,"Temporary Export from In-Bond Shop forRepair, Restoration or Improvement",EX2 - 2171: Temporary Export from an In-Bond shop for repair or restoration.
+11,EX2,2200,Temporary Export for Outward Processing,EX2  - 2200: Temporary Export for Processing (Outward Processing)
+12,EX3,3040,Re-Export After Entry for Home Use,"EX3 - 3040: Re-Export to a foreign country, after previously being imported"
+13,EX3,3050,Re-Export after Temporary Import in Same State,EX3 - 3050: Re-Export to a foreign market after temporary import in same state
+14,EX3,3051,"Re-Export after Temporary Import for Repairs, Restoration or Improvement",EX3 - 3051: Re-Export to a foreign market after temporary import for repairs or restoration.
+15,EX3,3052,Re-Export after Temporary import for inward processing,EX3 - 3052: Re-Export after Temporary import for Processing (inward processing)
+16,EX3,3053,Re-Export after Temporary import exhibition or entertainment,EX3 - 3053: Re-export after previous import for exhibition or entertainment
+17,EX3,3058,Re-Export after Temporary Import  (LegacySystem),EX3 - 3058: Re-export after previous import (Legacy system)
+18,EX3,3070,Re-Export after Private Bonded Warehousing,EX3 - 3070: Re-export after previous import into Private Bonded Warehouse
+19,EX3,3071,Re-Export after In-bond Warehousing - Accounting for DFS Sales,EX3 - 3071: Re-export after previous In-bond warehousing (Accounting for DFS Sales)
+20,EX3,3078,Re-Export after Warehousing (Legacy System),EX3 - 3078: Re-export after previous warehousing (Legacy System)
+21,EX3,3171,Re-Export after In-bond - Other,EX3 - 3171: Re-export after previous In-bond warehousing (Other)
+22,EX3,8100,Transit (By road to another port for Re-export),EX8 - 8100: Transit by road to another port for Re-export
+23,EX8,9390,Export from Free Zone,EX9 - 9390: Export from a Special Economic Zone (SEZ) to a foreign country
+24,IM10,9070,Entry into Free Zone from bonded warehouse,IM10 - 9070: Transfer from Private Bonded Warehouse to a Special Economic Zone
+25,IM11,9090,Transfer between Free Zones,IM11 - 9090: Transfer between Speacial Economic Zones (SEZ's)
+26,IM12,9098,Entry for Free Zone from Legacy System,IM12 - 9098: Transfer from Legacy system to Private Bonded Warehouse
+27,IM13,9100,Entry into Free Zone for Processing,IM13 - 9100: Import Entry into a Special Economic Zone for Processing
+28,IM14,9191,Transfer between Free Zone for Processing,IM14 - 9191: Transfer between Special Economic Zones (SEZ's) for Processing
+29,IM15,9200,Entry into Free Zone for Consumption,IM15 - 9200: Import Entry into SEZ for consumption
+30,IM16,9270,Entry into Free Zone for consumption from Bonded Warehouse,IM16 - 9270: Transfer from Private Bonded Warehouse to SEZ for Consumption
+31,IM17,9390,Export from Free Zone,IM17 - 9390: Import from a Special Economic Zone (SEZ) for home use
+32,IM18,9391,Export from Free Zone after processing,IM18 - 9391: Import from a Special Economic Zone (SEZ) after Processing
+33,IM19,9500,Destruction of goods,IM19 - 9500: Destruction of goods
+34,IM20,9700,Goods sold in auction,IM20 - 9700: Goods sold in auction
+35,IM4,4000,Commercial Import,IM4  - 4000: Import by registered taxpayer (GCT)
+36,IM4,4042,Finalisation of Provisional Entry,IM4  - 4042: Import for home use after Provisional Entry
+37,IM4,4050,Home use after Temporary Import for return in same state,IM4  - 4050: Permanent Import of goods that were previously imported on a temporary basis (in the same state).
+38,IM4,4051,"Home use after Temporary Import for Repair,Restoration or Improvement",IM4  - 4051: Import of goods (for home use) that were temporarily imported for repairs or restoration
+39,IM4,4052,Home use after Temporary Import for Inward Processing,IM4  - 4052: Import of goods (for home use) that were temporarily imported for processing.
+40,IM4,4053,Home use after Temporary Import  for Exhibition or Entertainment,IM4  - 4053: Import of goods (for home use) that were temporarily imported exhibition or entertainment.
+41,IM4,4070,Ex- Warehouse,IM4  - 4070: Import from Private Bonded Warehouse (Ex-Warehouse)
+42,IM4,4071,Ex- Warehouse (Duty Free Shops),IM4  - 4071: Import from In-Bond warehouse (Duty Free Sales)
+43,IM4,4090,Import from Free Zone,IM4  - 4090: Import from a Special Economic Zone
+44,IM4,4091,Import from Free Zone After Processing,IM4  - 4091: Import from a Special Economic Zone after processing.
+45,IM4,4092,Import for Home Use after Entry into Free Zone for Consumption,IM4  - 4092: Import of goods (for home use) previously entered into a Special Economic Zone for consumption.
+46,IM4,4200,Provisional Entry,IM4  - 4200: Provisional Entry
+47,IM4,4400,Short Shipment,IM4  - 4400: Entry for Short Shipment
+48,IM4,4500,Non-Commercial  Import,IM4  - 4500: Import for your personal use
+49,IM4,4600,Passenger Baggage,IM4  - 4600: Passenger Baggage
+50,IM4,4900,Commercial Import with Uplift Applied,IM4  - 4900: Import by unregistered taxpayer (GCT ).
+51,IM5,5000,Temporary Import for Return in Same State,IM5 - 5000: Temporary import to be returned in same state
+52,IM5,5058,Temporary Import for Return in same State (Legacy System),IM5 - 5058: Temporary import to be returned in same state (Legacy system)
+53,IM5,5100,"Temporary Import for Repair, Restoration or Improvement",IM5 - 5100 : Temporary import for repairs and restoration
+54,IM5,5200,Temporary Import for Inward Processing,IM5 - 5200: Temporary import for manufacturing (inward processing)
+55,IM5,5300,Temporary Import  for Exhibition or Entertainment,IM5 - 5300: Temporary import for exhibition & entertainment
+56,IM6,6010,Re- Import after Permanent Export,IM6  - 6010: Re- Import after previous permanent export
+57,IM6,6020,Re-Import after Temporary Export in Same State,IM6  - 6020: Re-Import after previous temporary export in same state
+58,IM6,6021,Re-Import after Temporary Export for Repairs or Restoration,IM6  - 6021: Re-Import after Temporary Export for Repairs or Restoration
+59,IM6,6022,Re-Import after Temporary Export for Outward Processing,IM6  - 6022: Re-Import after Temporary Export for Processing (Outward Processing)
+60,IM6,6028,Re-Importation from Temporary Export (Legacy System),IM6  - 6028: Re-Importation from Temporary Export (Legacy System)
+61,IM7,7000,Warehouse (Private Bonded),IM7 - 7000: Entry into a Private Bonded warehouse
+62,IM7,7070,Transfer between Private Bonded Warehouse,IM7 - 7070: Transfer between Private Bonded Warehouse
+63,IM7,7078,Warehousing from Legacy System,IM7 - 7078: Transfer from Legacy system to Private Bonded Warehouse
+64,IM7,7090,Import from Free Zone to Private Bonded Warehouse,IM7 - 7090: Transfer from a Special Economic Zone to Private Bonded Warehouse
+65,IM7,7100,Warehouse In bond(DFS),IM7 - 7100: Entry into In-bond warehouse (Duty Free Sale)
+66,IM7,7130,Return of item after In Bond – Duty Free Sale Accounting,IM7 - 7130: Return of item after In-Bond warehouse entry (Duty free sale accounting)
+67,IM7,7170,Transfer to In bond Warehouse (DFS) from Private Bonded Warehouse,IM7 - 7170: Transfer to In-bond Warehouse (DFS) from Private Bonded Warehouse
+68,IM7,7171,Transfer between In bond Warehouses(DFS),IM7 - 7171: Transfer between In-Bond warehouses (Duty free sale)
+69,IM7,7178,Transfer to In bond from Legacy System (DFS),IM7 - 7178: Transfer to In-bond warehouse from Legacy system
+70,IM8,8000,Goods Transfer (Public Bonded Warehouse),IM8  - 8000: Goods transfer to Public Bonded Warehouse
+71,IM8,8200,Transshipment (From Vessel to Vessel in the port),"IM8  - 8200: Transshipment in port, from Vessel to Vessel."
+72,IM8,8300,Transfer to Queen’s Warehouse,IM8  - 8300: Transfer to Queen's Warehouse
+73,IM8,8370,Transit to Queens Warehouse from bonded warehouse,IM8  - 8370: Transit from Queen's Warehouse to Private Bonded Warehouse
+74,IM9,9000,Free Zone Entry,IM9 - 9000: Import Entry into Special Economic Zone (SEZ)
+75,IMD4,4000,Commercial Import,IMD4  - 4000: Commercial Import for immediate delivery
+76,IML4,4000,Commercial Import,IML4 - 4000: Commercial Import from Legacy System
+77,IMS4,4000,Commercial Import,IMS4 - 4000: Commercial Import
+78,IMS4,4500,Non-Commercial Importation,IMS4 - 4500: Non-commercial Import
+79,IMS4,4600,Passenger Baggage,IMS4 - 4600: Passenger Baggage
+80,IMS4,4900,Commercial Import –with Uplift Applied,IMS4 - 4900: Commercial import by unregistered taxpayer (GCT ).
+81,IP8,8000,Transit Goods Transfer (Public Bonded Warehouse),IP8  - 8000:  Transfer of Transit Goods (Public Bonded Warehouse)

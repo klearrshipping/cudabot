@@ -1,0 +1,47 @@
+{
+  "supplier": {
+    "name": "EcoFlow Inc.",
+    "contact": {}
+  },
+  "buyer": {
+    "name": "Andria Scott",
+    "address": "44 SHARON ST, HARTFORD, CT 06112-1726, United States",
+    "contact": {}
+  },
+  "invoice_details": {
+    "invoice_number": "113-7256182-4008214",
+    "date": "2024-10-10",
+    "order_number": "113-7256182-4008214"
+  },
+  "items": [
+    {
+      "description": "EF ECOFLOW Solar Generator DELTA 2 Max 2048Wh with 4X100W 12V Solar Panels, High Efficiency Monocrystalline PV Modules, 2400W LFP Portable Power Station, AC + Solar Fast Dual Charging For Camping RV",
+      "quantity": 1.0,
+      "unit_price": 1399.0,
+      "total_price": 1399.0
+    }
+  ],
+  "totals": {
+    "subtotal": 1399.0,
+    "shipping_handling": 0.0,
+    "tax": 97.93,
+    "total_amount": 1496.93
+  },
+  "shipping": {
+    "method": "Standard Shipping",
+    "delivery_date": "2024-10-11"
+  },
+  "payment_terms": {
+    "method": "Mastercard ending in 3804"
+  },
+  "currency": "USD",
+  "document_type": "invoice",
+  "extraction_confidence": "high",
+  "_metadata": {
+    "extraction_timestamp": "2025-08-24T07:36:16.445267",
+    "source_file": "uploads\\orders\\ORD-20250824-003\\invoices\\invoice_20250824_073552.pdf",
+    "processor": "claude_sonnet_4_via_openrouter",
+    "model": "openai/gpt-5-mini",
+    "processing_method": "pdf_to_image_conversion"
+  }
+}

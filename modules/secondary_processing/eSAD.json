@@ -1,0 +1,296 @@
+{
+  "esad_mandatory_fields": {
+    "document_title": "Electronic Single Administrative Document (eSAD) - Mandatory Fields with Extraction Prompts",
+    "version": "1.0",
+    "total_mandatory_fields": 33,
+    "fields": [
+      {
+        "box_field": "A",
+        "field_name": "Office code",
+        "description": "Identifies the Customs Office where the goods declaration is being submitted for clearance",
+        "extraction_prompt": "AUTOMATED: This field is automatically populated by the esad_manifest script using Arrival Notice data from Jamaica Customs website. No LLM processing required.",
+        "processing_method": "automated_manifest_lookup",
+        "script": "esad_manifest"
+      },
+      {
+        "box_field": "A",
+        "field_name": "Manifest",
+        "description": "Reference number of the cargo manifest, which contains the goods being declared",
+        "extraction_prompt": "AUTOMATED: This field is automatically populated by the esad_manifest script using Arrival Notice data from Jamaica Customs website. No LLM processing required.",
+        "processing_method": "automated_manifest_lookup",
+        "script": "esad_manifest"
+      },
+      {
+        "box_field": "1",
+        "field_name": "Regime Type",
+        "description": "Code that identifies the model of the declaration being presented",
+        "extraction_prompt": "AUTOMATED: This field is automatically populated by the esad_regime script using business logic and document analysis. No LLM processing required.",
+        "processing_method": "automated_regime_lookup",
+        "script": "esad_regime"
+      },
+      {
+        "box_field": "2",
+        "field_name": "Exporter/Consignor Name/Company",
+        "description": "The exporter/consignor person or entity name",
+        "extraction_prompt": "Find the shipper or consignor name from fields like 'shipper', 'shipper_name', 'consignor', or 'exporter'. This is the entity sending the goods."
+      },
+      {
+        "box_field": "2",
+        "field_name": "Exporter/Consignor Address",
+        "description": "The place of residence/business of the exporter/consignor",
+        "extraction_prompt": "Locate the shipper's address from 'shipper_address', 'consignor_address', or similar fields. Extract complete address including country information."
+      },
+      {
+        "box_field": "6",
+        "field_name": "Total packages",
+        "description": "Total number of packages (piece count) making up the consignment",
+        "extraction_prompt": "Find the total number of packages or pieces. Look for package counts in cargo details, container contents, or fields showing quantities like '321 BOX' or package totals."
+      },
+      {
+        "box_field": "7",
+        "field_name": "Commercial reference number",
+        "description": "Reference number given by the declarant to identify and record this declaration",
+        "extraction_prompt": "AUTOMATED: This field is automatically populated with the Order ID (e.g., ORD-20250817-001) that tracks individual ESAD declarations. No LLM processing required.",
+        "processing_method": "automated_order_id",
+        "script": "esad_primary"
+      },
+      {
+        "box_field": "8",
+        "field_name": "Importer/Consignee TRN No.",
+        "description": "Taxpayer Registration Number (TRN) assigned to the consignee",
+        "extraction_prompt": "AUTOMATED: This field is automatically populated by the esad_trn script using client table lookup based on importer company name. No LLM processing required.",
+        "processing_method": "automated_trn_lookup",
+        "script": "esad_trn"
+      },
+      {
+        "box_field": "8",
+        "field_name": "Importer/Consignee Name/Company",
+        "description": "Name of the person/entity identified as the consignee",
+        "extraction_prompt": "Extract the consignee name from 'consignee_name', 'consignee', 'importer', or 'notify_party' fields. This is the entity receiving the goods."
+      },
+      {
+        "box_field": "8",
+        "field_name": "Importer/Consignee Address",
+        "description": "Place of residence/business of the person/entity in Jamaica that owns the goods",
+        "extraction_prompt": "Find the consignee address from 'consignee_address' or notify party address. Ensure it's the Jamaican address of the goods recipient."
+      },
+      {
+        "box_field": "10",
+        "field_name": "Country Last Consignment",
+        "description": "Last country where the goods were placed on board the vessel or aircraft before arriving to Jamaica",
+        "extraction_prompt": "Identify the last port of departure or loading before Jamaica. Extract country from 'last_departure_port', 'port_of_loading', or final loading location before Jamaica."
+      },
+      {
+        "box_field": "11",
+        "field_name": "Trading Country",
+        "description": "Country specified on the invoice where the financial transaction/purchase was finalized",
+        "extraction_prompt": "Determine the country where the commercial transaction was concluded. This may be inferred from the supplier/seller address or invoice issuing country."
+      },
+      {
+        "box_field": "14",
+        "field_name": "Declarant/Representative TRN No.",
+        "description": "TRN of the person/brokerage firm designated to act as clearing agent",
+        "extraction_prompt": "AUTOMATED: This field is automatically populated by the esad_trn script using client table lookup based on declarant/representative company name. No LLM processing required.",
+        "processing_method": "automated_trn_lookup",
+        "script": "esad_trn"
+      },
+      {
+        "box_field": "15",
+        "field_name": "Country of export",
+        "description": "Country from which the goods were initially dispatched",
+        "extraction_prompt": "Identify the origin country from 'port_of_origin', shipper country, or country where goods first began their journey. Extract country from origin port or shipper address."
+      },
+      {
+        "box_field": "20",
+        "field_name": "Delivery terms",
+        "description": "Particulars of the terms of the commercial contract (INCOTERMS code)",
+        "extraction_prompt": "AUTOMATED: This field is automatically set to default value 'CIF'. No LLM processing required.",
+        "processing_method": "automated_default_value",
+        "script": "esad_primary",
+        "default_value": "CIF"
+      },
+      {
+        "box_field": "20",
+        "field_name": "Applicable place",
+        "description": "Place to where the INCOTERMS are relevant",
+        "extraction_prompt": "Find the place where INCOTERMS apply, typically the port of loading, destination port, or place where risk transfers. Usually the 'port_of_destination' or 'port_of_loading'."
+      },
+      {
+        "box_field": "22",
+        "field_name": "Currency code",
+        "description": "Code for the currency in which the commercial invoice is presented",
+        "extraction_prompt": "Extract currency codes from freight charges, invoice amounts, or payment fields. Look for 'USD', 'JMD', or other currency indicators in financial data."
+      },
+      {
+        "box_field": "22",
+        "field_name": "Amount",
+        "description": "Total CIF value calculated from goods value, freight, insurance, and invoice charges",
+        "extraction_prompt": "Return the calculated CIF value from the esad_cif processor. This should be the total of goods value + freight + insurance + invoice charges (e.g., $1,708.64).",
+        "processing_method": "direct_cif_value",
+        "script": "esad_cif"
+      },
+      {
+        "box_field": "val_note",
+        "field_name": "Invoice value (goods only)",
+        "description": "Commercial price of goods excluding freight, insurance, and other charges",
+        "extraction_prompt": "Extract the base invoice amount for the goods themselves, excluding any freight, insurance, or other charges. This is the commercial value of the goods only. If the invoice shows a total that includes freight, you must extract the subtotal or line item total that represents goods value only.",
+        "processing_method": "llm_extraction_cif_processing",
+        "script": "esad_cif"
+      },
+      {
+        "box_field": "val_note",
+        "field_name": "Invoice total (including freight)",
+        "description": "Total invoice amount including all charges if freight is included in invoice total",
+        "extraction_prompt": "Extract the total invoice amount if it includes freight charges. This helps determine if freight costs need to be disaggregated from the invoice total for CIF calculations. If freight is separate, use null.",
+        "processing_method": "llm_extraction_cif_processing",
+        "script": "esad_cif"
+      },
+      {
+        "box_field": "val_note",
+        "field_name": "Freight charges (BOL)",
+        "description": "Transportation costs extracted from Bill of Lading charges table",
+        "extraction_prompt": "Extract freight charges specifically from the BOL charges table. Look for 'FREIGHT' in the charge_type field and extract the collect_amount. This is the primary source for freight costs.",
+        "processing_method": "llm_extraction_cif_processing",
+        "script": "esad_cif"
+      },
+      {
+        "box_field": "val_note",
+        "field_name": "Freight charges (invoice)",
+        "description": "Transportation costs extracted from invoice shipping/freight line items",
+        "extraction_prompt": "Extract freight charges from invoice line items if they are separately itemized. Look for shipping, freight, or transportation costs in the invoice totals or line items. Use null if not separately listed.",
+        "processing_method": "llm_extraction_cif_processing",
+        "script": "esad_cif"
+      },
+      {
+        "box_field": "val_note",
+        "field_name": "Insurance charges",
+        "description": "Insurance costs for goods during transportation",
+        "extraction_prompt": "Extract insurance charges from BOL charges table or invoice insurance costs. Look for 'INSURANCE' in BOL charges or insurance line items in invoice. Use null if not found.",
+        "processing_method": "llm_extraction_cif_processing",
+        "script": "esad_cif"
+      },
+      {
+        "box_field": "val_note",
+        "field_name": "Other charges (BOL)",
+        "description": "Additional charges from BOL excluding freight and insurance",
+        "extraction_prompt": "Extract other charges from BOL charges table excluding freight and insurance. Include charges like handling, wharfage, agency fees, etc. This helps with complete cost analysis.",
+        "processing_method": "llm_extraction_cif_processing",
+        "script": "esad_cif"
+      },
+      {
+        "box_field": "24",
+        "field_name": "Nature of Transaction",
+        "description": "Type of contract between the buyer and seller under which goods are supplied",
+        "extraction_prompt": "Extract transaction type information from commercial documentation, payment terms, or freight arrangements. Look for indicators of sale, lease, gift, or other transaction types.",
+        "processing_method": "llm_extraction_transaction_processing",
+        "script": "esad_trans_type"
+      },
+      {
+        "box_field": "25",
+        "field_name": "Mode of transport at the border",
+        "description": "Mode of transport corresponding to the active means of transport",
+        "extraction_prompt": "Extract transport mode information from vessel details, flight information, or transport type indicators. Look for vessel names, voyage numbers, flight numbers, or transport method descriptions.",
+        "processing_method": "llm_extraction_transport_processing",
+        "script": "esad_transport_mode"
+      },
+      {
+        "box_field": "18",
+        "field_name": "Identity and nationality of active means of transport at arrival",
+        "description": "Describes the identity of the means of transport on which the goods are directly loaded at the time of the import, export or transit formalities, followed by the nationality of the means of transport (or that of the vehicle propelling the others if there are several means of transport) in the form of the relevant country code",
+        "extraction_prompt": "Extract transport identity based on mode: Sea Transport - Name of vessel; Air Transport - Number and Date of flight or Tail Number; Road Transport - Vehicle Registration Number. Also identify nationality/country code of the transport means."
+      },
+             {
+         "box_field": "27",
+         "field_name": "Place of Loading/Unloading",
+         "description": "Location or Customs area at which the goods were unloaded/loaded",
+         "extraction_prompt": "Extract port information from Bill of Lading. For imports: look for port_of_destination, port_of_discharge, place_of_delivery. For exports: look for port_of_loading, port_of_departure, port_of_lading. Return LOCODE value.",
+         "processing_method": "llm_extraction_location_processing",
+         "script": "esad_location"
+       },
+      {
+        "box_field": "30",
+        "field_name": "Location of goods",
+        "description": "Transit shed or temporary storage area where the goods are stored",
+        "extraction_prompt": "Identify where goods are stored pending customs clearance. May be inferred from berth number, terminal, warehouse, or storage facility information."
+      },
+      {
+        "box_field": "31",
+        "field_name": "Marks and numbers of packages",
+        "description": "Hand-written or typed identifiers placed on the packages",
+        "extraction_prompt": "Find package markings, container numbers, seal numbers, or cargo identification marks. Look for 'marks', 'container_no', 'seal', or package identification codes."
+      },
+      {
+        "box_field": "31",
+        "field_name": "No. of packages",
+        "description": "Amount of packages for the particular item being declared",
+        "extraction_prompt": "Extract package quantities from cargo descriptions like '321 BOX', package counts, or piece counts in the container/cargo details."
+      },
+      {
+        "box_field": "31",
+        "field_name": "Kind of packages",
+        "description": "Code used to describe the shape or configuration of a package",
+        "extraction_prompt": "Identify package types from descriptions like 'BOX', 'CARTON', 'PALLET', etc. Extract from commodity descriptions or package type fields."
+      },
+      {
+        "box_field": "31",
+        "field_name": "Commercial description",
+        "description": "Commercial description of the goods (must be precise for identification)",
+        "extraction_prompt": "Extract detailed commodity description from 'commodity', 'description_of_goods', or cargo manifest details. Should be specific enough for tariff classification."
+      },
+      {
+        "box_field": "33",
+        "field_name": "Commodity code",
+        "description": "Tariff code which classifies the goods according to Jamaica Common External Tariff",
+        "extraction_prompt": "Look for HS codes, tariff codes, or commodity classification numbers. These may not be in shipping documents and may need to be determined based on commodity description."
+      },
+      {
+        "box_field": "34",
+        "field_name": "Country Origin Code",
+        "description": "Code for the country of origin of the goods",
+        "extraction_prompt": "Determine country of origin from manufacturer location, 'made in' markings, or production country. May be inferred from shipper address or origin port country."
+      },
+      {
+        "box_field": "35",
+        "field_name": "Gross Weight (kg)",
+        "description": "Gross weight in kilograms of the goods with all their packing",
+        "extraction_prompt": "Find total weight including packaging from weight fields like '6149 KGS' or gross weight measurements. Convert to kilograms if in other units."
+      },
+      {
+        "box_field": "37",
+        "field_name": "Procedure",
+        "description": "Customs Procedure Code (CPC) and Additional National Codes (ANC)",
+        "extraction_prompt": "Determine appropriate customs procedure codes based on import/export type and special treatments. This typically requires customs expertise and may not be in shipping documents."
+      },
+      {
+        "box_field": "38",
+        "field_name": "Net Weight (kg)",
+        "description": "Net weight in kilograms of the goods without any packaging",
+        "extraction_prompt": "Find net weight of goods excluding packaging. May need to be calculated from gross weight minus packaging weight, or found in separate net weight fields."
+      },
+      {
+        "box_field": "40",
+        "field_name": "Transport document/Previous Document",
+        "description": "Bill of lading or airway bill number to identify the consignment",
+        "extraction_prompt": "Extract transport document numbers like 'bill_of_lading', 'master_b/l', airway bill numbers, or other transport document references that identify the shipment."
+      },
+      {
+        "box_field": "41",
+        "field_name": "Statistical Units",
+        "description": "Quantity of the item expressed in the unit laid down in the Common External Tariff",
+        "extraction_prompt": "Find quantity measurements in relevant units (pieces, meters, liters, etc.) from package descriptions or cargo measurements. May need conversion to CET standard units."
+      },
+      {
+        "box_field": "43",
+        "field_name": "V.M.",
+        "description": "Valuation Method used to determine the customs value of imported goods",
+        "extraction_prompt": "Determine valuation method based on transaction type and pricing basis. Usually Method 1 (transaction value) for normal commercial sales. May require customs expertise."
+      },
+      {
+        "box_field": "50",
+        "field_name": "Principal",
+        "description": "Person or entity accepting responsibility on transit/transshipment declarations",
+        "extraction_prompt": "Identify the responsible party for transit operations. For normal imports/exports, this may be the importer/exporter or their authorized representative."
+      }
+    ]
+  }
+} 

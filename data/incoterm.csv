@@ -1,0 +1,12 @@
+﻿id,code,description
+,FCA ,Free Carrier
+,FAS ,Free Alongside Ship
+,DAP ,Delivered at Place
+,DDP ,Delivered Duty Paid
+,CPT ,Carriage Paid To
+,CIP,Carriage and Insurance Paid To
+,DAT,Delivered at Terminal
+,EXW ,Ex Works
+,CFR,Cost and Freight
+,FOB ,Free on Board
+,CIF,"Cost, Insurance and Freight"

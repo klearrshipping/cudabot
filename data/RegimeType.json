@@ -1,0 +1,226 @@
+[
+  {
+    "type_of_declaration": "IM",
+    "procedure_code": 4,
+    "regime_type": "IM4",
+    "details": "Goods for Commercial Use (Resale), Motor Vehicles and Goods with a CIF value greater than US $5,000",
+    "description": "Commercial Import",
+    "entry_type": "Import"
+  },
+  {
+    "type_of_declaration": "IM",
+    "procedure_code": 7,
+    "regime_type": "IM7",
+    "details": "Goods to be stored in a Bonded Warehouse",
+    "description": "Entry for Warehousing",
+    "entry_type": "Import"
+  },
+  {
+    "type_of_declaration": "IM",
+    "procedure_code": 5,
+    "regime_type": "IM5",
+    "details": "Goods that will be Imported Temporarily",
+    "description": "Temporary Import",
+    "entry_type": "Import"
+  },
+  {
+    "type_of_declaration": "IMS",
+    "procedure_code": 4,
+    "regime_type": "IMS4",
+    "details": "Goods for personal use that have a CIF value less than US $5,000.00",
+    "description": "Simplified Declaration for Import",
+    "entry_type": "Import"
+  },
+  {
+    "type_of_declaration": "IM",
+    "procedure_code": 8,
+    "regime_type": "IM8",
+    "details": "Goods being transhipped through Jamaica (Transshipment)",
+    "description": "Customs Transit/Transshipment",
+    "entry_type": "Import"
+  },
+  {
+    "type_of_declaration": "IM",
+    "procedure_code": 9,
+    "regime_type": "IM9",
+    "details": "Goods to be stored in a Free Zone ",
+    "description": "Free Zone Entry",
+    "entry_type": "Import"
+  },
+  {
+    "type_of_declaration": "IMD",
+    "procedure_code": 4,
+    "regime_type": "IMD4",
+    "details": "Goods for Immediate Delivery ",
+    "description": "Immediate Delivery – Import for Home Use",
+    "entry_type": "Import"
+  },
+  {
+    "type_of_declaration": "IM",
+    "procedure_code": 6,
+    "regime_type": "IM6",
+    "details": "Goods that are being Re-Imported",
+    "description": "Re-Importation",
+    "entry_type": "Import"
+  },
+  {
+    "type_of_declaration": "IP",
+    "procedure_code": 8,
+    "regime_type": "IP8",
+    "details": "Goods being transported between Ports (Intra Port Transfer)",
+    "description": "Intra Port Transfer",
+    "entry_type": "Import"
+  },
+  {
+    "type_of_declaration": "IM",
+    "procedure_code": 17,
+    "regime_type": "IM17",
+    "details": "Goods exported from a Free Zone",
+    "description": "Export from Free Zone",
+    "entry_type": "Import"
+  },
+  {
+    "type_of_declaration": "IM",
+    "procedure_code": 18,
+    "regime_type": "IM18",
+    "details": "Goods Exported from a Free Zone after processing",
+    "description": "Export from Free Zone after processing",
+    "entry_type": "Import"
+  },
+  {
+    "type_of_declaration": "IM",
+    "procedure_code": 15,
+    "regime_type": "IM15",
+    "details": "Goods that will be consumed within a Free Zone",
+    "description": "Entry into Free Zone for Consumption",
+    "entry_type": "Import"
+  },
+  {
+    "type_of_declaration": "IM",
+    "procedure_code": 16,
+    "regime_type": "IM16",
+    "details": "Goods being transferred from a Bonded Warehouse to a Free Zone for consumption",
+    "description": "Entry into Free Zone for consumption from Bonded Warehouse",
+    "entry_type": "Transfer"
+  },
+  {
+    "type_of_declaration": "IM",
+    "procedure_code": 14,
+    "regime_type": "IM14",
+    "details": "Goods Transferred between Free Zones for processing",
+    "description": "Transfer between Free Zone for Processing",
+    "entry_type": "Transfer"
+  },
+  {
+    "type_of_declaration": "IM",
+    "procedure_code": 13,
+    "regime_type": "IM13",
+    "details": "Goods entering a Free Zone for processing",
+    "description": "Entry into Free Zone for Processing",
+    "entry_type": "Transfer"
+  },
+  {
+    "type_of_declaration": "IM",
+    "procedure_code": 12,
+    "regime_type": "IM12",
+    "details": "Goods being transferred from a Legacy System into a Free Zone",
+    "description": "Entry for Free Zone from Legacy System",
+    "entry_type": "Transfer"
+  },
+  {
+    "type_of_declaration": "IM",
+    "procedure_code": 11,
+    "regime_type": "IM11",
+    "details": "Goods that will be Transferred between Free Zones",
+    "description": "Transfer between Free Zones",
+    "entry_type": "Transfer"
+  },
+  {
+    "type_of_declaration": "IM",
+    "procedure_code": 10,
+    "regime_type": "IM10",
+    "details": "Goods being transferred from a bonded warehouse to a Free Zone.",
+    "description": "Entry into Free Zone from bonded warehouse",
+    "entry_type": "Transfer"
+  },
+  {
+    "type_of_declaration": "IM",
+    "procedure_code": 19,
+    "regime_type": "IM19",
+    "details": "Goods held for Destruction",
+    "description": "Destruction of goods",
+    "entry_type": "Transfer"
+  },
+  {
+    "type_of_declaration": "IM",
+    "procedure_code": 20,
+    "regime_type": "IM20",
+    "details": "Goods held for Auction",
+    "description": "Goods sold in auction",
+    "entry_type": "Transfer"
+  },
+  {
+    "type_of_declaration": "IML",
+    "procedure_code": 4,
+    "regime_type": "IML4",
+    "details": "De Novo From Legacy System – Import for Home Use",
+    "description": "De Nova From Legacy System – Import for Home Use",
+    "entry_type": "Transfer"
+  },
+  {
+    "type_of_declaration": "EX",
+    "procedure_code": 1,
+    "regime_type": "EX1",
+    "details": "Goods for Export (Permanent)",
+    "description": "Permanent Export",
+    "entry_type": "Export"
+  },
+  {
+    "type_of_declaration": "EX",
+    "procedure_code": 8,
+    "regime_type": "EX8",
+    "details": "Goods in Transit for Export",
+    "description": "Transit to Export",
+    "entry_type": "Export"
+  },
+  {
+    "type_of_declaration": "EX",
+    "procedure_code": 2,
+    "regime_type": "EX2",
+    "details": "Goods that will be Temporarily Exported",
+    "description": "Temporary Export",
+    "entry_type": "Export"
+  },
+  {
+    "type_of_declaration": "EX",
+    "procedure_code": 3,
+    "regime_type": "EX3",
+    "details": "Goods for Re-Exportation",
+    "description": "Re-Exportation",
+    "entry_type": "Export"
+  },
+  {
+    "type_of_declaration": "EX",
+    "procedure_code": 10,
+    "regime_type": "EX10",
+    "details": "Goods Exported from a Free Zone after processing",
+    "description": "Export from Free Zone after processing",
+    "entry_type": "Export"
+  },
+  {
+    "type_of_declaration": "EX",
+    "procedure_code": 11,
+    "regime_type": "EX11",
+    "details": "Goods held for Destruction (Export)",
+    "description": "Destruction of goods",
+    "entry_type": "Export"
+  },
+  {
+    "type_of_declaration": "BG",
+    "procedure_code": 4,
+    "regime_type": "BG4",
+    "details": "Passenger luggage (Non-commercial)",
+    "description": "Non- Commercial Passenger Baggage",
+    "entry_type": "Non-Commercial Baggage or Passenger "
+  }
+]

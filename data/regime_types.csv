@@ -1,0 +1,29 @@
+id,regime_type,type_of_declaration,procedure_code,details,description,entry_type
+1,IM4,IM,4,"Goods for Commercial Use (Resale), Motor Vehicles and Goods with a CIF value greater than US $5,000",Commercial Import,Import
+2,IM7,IM,7,Goods to be stored in a Bonded Warehouse,Entry for Warehousing,Import
+3,IM5,IM,5,Goods that will be Imported Temporarily,Temporary Import,Import
+4,IMS4,IMS,4,"Goods for personal use that have a CIF value less than US $5,000.00",Simplified Declaration for Import,Import
+5,IM8,IM,8,Goods being transhipped through Jamaica (Transshipment),Customs Transit/Transshipment,Import
+6,IM9,IM,9,Goods to be stored in a Free Zone ,Free Zone Entry,Import
+7,IMD4,IMD,4,Goods for Immediate Delivery ,Immediate Delivery – Import for Home Use,Import
+8,IM6,IM,6,Goods that are being Re-Imported,Re-Importation,Import
+9,IP8,IP,8,Goods being transported between Ports (Intra Port Transfer),Intra Port Transfer,Import
+10,IM17,IM,17,Goods exported from a Free Zone,Export from Free Zone,Import
+11,IM18,IM,18,Goods Exported from a Free Zone after processing,Export from Free Zone after processing,Import
+12,IM15,IM,15,Goods that will be consumed within a Free Zone,Entry into Free Zone for Consumption,Import
+13,IM16,IM,16,Goods being transferred from a Bonded Warehouse to a Free Zone for consumption,Entry into Free Zone for consumption from Bonded Warehouse,Transfer
+14,IM14,IM,14,Goods Transferred between Free Zones for processing,Transfer between Free Zone for Processing,Transfer
+15,IM13,IM,13,Goods entering a Free Zone for processing,Entry into Free Zone for Processing,Transfer
+16,IM12,IM,12,Goods being transferred from a Legacy System into a Free Zone,Entry for Free Zone from Legacy System,Transfer
+17,IM11,IM,11,Goods that will be Transferred between Free Zones,Transfer between Free Zones,Transfer
+18,IM10,IM,10,Goods being transferred from a bonded warehouse to a Free Zone.,Entry into Free Zone from bonded warehouse,Transfer
+19,IM19,IM,19,Goods held for Destruction,Destruction of goods,Transfer
+20,IM20,IM,20,Goods held for Auction,Goods sold in auction,Transfer
+21,IML4,IML,4,De Novo From Legacy System – Import for Home Use,De Nova From Legacy System – Import for Home Use,Transfer
+22,EX1,EX,1,Goods for Export (Permanent),Permanent Export,Export
+23,EX8,EX,8,Goods in Transit for Export,Transit to Export,Export
+24,EX2,EX,2,Goods that will be Temporarily Exported,Temporary Export,Export
+25,EX3,EX,3,Goods for Re-Exportation,Re-Exportation,Export
+26,EX10,EX,10,Goods Exported from a Free Zone after processing,Export from Free Zone after processing,Export
+27,EX11,EX,11,Goods held for Destruction (Export),Destruction of goods,Export
+28,BG4,BG,4,Passenger luggage (Non-commercial),Non- Commercial Passenger Baggage,Non-Commercial Baggage or Passenger 

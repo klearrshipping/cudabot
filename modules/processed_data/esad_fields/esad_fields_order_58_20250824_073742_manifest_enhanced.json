@@ -1,0 +1,255 @@
+{
+  "order_id": 58,
+  "processing_timestamp": "2025-08-24T07:37:42.098987",
+  "processor": "esad_primary_processor_llm_manifest_enhanced",
+  "model_used": "mistral_small",
+  "fields_count": 39,
+  "lookup_summary": {
+    "total_fields": 39,
+    "llm_populated": 29,
+    "manifest_lookup_populated": 0,
+    "regime_lookup_populated": 1,
+    "trn_lookup_populated": 1,
+    "trn_not_required": 0,
+    "default_value_populated": 1,
+    "order_id_generated": 1,
+    "remaining_null": 6,
+    "total_lookup_rate": "10.3%"
+  },
+  "esad_fields": {
+    "Office code": {
+      "value": "JMKCT",
+      "box_field": "A",
+      "extraction_prompt": "AUTOMATED: This field is automatically populated by the esad_manifest script using Arrival Notice data from Jamaica Customs website. No LLM processing required.",
+      "source": "llm_processing"
+    },
+    "Manifest": {
+      "value": "JMALB 2025 32",
+      "box_field": "A",
+      "extraction_prompt": "AUTOMATED: This field is automatically populated by the esad_manifest script using Arrival Notice data from Jamaica Customs website. No LLM processing required.",
+      "source": "llm_processing"
+    },
+    "Regime Type": {
+      "value": "IMD4",
+      "box_field": "1",
+      "extraction_prompt": "AUTOMATED: This field is automatically populated by the esad_regime script using business logic and document analysis. No LLM processing required.",
+      "source": "regime_lookup"
+    },
+    "Exporter/Consignor Name/Company": {
+      "value": "AMAZON",
+      "box_field": "2",
+      "extraction_prompt": "Find the shipper or consignor name from fields like 'shipper', 'shipper_name', 'consignor', or 'exporter'. This is the entity sending the goods.",
+      "source": "llm_processing"
+    },
+    "Exporter/Consignor Address": {
+      "value": "104 WILLIAMSON STREET, FORT MILL, SC 29715. UNITED STATES OF AMERICA",
+      "box_field": "2",
+      "extraction_prompt": "Locate the shipper's address from 'shipper_address', 'consignor_address', or similar fields. Extract complete address including country information.",
+      "source": "llm_processing"
+    },
+    "Total packages": {
+      "value": null,
+      "box_field": "6",
+      "extraction_prompt": "Find the total number of packages or pieces. Look for package counts in cargo details, container contents, or fields showing quantities like '321 BOX' or package totals.",
+      "source": "llm_processing_null"
+    },
+    "Commercial reference number": {
+      "value": "ORD-20250824-058",
+      "box_field": "7",
+      "extraction_prompt": "AUTOMATED: This field is automatically populated with the Order ID (e.g., ORD-20250817-001) that tracks individual ESAD declarations. No LLM processing required.",
+      "source": "order_id_generated"
+    },
+    "Importer/Consignee TRN No.": {
+      "value": "1141034960000",
+      "box_field": "8",
+      "extraction_prompt": "AUTOMATED: This field is automatically populated by the esad_trn script using client table lookup based on importer company name. No LLM processing required.",
+      "source": "trn_lookup"
+    },
+    "Importer/Consignee Name/Company": {
+      "value": "RAFER JOHNSON",
+      "box_field": "8",
+      "extraction_prompt": "Extract the consignee name from 'consignee_name', 'consignee', 'importer', or 'notify_party' fields. This is the entity receiving the goods.",
+      "source": "llm_processing"
+    },
+    "Importer/Consignee Address": {
+      "value": "34 ROEHHAMPTON CLOSE, KINGSTON 19, JAMAICA",
+      "box_field": "8",
+      "extraction_prompt": "Find the consignee address from 'consignee_address' or notify party address. Ensure it's the Jamaican address of the goods recipient.",
+      "source": "llm_processing"
+    },
+    "Country Last Consignment": {
+      "value": "United States",
+      "box_field": "10",
+      "extraction_prompt": "Identify the last port of departure or loading before Jamaica. Extract country from 'last_departure_port', 'port_of_loading', or final loading location before Jamaica.",
+      "source": "llm_processing"
+    },
+    "Trading Country": {
+      "value": "United States",
+      "box_field": "11",
+      "extraction_prompt": "Determine the country where the commercial transaction was concluded. This may be inferred from the supplier/seller address or invoice issuing country.",
+      "source": "llm_processing"
+    },
+    "Declarant/Representative TRN No.": {
+      "value": null,
+      "box_field": "14",
+      "extraction_prompt": "AUTOMATED: This field is automatically populated by the esad_trn script using client table lookup based on declarant/representative company name. No LLM processing required.",
+      "source": "pending_trn_lookup"
+    },
+    "Country of export": {
+      "value": "United States",
+      "box_field": "15",
+      "extraction_prompt": "Identify the origin country from 'port_of_origin', shipper country, or country where goods first began their journey. Extract country from origin port or shipper address.",
+      "source": "llm_processing"
+    },
+    "Delivery terms": {
+      "value": "CIF",
+      "box_field": "20",
+      "extraction_prompt": "AUTOMATED: This field is automatically set to default value 'CIF'. No LLM processing required.",
+      "source": "default_value"
+    },
+    "Applicable place": {
+      "value": "MIAMI, UNITED STATES OF AMERICA",
+      "box_field": "20",
+      "extraction_prompt": "Find the place where INCOTERMS apply, typically the port of loading, destination port, or place where risk transfers. Usually the 'port_of_destination' or 'port_of_loading'.",
+      "source": "llm_processing"
+    },
+    "Currency code": {
+      "value": "USD",
+      "box_field": "22",
+      "extraction_prompt": "Extract currency codes from freight charges, invoice amounts, or payment fields. Look for 'USD', 'JMD', or other currency indicators in financial data.",
+      "source": "llm_processing"
+    },
+    "Amount": {
+      "value": "1496.93",
+      "box_field": "22",
+      "extraction_prompt": "Find the total commercial value or invoice amount for the goods. Look for freight values, cargo values, or commercial invoice totals in the financial sections.",
+      "source": "llm_processing"
+    },
+    "Invoice value": {
+      "value": "1399.0",
+      "box_field": "val_note",
+      "extraction_prompt": "Extract the base invoice amount for the goods themselves, excluding any freight, insurance, or other charges. This is the commercial value of the goods only. This field will be processed by esad_cif script to calculate CIF components.",
+      "source": "llm_processing"
+    },
+    "Freight charges": {
+      "value": "211.71",
+      "box_field": "val_note",
+      "extraction_prompt": "Extract freight charges from BOL charges, invoice shipping costs, or transport fee sections. Look for freight, carriage, or transportation cost amounts. This field will be processed by esad_cif script to calculate CIF components.",
+      "source": "llm_processing"
+    },
+    "Insurance charges": {
+      "value": null,
+      "box_field": "val_note",
+      "extraction_prompt": "Extract insurance charges from BOL charges, invoice insurance costs, or insurance fee sections. Look for insurance, coverage, or protection cost amounts. This field will be processed by esad_cif script to calculate CIF components.",
+      "source": "llm_processing_null"
+    },
+    "Nature of Transaction": {
+      "value": "sale",
+      "box_field": "24",
+      "extraction_prompt": "Determine transaction type (sale, lease, gift, etc.). May be inferred from payment terms, whether freight is prepaid/collect, or commercial documentation.",
+      "source": "llm_processing"
+    },
+    "Mode of transport at the border": {
+      "value": "SEA",
+      "box_field": "25",
+      "extraction_prompt": "Identify transport mode from vessel information, flight details, or transport type. Extract from 'vessel/voyage' for sea transport, or determine if air, road, or rail transport.",
+      "source": "llm_processing"
+    },
+    "Identity and nationality of active means of transport at arrival": {
+      "value": "SEABOARD/GEM",
+      "box_field": "18",
+      "extraction_prompt": "Extract transport identity based on mode: Sea Transport - Name of vessel; Air Transport - Number and Date of flight or Tail Number; Road Transport - Vehicle Registration Number. Also identify nationality/country code of the transport means.",
+      "source": "llm_processing"
+    },
+    "Place of Loading/Unloading": {
+      "value": "MIAMI, UNITED STATES OF AMERICA",
+      "box_field": "27",
+      "extraction_prompt": "Find loading/unloading locations from 'port_of_loading', 'port_of_destination', 'berth', or terminal information where cargo handling occurs.",
+      "source": "llm_processing"
+    },
+    "Location of goods": {
+      "value": "B1",
+      "box_field": "30",
+      "extraction_prompt": "Identify where goods are stored pending customs clearance. May be inferred from berth number, terminal, warehouse, or storage facility information.",
+      "source": "llm_processing"
+    },
+    "Marks and numbers of packages": {
+      "value": "TCNU9472148, X20250109665963",
+      "box_field": "31",
+      "extraction_prompt": "Find package markings, container numbers, seal numbers, or cargo identification marks. Look for 'marks', 'container_no', 'seal', or package identification codes.",
+      "source": "llm_processing"
+    },
+    "No. of packages": {
+      "value": null,
+      "box_field": "31",
+      "extraction_prompt": "Extract package quantities from cargo descriptions like '321 BOX', package counts, or piece counts in the container/cargo details.",
+      "source": "llm_processing_null"
+    },
+    "Kind of packages": {
+      "value": "BX",
+      "box_field": "31",
+      "extraction_prompt": "Identify package types from descriptions like 'BOX', 'CARTON', 'PALLET', etc. Extract from commodity descriptions or package type fields.",
+      "source": "llm_processing"
+    },
+    "Commercial description": {
+      "value": "EF ECOFLOW Solar Generator DELTA 2 Max 2048Wh with 4X100W 12V Solar Panels, High Efficiency Monocrystalline PV Modules, 2400W LFP Portable Power Station, AC + Solar Fast Dual Charging For Camping RV",
+      "box_field": "31",
+      "extraction_prompt": "Extract detailed commodity description from 'commodity', 'description_of_goods', or cargo manifest details. Should be specific enough for tariff classification.",
+      "source": "llm_processing"
+    },
+    "Commodity code": {
+      "value": "8501.40.00",
+      "box_field": "33",
+      "extraction_prompt": "Look for HS codes, tariff codes, or commodity classification numbers. These may not be in shipping documents and may need to be determined based on commodity description.",
+      "source": "llm_processing"
+    },
+    "Country Origin Code": {
+      "value": "US",
+      "box_field": "34",
+      "extraction_prompt": "Determine country of origin from manufacturer location, 'made in' markings, or production country. May be inferred from shipper address or origin port country.",
+      "source": "llm_processing"
+    },
+    "Gross Weight (kg)": {
+      "value": "78.93",
+      "box_field": "35",
+      "extraction_prompt": "Find total weight including packaging from weight fields like '6149 KGS' or gross weight measurements. Convert to kilograms if in other units.",
+      "source": "llm_processing"
+    },
+    "Procedure": {
+      "value": null,
+      "box_field": "37",
+      "extraction_prompt": "Determine appropriate customs procedure codes based on import/export type and special treatments. This typically requires customs expertise and may not be in shipping documents.",
+      "source": "llm_processing_null"
+    },
+    "Net Weight (kg)": {
+      "value": null,
+      "box_field": "38",
+      "extraction_prompt": "Find net weight of goods excluding packaging. May need to be calculated from gross weight minus packaging weight, or found in separate net weight fields.",
+      "source": "llm_processing_null"
+    },
+    "Transport document/Previous Document": {
+      "value": "SMLU8375131A,HBL161959,JMALB 2025 32",
+      "box_field": "40",
+      "extraction_prompt": "Extract transport document numbers like 'bill_of_lading', 'master_b/l', airway bill numbers, or other transport document references that identify the shipment.",
+      "source": "llm_processing"
+    },
+    "Statistical Units": {
+      "value": "1",
+      "box_field": "41",
+      "extraction_prompt": "Find quantity measurements in relevant units (pieces, meters, liters, etc.) from package descriptions or cargo measurements. May need conversion to CET standard units.",
+      "source": "llm_processing"
+    },
+    "V.M.": {
+      "value": "1",
+      "box_field": "43",
+      "extraction_prompt": "Determine valuation method based on transaction type and pricing basis. Usually Method 1 (transaction value) for normal commercial sales. May require customs expertise.",
+      "source": "llm_processing"
+    },
+    "Principal": {
+      "value": "RAFER JOHNSON 34 ROEHHAMPTON CLOSE, KINGSTON 19, JAMAICA",
+      "box_field": "50",
+      "extraction_prompt": "Identify the responsible party for transit operations. For normal imports/exports, this may be the importer/exporter or their authorized representative.",
+      "source": "llm_processing"
+    }
+  }
+}

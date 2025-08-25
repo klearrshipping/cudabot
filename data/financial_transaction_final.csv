@@ -1,0 +1,25 @@
+transaction_code,transaction_description,detail_code,detail_description
+1,Purchase or Sale,1,Outright purchase or sale
+1,Purchase or Sale,2,"Sale, after approval or trial"
+1,Purchase or Sale,3,Barter trade (Compensation in kind)
+1,Purchase or Sale,4,Financing Lease (Hire-purchase)
+1,Purchase or Sale,9,Other
+2,Return of goods free of charge,1,Return of Goods
+2,Return of goods free of charge,2,Replacement of returned goods
+2,Return of goods free of charge,3,Replacement for goods not returned
+2,Return of goods free of charge,9,Other type of replacement 
+3,Transfer of goods - No compensation,1,Transfer of goods - Aid program
+3,Transfer of goods - No compensation,2,Other aid shipments - Public Admin
+3,Transfer of goods - No compensation,3,Other aid shipments - Private Organisations
+4,For (Inward) Processing - Contract,1,Goods returned to member state
+4,For (Inward) Processing - Contract,2,Goods not returned to member state
+5,After (Outward) Processing - Contract,1,Goods returned to member state
+5,After (Outward) Processing - Contract,2,Goods not returned to member state
+6,Repairs & Maintenance,1,For Repair/Maintenance - With Compensation
+6,Repairs & Maintenance,2,After Repair Maintenance - With compensation
+6,Repairs & Maintenance,3,For Repair/Maintenance - No Compensation
+6,Repairs & Maintenance,4,After Repair Maintenance - No compensation
+7,Joint intergovernment programme,0,Joint intergovernmental programme
+8,Contract - No separate invoicing,1,"Rent, operate lease over 24 months"
+8,Contract - No separate invoicing,2,Stock movement - No compensation
+9,Other,9,Other 

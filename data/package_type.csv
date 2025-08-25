@@ -1,0 +1,379 @@
+code,package_type,rank
+BX,Box,1
+PX,Pallet,2
+UN,Unit (single item or object),3
+VN,Vehicle,4
+BA,Barrel,5
+AE,Aerosol,6
+AM,"Ampoule, non-protected",7
+AP,"Ampoule, protected",8
+AT,Atomizer,9
+BG,Bag,10
+GY,"Bag, Gunny",11
+JB,"Bag, Jumbo",12
+FX,"Bag, flexible container",13
+ZB,"Bag, large",14
+MB,"Bag, multiply",15
+5M,"Bag, paper",16
+XJ,"Bag, paper, multi-wall",17
+XK,"Bag, paper, multi-wall, water resi",18
+EC,"Bag, plastic",19
+XD,"Bag, plastics film",20
+44,"Bag, polybag ",21
+43,"Bag, super bulk",22
+5L,"Bag, textile",23
+XG,"Bag, textile, sift proof",24
+XH,"Bag, textile, water resistant",25
+XF,"Bag, textile, without inner coat/l",26
+TT,"Bag, tote ",27
+5H,"Bag, woven plastic",28
+XB,"Bag, woven plastic, sift proof",29
+XC,"Bag, woven plastic, water resistan",30
+XA,"Bag, woven plastic, without inner ",31
+BL,"Bale, compressed",32
+BN,"Bale, non-compressed",33
+AL,Ball,34
+BF,"Balloon, non-protected",35
+BP,"Balloon, protected",36
+BR,Bar,37
+2C,"Barrel, wooden",38
+QH,"Barrel, wooden, bung type",39
+QJ,"Barrel, wooden, removable head",40
+BZ,"Bars, in bundle/bunch/truss",41
+BM,Basin,42
+BK,Basket,43
+HC,"Basket, with handle, cardboard",44
+HA,"Basket, with handle, plastic",45
+HB,"Basket, with handle, wooden",46
+B4,Belt,47
+BI,Bin,48
+OK,Block,49
+BD,Board,50
+BY,"Board, in bundle/bunch/truss",51
+BB,Bobbin,52
+BT,Bolt,53
+GB,"Bottle, gas",54
+BS,"Bottle, non-protected, bulbous",55
+BO,"Bottle, non-protected, cylindrical",56
+BV,"Bottle, protected bulbous",57
+BQ,"Bottle, protected cylindrical",58
+BC,Bottlecrate / bottlerack,59
+DH,"Box, Commonwealth Handling Equipme",60
+4B,"Box, aluminium",61
+4G,"Box, fibreboard",62
+BW,"Box, for liquids",63
+4C,"Box, natural wood",64
+4H,"Box, plastic",65
+QR,"Box, plastic, expanded",66
+QS,"Box, plastic, solid",67
+4D,"Box, plywood",68
+4F,"Box, reconstituted wood",69
+4A,"Box, steel",70
+QP,"Box, wooden, natural wood, ordinar",71
+QQ,"Box, wooden, natural wood, with si",72
+BJ,Bucket,73
+VG,"Bulk, gas (at 1031 mbar and 15AC)",74
+VQ,"Bulk, liquefied gas (at abnormal t",75
+VL,"Bulk, liquid",76
+VS,"Bulk, scrap metal ",77
+VY,"Bulk, solid, fine particles (Apowd",78
+VR,"Bulk, solid, granular particles (A",79
+VO,"Bulk, solid, large particles",80
+BH,Bunch,81
+BE,Bundle,82
+8C,"Bundle, Wooden",83
+BU,Butt,84
+CG,Cage,85
+DG,"Cage, Commonwealth Handling Equipm",86
+CW,"Cage, roll",87
+CX,"Can, cylindrical",88
+CA,"Can, rectangular",89
+CD,"Can, with handle and spout",90
+CI,Canister,91
+CZ,Canvas,92
+AV,Capsule,93
+CO,"Carboy, non-protected",94
+CP,"Carboy, protected",95
+CM,Card,96
+FW,"Cart, flatbed",97
+CT,Carton,98
+CQ,Cartridge,99
+CS,Case,100
+7A,"Case, Car",101
+7B,"Case, Wooden",102
+EI,"Case, isothermic",103
+SK,"Case, skeleton",104
+SS,"Case, steel",105
+ED,"Case, with pallet base",106
+EF,"Case, with pallet base, cardboard",107
+EH,"Case, with pallet base, metal",108
+EG,"Case, with pallet base, plastic",109
+EE,"Case, with pallet base, wooden",110
+CK,Cask,111
+CH,Chest,112
+CC,Churn,113
+AI,Clamshell,114
+CF,Coffer,115
+CJ,Coffin,116
+CL,Coil,117
+YN,"Composite packaging, glass recepta",118
+6P,"Composite packaging, glass recepta",119
+YZ,"Composite packaging, glass recepta",120
+YY,"Composite packaging, glass recepta",121
+YX,"Composite packaging, glass recepta",122
+YW,"Composite packaging, glass recepta",123
+YV,"Composite packaging, glass recepta",124
+YT,"Composite packaging, glass recepta",125
+YS,"Composite packaging, glass recepta",126
+YR,"Composite packaging, glass recepta",127
+YQ,"Composite packaging, glass recepta",128
+YP,"Composite packaging, glass recepta",129
+YL,"Composite packaging, plastic recep",130
+YG,"Composite packaging, plastic recep",131
+YM,"Composite packaging, plastic recep",132
+YH,"Composite packaging, plastic recep",133
+YJ,"Composite packaging, plastic recep",134
+YK,"Composite packaging, plastic recep",135
+6H,"Composite packaging, plastic recep",136
+YA,"Composite packaging, plastic recep",137
+YB,"Composite packaging, plastic recep",138
+YC,"Composite packaging, plastic recep",139
+YD,"Composite packaging, plastic recep",140
+YF,"Composite packaging, plastic recep",141
+AJ,Cone,142
+GL,"Container, Gallon",143
+ME,"Container, Metal",144
+OU,"Container, Outer",145
+1F,"Container, flexible ",146
+CN,"Container, not otherwise specified",147
+CV,Cover,148
+CR,Crate,149
+MA,"Crate, Metal",150
+8B,"Crate, Wooden",151
+CB,"Crate, beer",152
+DK,"Crate, bulk, cardboard",153
+DL,"Crate, bulk, plastic",154
+DM,"Crate, bulk, wooden",155
+FD,"Crate, framed",156
+FC,"Crate, fruit",157
+MC,"Crate, milk",158
+DC,"Crate, multiple layer, cardboard",159
+DA,"Crate, multiple layer, plastic",160
+DB,"Crate, multiple layer, wooden",161
+SC,"Crate, shallow",162
+CE,Creel,163
+CU,Cup,164
+CY,Cylinder,165
+DJ,"Demijohn, non-protected",166
+DP,"Demijohn, protected",167
+DN,Dispenser,168
+DR,Drum,169
+1B,"Drum, aluminium",170
+QC,"Drum, aluminium, non-removable hea",171
+QD,"Drum, aluminium, removable head",172
+1G,"Drum, fibre",173
+DI,"Drum, iron",174
+IH,"Drum, plastic",175
+QF,"Drum, plastic, non-removable head",176
+QG,"Drum, plastic, removable head",177
+1D,"Drum, plywood",178
+1A,"Drum, steel",179
+QA,"Drum, steel, non-removable head",180
+QB,"Drum, steel, removable head",181
+1W,"Drum, wooden",182
+EN,Envelope,183
+SV,"Envelope, steel",184
+FP,Filmpack,185
+FI,Firkin,186
+FL,Flask,187
+FE,FlexiTank,188
+FB,Flexibag,189
+FT,Foodtainer,190
+FO,Footlocker,191
+FR,Frame,192
+GI,Girder,193
+GZ,"Girders, in bundle/bunch/truss",194
+HR,Hamper,195
+HN,Hanger,196
+HG,Hogshead,197
+IN,Ingot,198
+IZ,"Ingots, in bundle/bunch/truss",199
+WA,Intermediate bulk container,200
+WD,"Intermediate bulk container, alumi",201
+WL,"Intermediate bulk container, alumi",202
+WH,"Intermediate bulk container, alumi",203
+ZL,"Intermediate bulk container, compo",204
+ZM,"Intermediate bulk container, compo",205
+ZN,"Intermediate bulk container, compo",206
+ZP,"Intermediate bulk container, compo",207
+ZQ,"Intermediate bulk container, compo",208
+ZR,"Intermediate bulk container, compo",209
+ZS,"Intermediate bulk container, compo",210
+ZT,"Intermediate bulk container, fibre",211
+ZU,"Intermediate bulk container, flexi",212
+WF,"Intermediate bulk container, metal",213
+WM,"Intermediate bulk container, metal",214
+ZV,"Intermediate bulk container, metal",215
+WJ,"Intermediate bulk container, metal",216
+WU,"Intermediate bulk container, natur",217
+ZW,"Intermediate bulk container, natur",218
+ZA,"Intermediate bulk container, paper",219
+ZC,"Intermediate bulk container, paper",220
+WS,"Intermediate bulk container, plast",221
+WY,"Intermediate bulk container, plywo",222
+ZX,"Intermediate bulk container, plywo",223
+WZ,"Intermediate bulk container, recon",224
+ZY,"Intermediate bulk container, recon",225
+ZJ,"Intermediate bulk container, rigid",226
+ZK,"Intermediate bulk container, rigid",227
+ZD,"Intermediate bulk container, rigid",228
+ZG,"Intermediate bulk container, rigid",229
+ZH,"Intermediate bulk container, rigid",230
+ZF,"Intermediate bulk container, rigid",231
+AA,"Intermediate bulk container, rigid",232
+WG,"Intermediate bulk container, steel",233
+WC,"Intermediate bulk container, steel",234
+WK,"Intermediate bulk container, steel",235
+WT,"Intermediate bulk container, texti",236
+WV,"Intermediate bulk container, texti",237
+WW,"Intermediate bulk container, texti",238
+WX,"Intermediate bulk container, texti",239
+WN,"Intermediate bulk container, woven",240
+WP,"Intermediate bulk container, woven",241
+WQ,"Intermediate bulk container, woven",242
+WR,"Intermediate bulk container, woven",243
+JR,Jar,244
+JY,"Jerrican, cylindrical",245
+3H,"Jerrican, plastic",246
+QM,"Jerrican, plastic, non-removable h",247
+QN,"Jerrican, plastic, removable head",248
+JC,"Jerrican, rectangular",249
+3A,"Jerrican, steel",250
+QK,"Jerrican, steel, non-removable hea",251
+QL,"Jerrican, steel, removable head",252
+JG,Jug,253
+JT,Jutebag,254
+KG,Keg,255
+KI,Kit,256
+LV,Liftvan,257
+LG,Log,258
+LZ,"Logs, in bundle/bunch/truss",259
+LT,Lot,260
+LU,Lug,261
+LE,Luggage,262
+MT,Mat,263
+MX,Matchbox,264
+ZZ,Mutually defined,265
+NS,Nest,266
+NT,Net,267
+NU,"Net, tube, plastic",268
+NV,"Net, tube, textile",269
+NA,Not available,270
+OT,Octabin,271
+PK,Package / Piece,272
+IK,"Package, cardboard, with bottle gr",273
+IB,"Package, display, cardboard",274
+ID,"Package, display, metal",275
+IC,"Package, display, plastic",276
+IA,"Package, display, wooden",277
+IF,"Package, flow",278
+IG,"Package, paper wrapped",279
+IE,"Package, show",280
+PA,Packet,281
+PL,Pail,282
+AH,"Pallet, 100cms * 110cms",283
+OD,"Pallet, AS 4068-1993",284
+OC,"Pallet, CHEP 100 cm x 120 cm",285
+OA,"Pallet, CHEP 40 cm x 60 cm",286
+OB,"Pallet, CHEP 80 cm x 120 cm",287
+OE,"Pallet, ISO T11",288
+8A,"Pallet, Wooden",289
+PB,"Pallet, box Combined open-ended bo",290
+PE,"Pallet, modular, collars 80cms * 1",291
+PD,"Pallet, modular, collars 80cms * 1",292
+AF,"Pallet, modular, collars 80cms * 6",293
+AG,"Pallet, shrinkwrapped",294
+TW,"Pallet, triwall ",295
+P2,Pan,296
+PC,Parcel,297
+PF,Pen,298
+PP,Piece,299
+PI,Pipe,300
+PV,"Pipes, in bundle/bunch/truss",301
+PH,Pitcher,302
+PN,Plank,303
+PZ,"Planks, in bundle/bunch/truss",304
+PG,Plate,305
+PY,"Plates, in bundle/bunch/truss",306
+OF,"Platform, unspecified weight or di",307
+PT,Pot,308
+PO,Pouch,309
+PJ,Punnet,310
+RK,Rack,311
+RJ,"Rack, clothing hanger",312
+AB,"Receptacle, fibre",313
+GR,"Receptacle, glass",314
+MR,"Receptacle, metal",315
+AC,"Receptacle, paper",316
+PR,"Receptacle, plastic",317
+MW,"Receptacle, plastic wrapped",318
+AD,"Receptacle, wooden",319
+RT,Rednet,320
+RL,Reel,321
+RG,Ring,322
+RD,Rod,323
+RZ,"Rods, in bundle/bunch/truss",324
+RO,Roll,325
+SH,Sachet,326
+SA,Sack,327
+MS,"Sack, multi-wall",328
+SE,Sea-chest,329
+SX,Set,330
+ST,Sheet,331
+SP,"Sheet, plastic wrapping",332
+SM,Sheetmetal,333
+SZ,"Sheets, in bundle/bunch/truss",334
+SW,Shrinkwrapped,335
+SI,Skid,336
+SB,Slab,337
+SY,Sleeve,338
+SL,Slipsheet,339
+SD,Spindle,340
+SO,Spool,341
+SU,Suitcase,342
+T1,Tablet ,343
+TG,"Tank container, generic ",344
+TY,"Tank, cylindrical",345
+TK,"Tank, rectangular",346
+TC,Tea-chest,347
+TI,Tierce,348
+TN,Tin,349
+PU,Tray,350
+GU,"Tray, containing horizontally stac",351
+DV,"Tray, one layer no cover, cardboar",352
+DS,"Tray, one layer no cover, plastic",353
+DU,"Tray, one layer no cover, polystyr",354
+DT,"Tray, one layer no cover, wooden",355
+IL,"Tray, rigid, lidded stackable (CEN)",356
+DY,"Tray, two layers no cover, cardboa",357
+DW,"Tray, two layers no cover, plastic",358
+DX,"Tray, two layers no cover, wooden",359
+TR,Trunk,360
+TS,Truss,361
+TB,Tub,362
+TL,"Tub, with lid",363
+TU,Tube,364
+TD,"Tube, collapsible",365
+TV,"Tube, with nozzle",366
+TZ,"Tubes, in bundle/bunch/truss",367
+TO,Tun,368
+TE,Tyre ,369
+UC,Uncaged,370
+NE,Unpacked or unpackaged,371
+NG,"Unpacked or unpackaged, multiple u",372
+NF,"Unpacked or unpackaged, single uni",373
+VP,Vacuum-packed,374
+VK,Vanpack,375
+VA,Vat,376
+VI,Vial,377
+WB,Wickerbottle,378

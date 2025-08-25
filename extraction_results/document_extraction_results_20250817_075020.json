@@ -1,0 +1,470 @@
+{
+  "claude_sonnet_4": {
+    "model_name": "claude_sonnet_4",
+    "model_id": "anthropic/claude-sonnet-4",
+    "start_time": "2025-08-17T07:43:26.555259",
+    "processing_time": 60.517077922821045,
+    "invoice_extraction": {
+      "supplier": {
+        "name": "Amazon.com",
+        "contact": {}
+      },
+      "buyer": {
+        "name": "Rafer Johnson",
+        "address": "7500 NW 81ST PL STE 2, MIAMI, FL 33166-2180, United States",
+        "contact": {}
+      },
+      "invoice_details": {
+        "date": "October 10, 2024",
+        "order_number": "113-7256182-4008214"
+      },
+      "items": [
+        {
+          "description": "EF ECOFLOW Solar Generator DELTA 2 Max 2048Wh with 4X100W 12V Solar Panels, High Efficiency Monocrystalline PV Modules, 2400W LFP Portable Power Station, AC + Solar Fast Dual Charging For Camping RV",
+          "quantity": 1.0,
+          "unit_price": 1399.0,
+          "total_price": 1399.0
+        }
+      ],
+      "totals": {
+        "subtotal": 1399.0,
+        "shipping_handling": 0.0,
+        "tax": 97.93,
+        "total_amount": 1496.93
+      },
+      "shipping": {
+        "method": "Standard Shipping",
+        "delivery_date": "October 11, 2024"
+      },
+      "payment_terms": {
+        "method": "Mastercard ending in 3804"
+      },
+      "currency": "USD",
+      "document_type": "invoice",
+      "extraction_confidence": "high",
+      "_metadata": {
+        "extraction_timestamp": "2025-08-17T07:43:43.403460",
+        "source_file": "C:\\Users\\rafer\\Downloads\\Amazon.com - Order 113-7256182-4008214 (1) (1).pdf",
+        "processor": "claude_sonnet_4_via_openrouter",
+        "model": "anthropic/claude-sonnet-4",
+        "processing_method": "pdf_to_image_conversion"
+      }
+    },
+    "bol_extraction": {
+      "note": "BOL extraction placeholder - needs implementation"
+    },
+    "document_processing": {
+      "invoice": {
+        "status": "failed",
+        "document_type": "invoice",
+        "processor_type": "claude_sonnet_4_via_openrouter",
+        "error": "unsupported operand type(s) for /: 'NoneType' and 'str'",
+        "error_details": "Traceback (most recent call last):\n  File \"C:\\Users\\rafer\\OneDrive\\Desktop\\projects\\cuda\\modules\\primary_processing\\document_processor.py\", line 200, in _process_invoice\n    extracted_file = output_dir / f\"invoice_{order_number}_primary_extract.json\"\n                     ~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nTypeError: unsupported operand type(s) for /: 'NoneType' and 'str'\n",
+        "timestamp": "2025-08-17T07:43:59.307038"
+      },
+      "bol": {
+        "status": "failed",
+        "document_type": "bill_of_lading",
+        "processor_type": "claude_sonnet_4_via_openrouter",
+        "error": "unsupported operand type(s) for /: 'NoneType' and 'str'",
+        "error_details": "Traceback (most recent call last):\n  File \"C:\\Users\\rafer\\OneDrive\\Desktop\\projects\\cuda\\modules\\primary_processing\\document_processor.py\", line 390, in _process_bill_of_lading\n    extracted_file = output_dir / f\"bill_of_lading_{order_number}_primary_extract.json\"\n                     ~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nTypeError: unsupported operand type(s) for /: 'NoneType' and 'str'\n",
+        "timestamp": "2025-08-17T07:44:26.293133"
+      }
+    },
+    "esad_fields": {
+      "error": "ESADFieldPopulator.populate_fields() got an unexpected keyword argument 'bill_of_lading'"
+    },
+    "success": true,
+    "error": null
+  },
+  "gpt_5": {
+    "model_name": "gpt_5",
+    "model_id": "openai/gpt-5",
+    "start_time": "2025-08-17T07:44:29.073135",
+    "processing_time": 64.6745457649231,
+    "invoice_extraction": {
+      "supplier": {
+        "name": "Amazon.com",
+        "contact": {}
+      },
+      "buyer": {
+        "name": "Rafer Johnson",
+        "address": "7500 NW 81ST PL STE 2, MIAMI, FL 33166-2180, United States",
+        "contact": {}
+      },
+      "invoice_details": {
+        "date": "October 10, 2024",
+        "order_number": "113-7256182-4008214"
+      },
+      "items": [
+        {
+          "description": "EF ECOFLOW Solar Generator DELTA 2 Max 2048Wh with 4X100W 12V Solar Panels, High Efficiency Monocrystalline PV Modules, 2400W LFP Portable Power Station, AC + Solar Fast Dual Charging For Camping RV",
+          "quantity": 1.0,
+          "unit_price": 1399.0,
+          "total_price": 1399.0
+        }
+      ],
+      "totals": {
+        "subtotal": 1399.0,
+        "shipping_handling": 0.0,
+        "tax": 97.93,
+        "total_amount": 1496.93
+      },
+      "shipping": {
+        "method": "Standard Shipping",
+        "delivery_date": "October 11, 2024"
+      },
+      "payment_terms": {
+        "method": "Mastercard ending in 3804"
+      },
+      "currency": "USD",
+      "document_type": "invoice",
+      "extraction_confidence": "high",
+      "_metadata": {
+        "extraction_timestamp": "2025-08-17T07:44:45.327950",
+        "source_file": "C:\\Users\\rafer\\Downloads\\Amazon.com - Order 113-7256182-4008214 (1) (1).pdf",
+        "processor": "claude_sonnet_4_via_openrouter",
+        "model": "anthropic/claude-sonnet-4",
+        "processing_method": "pdf_to_image_conversion"
+      }
+    },
+    "bol_extraction": {
+      "note": "BOL extraction placeholder - needs implementation"
+    },
+    "document_processing": {
+      "invoice": {
+        "status": "failed",
+        "document_type": "invoice",
+        "processor_type": "claude_sonnet_4_via_openrouter",
+        "error": "unsupported operand type(s) for /: 'NoneType' and 'str'",
+        "error_details": "Traceback (most recent call last):\n  File \"C:\\Users\\rafer\\OneDrive\\Desktop\\projects\\cuda\\modules\\primary_processing\\document_processor.py\", line 200, in _process_invoice\n    extracted_file = output_dir / f\"invoice_{order_number}_primary_extract.json\"\n                     ~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nTypeError: unsupported operand type(s) for /: 'NoneType' and 'str'\n",
+        "timestamp": "2025-08-17T07:45:04.502319"
+      },
+      "bol": {
+        "status": "failed",
+        "document_type": "bill_of_lading",
+        "processor_type": "claude_sonnet_4_via_openrouter",
+        "error": "unsupported operand type(s) for /: 'NoneType' and 'str'",
+        "error_details": "Traceback (most recent call last):\n  File \"C:\\Users\\rafer\\OneDrive\\Desktop\\projects\\cuda\\modules\\primary_processing\\document_processor.py\", line 390, in _process_bill_of_lading\n    extracted_file = output_dir / f\"bill_of_lading_{order_number}_primary_extract.json\"\n                     ~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nTypeError: unsupported operand type(s) for /: 'NoneType' and 'str'\n",
+        "timestamp": "2025-08-17T07:45:33.236858"
+      }
+    },
+    "esad_fields": {
+      "error": "ESADFieldPopulator.populate_fields() got an unexpected keyword argument 'bill_of_lading'"
+    },
+    "success": true,
+    "error": null
+  },
+  "gpt_5_mini": {
+    "model_name": "gpt_5_mini",
+    "model_id": "openai/gpt-5-mini",
+    "start_time": "2025-08-17T07:45:35.751305",
+    "processing_time": 74.52421498298645,
+    "invoice_extraction": {
+      "supplier": {
+        "name": "Amazon.com",
+        "contact": {}
+      },
+      "buyer": {
+        "name": "Rafer Johnson",
+        "address": "7500 NW 81ST PL STE 2, MIAMI, FL 33166-2180, United States",
+        "contact": {}
+      },
+      "invoice_details": {
+        "date": "October 10, 2024",
+        "order_number": "113-7256182-4008214"
+      },
+      "items": [
+        {
+          "description": "EF ECOFLOW Solar Generator DELTA 2 Max 2048Wh with 4X100W 12V Solar Panels, High Efficiency Monocrystalline PV Modules, 2400W LFP Portable Power Station, AC + Solar Fast Dual Charging For Camping RV",
+          "quantity": 1.0,
+          "unit_price": 1399.0,
+          "total_price": 1399.0
+        }
+      ],
+      "totals": {
+        "subtotal": 1399.0,
+        "shipping_handling": 0.0,
+        "tax": 97.93,
+        "total_amount": 1496.93
+      },
+      "shipping": {
+        "method": "Standard Shipping",
+        "delivery_date": "October 11, 2024"
+      },
+      "payment_terms": {
+        "method": "Mastercard ending in 3804"
+      },
+      "currency": "USD",
+      "document_type": "invoice",
+      "extraction_confidence": "high",
+      "_metadata": {
+        "extraction_timestamp": "2025-08-17T07:45:52.238414",
+        "source_file": "C:\\Users\\rafer\\Downloads\\Amazon.com - Order 113-7256182-4008214 (1) (1).pdf",
+        "processor": "claude_sonnet_4_via_openrouter",
+        "model": "anthropic/claude-sonnet-4",
+        "processing_method": "pdf_to_image_conversion"
+      }
+    },
+    "bol_extraction": {
+      "note": "BOL extraction placeholder - needs implementation"
+    },
+    "document_processing": {
+      "invoice": {
+        "status": "failed",
+        "document_type": "invoice",
+        "processor_type": "claude_sonnet_4_via_openrouter",
+        "error": "unsupported operand type(s) for /: 'NoneType' and 'str'",
+        "error_details": "Traceback (most recent call last):\n  File \"C:\\Users\\rafer\\OneDrive\\Desktop\\projects\\cuda\\modules\\primary_processing\\document_processor.py\", line 200, in _process_invoice\n    extracted_file = output_dir / f\"invoice_{order_number}_primary_extract.json\"\n                     ~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nTypeError: unsupported operand type(s) for /: 'NoneType' and 'str'\n",
+        "timestamp": "2025-08-17T07:46:15.985185"
+      },
+      "bol": {
+        "status": "failed",
+        "document_type": "bill_of_lading",
+        "processor_type": "claude_sonnet_4_via_openrouter",
+        "error": "unsupported operand type(s) for /: 'NoneType' and 'str'",
+        "error_details": "Traceback (most recent call last):\n  File \"C:\\Users\\rafer\\OneDrive\\Desktop\\projects\\cuda\\modules\\primary_processing\\document_processor.py\", line 390, in _process_bill_of_lading\n    extracted_file = output_dir / f\"bill_of_lading_{order_number}_primary_extract.json\"\n                     ~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nTypeError: unsupported operand type(s) for /: 'NoneType' and 'str'\n",
+        "timestamp": "2025-08-17T07:46:49.732794"
+      }
+    },
+    "esad_fields": {
+      "error": "ESADFieldPopulator.populate_fields() got an unexpected keyword argument 'bill_of_lading'"
+    },
+    "success": true,
+    "error": null
+  },
+  "gpt_5_nano": {
+    "model_name": "gpt_5_nano",
+    "model_id": "openai/gpt-5-nano",
+    "start_time": "2025-08-17T07:46:52.283232",
+    "processing_time": 66.08258080482483,
+    "invoice_extraction": {
+      "supplier": {
+        "name": "Amazon.com",
+        "contact": {}
+      },
+      "buyer": {
+        "name": "Rafer Johnson",
+        "address": "7500 NW 81ST PL STE 2, MIAMI, FL 33166-2180, United States",
+        "contact": {}
+      },
+      "invoice_details": {
+        "date": "October 10, 2024",
+        "order_number": "113-72561182-4008214"
+      },
+      "items": [
+        {
+          "description": "EF ECOFLOW Solar Generator DELTA 2 Max 2048Wh with 4X100W 12V Solar Panels, High Efficiency Monocrystalline PV Modules, 2400W LFP Portable Power Station, AC + Solar Fast Dual Charging For Camping RV",
+          "quantity": 1.0,
+          "unit_price": 1399.0,
+          "total_price": 1399.0
+        }
+      ],
+      "totals": {
+        "subtotal": 1399.0,
+        "shipping_handling": 0.0,
+        "tax": 97.93,
+        "total_amount": 1496.93
+      },
+      "shipping": {
+        "method": "Standard Shipping",
+        "delivery_date": "October 11, 2024"
+      },
+      "payment_terms": {
+        "method": "Mastercard ending in 3804"
+      },
+      "currency": "USD",
+      "document_type": "invoice",
+      "extraction_confidence": "high",
+      "_metadata": {
+        "extraction_timestamp": "2025-08-17T07:47:09.892443",
+        "source_file": "C:\\Users\\rafer\\Downloads\\Amazon.com - Order 113-7256182-4008214 (1) (1).pdf",
+        "processor": "claude_sonnet_4_via_openrouter",
+        "model": "anthropic/claude-sonnet-4",
+        "processing_method": "pdf_to_image_conversion"
+      }
+    },
+    "bol_extraction": {
+      "note": "BOL extraction placeholder - needs implementation"
+    },
+    "document_processing": {
+      "invoice": {
+        "status": "failed",
+        "document_type": "invoice",
+        "processor_type": "claude_sonnet_4_via_openrouter",
+        "error": "unsupported operand type(s) for /: 'NoneType' and 'str'",
+        "error_details": "Traceback (most recent call last):\n  File \"C:\\Users\\rafer\\OneDrive\\Desktop\\projects\\cuda\\modules\\primary_processing\\document_processor.py\", line 200, in _process_invoice\n    extracted_file = output_dir / f\"invoice_{order_number}_primary_extract.json\"\n                     ~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nTypeError: unsupported operand type(s) for /: 'NoneType' and 'str'\n",
+        "timestamp": "2025-08-17T07:47:29.905715"
+      },
+      "bol": {
+        "status": "failed",
+        "document_type": "bill_of_lading",
+        "processor_type": "claude_sonnet_4_via_openrouter",
+        "error": "unsupported operand type(s) for /: 'NoneType' and 'str'",
+        "error_details": "Traceback (most recent call last):\n  File \"C:\\Users\\rafer\\OneDrive\\Desktop\\projects\\cuda\\modules\\primary_processing\\document_processor.py\", line 390, in _process_bill_of_lading\n    extracted_file = output_dir / f\"bill_of_lading_{order_number}_primary_extract.json\"\n                     ~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nTypeError: unsupported operand type(s) for /: 'NoneType' and 'str'\n",
+        "timestamp": "2025-08-17T07:47:57.840860"
+      }
+    },
+    "esad_fields": {
+      "error": "ESADFieldPopulator.populate_fields() got an unexpected keyword argument 'bill_of_lading'"
+    },
+    "success": true,
+    "error": null
+  },
+  "gemini_2_5_pro": {
+    "model_name": "gemini_2_5_pro",
+    "model_id": "google/gemini-2.5-pro",
+    "start_time": "2025-08-17T07:48:00.366850",
+    "processing_time": 64.17585682868958,
+    "invoice_extraction": {
+      "supplier": {
+        "name": "Amazon.com",
+        "contact": {}
+      },
+      "buyer": {
+        "name": "Rafer Johnson",
+        "address": "7500 NW 81ST PL STE 2, MIAMI, FL 33166-2180, United States",
+        "contact": {}
+      },
+      "invoice_details": {
+        "date": "October 10, 2024",
+        "order_number": "113-7256182-4008214"
+      },
+      "items": [
+        {
+          "description": "EF ECOFLOW Solar Generator DELTA 2 Max 2048Wh with 4X100W 12V Solar Panels, High Efficiency Monocrystalline PV Modules, 2400W LFP Portable Power Station, AC + Solar Fast Dual Charging For Camping RV",
+          "quantity": 1.0,
+          "unit_price": 1399.0,
+          "total_price": 1399.0
+        }
+      ],
+      "totals": {
+        "subtotal": 1399.0,
+        "shipping_handling": 0.0,
+        "tax": 97.93,
+        "total_amount": 1496.93
+      },
+      "shipping": {
+        "method": "Standard Shipping",
+        "delivery_date": "October 11, 2024"
+      },
+      "payment_terms": {
+        "method": "Mastercard ending in 3804"
+      },
+      "currency": "USD",
+      "document_type": "invoice",
+      "extraction_confidence": "high",
+      "_metadata": {
+        "extraction_timestamp": "2025-08-17T07:48:20.751299",
+        "source_file": "C:\\Users\\rafer\\Downloads\\Amazon.com - Order 113-7256182-4008214 (1) (1).pdf",
+        "processor": "claude_sonnet_4_via_openrouter",
+        "model": "anthropic/claude-sonnet-4",
+        "processing_method": "pdf_to_image_conversion"
+      }
+    },
+    "bol_extraction": {
+      "note": "BOL extraction placeholder - needs implementation"
+    },
+    "document_processing": {
+      "invoice": {
+        "status": "failed",
+        "document_type": "invoice",
+        "processor_type": "claude_sonnet_4_via_openrouter",
+        "error": "unsupported operand type(s) for /: 'NoneType' and 'str'",
+        "error_details": "Traceback (most recent call last):\n  File \"C:\\Users\\rafer\\OneDrive\\Desktop\\projects\\cuda\\modules\\primary_processing\\document_processor.py\", line 200, in _process_invoice\n    extracted_file = output_dir / f\"invoice_{order_number}_primary_extract.json\"\n                     ~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nTypeError: unsupported operand type(s) for /: 'NoneType' and 'str'\n",
+        "timestamp": "2025-08-17T07:48:40.188459"
+      },
+      "bol": {
+        "status": "failed",
+        "document_type": "bill_of_lading",
+        "processor_type": "claude_sonnet_4_via_openrouter",
+        "error": "unsupported operand type(s) for /: 'NoneType' and 'str'",
+        "error_details": "Traceback (most recent call last):\n  File \"C:\\Users\\rafer\\OneDrive\\Desktop\\projects\\cuda\\modules\\primary_processing\\document_processor.py\", line 390, in _process_bill_of_lading\n    extracted_file = output_dir / f\"bill_of_lading_{order_number}_primary_extract.json\"\n                     ~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nTypeError: unsupported operand type(s) for /: 'NoneType' and 'str'\n",
+        "timestamp": "2025-08-17T07:49:03.914523"
+      }
+    },
+    "esad_fields": {
+      "error": "ESADFieldPopulator.populate_fields() got an unexpected keyword argument 'bill_of_lading'"
+    },
+    "success": true,
+    "error": null
+  },
+  "llama_3_2_11b_vision": {
+    "model_name": "llama_3_2_11b_vision",
+    "model_id": "meta-llama/llama-3.2-11b-vision-instruct",
+    "start_time": "2025-08-17T07:49:06.544820",
+    "processing_time": 72.2629120349884,
+    "invoice_extraction": {
+      "supplier": {
+        "name": "Amazon.com",
+        "contact": {}
+      },
+      "buyer": {
+        "name": "Rafer Johnson",
+        "address": "7500 NW 81ST PL STE 2, MIAMI, FL 33166-2180, United States",
+        "contact": {}
+      },
+      "invoice_details": {
+        "date": "October 10, 2024",
+        "order_number": "113-7256182-4008214"
+      },
+      "items": [
+        {
+          "description": "EF ECOFLOW Solar Generator DELTA 2 Max 2048Wh with 4X100W 12V Solar Panels, High Efficiency Monocrystalline PV Modules, 2400W LFP Portable Power Station, AC + Solar Fast Dual Charging For Camping RV",
+          "quantity": 1.0,
+          "unit_price": 1399.0,
+          "total_price": 1399.0
+        }
+      ],
+      "totals": {
+        "subtotal": 1399.0,
+        "shipping_handling": 0.0,
+        "tax": 97.93,
+        "total_amount": 1496.93
+      },
+      "shipping": {
+        "method": "Standard Shipping",
+        "delivery_date": "October 11, 2024"
+      },
+      "payment_terms": {
+        "method": "Mastercard ending in 3804"
+      },
+      "currency": "USD",
+      "document_type": "invoice",
+      "extraction_confidence": "high",
+      "_metadata": {
+        "extraction_timestamp": "2025-08-17T07:49:27.738538",
+        "source_file": "C:\\Users\\rafer\\Downloads\\Amazon.com - Order 113-7256182-4008214 (1) (1).pdf",
+        "processor": "claude_sonnet_4_via_openrouter",
+        "model": "anthropic/claude-sonnet-4",
+        "processing_method": "pdf_to_image_conversion"
+      }
+    },
+    "bol_extraction": {
+      "note": "BOL extraction placeholder - needs implementation"
+    },
+    "document_processing": {
+      "invoice": {
+        "status": "failed",
+        "document_type": "invoice",
+        "processor_type": "claude_sonnet_4_via_openrouter",
+        "error": "unsupported operand type(s) for /: 'NoneType' and 'str'",
+        "error_details": "Traceback (most recent call last):\n  File \"C:\\Users\\rafer\\OneDrive\\Desktop\\projects\\cuda\\modules\\primary_processing\\document_processor.py\", line 200, in _process_invoice\n    extracted_file = output_dir / f\"invoice_{order_number}_primary_extract.json\"\n                     ~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nTypeError: unsupported operand type(s) for /: 'NoneType' and 'str'\n",
+        "timestamp": "2025-08-17T07:49:47.342363"
+      },
+      "bol": {
+        "status": "failed",
+        "document_type": "bill_of_lading",
+        "processor_type": "claude_sonnet_4_via_openrouter",
+        "error": "unsupported operand type(s) for /: 'NoneType' and 'str'",
+        "error_details": "Traceback (most recent call last):\n  File \"C:\\Users\\rafer\\OneDrive\\Desktop\\projects\\cuda\\modules\\primary_processing\\document_processor.py\", line 390, in _process_bill_of_lading\n    extracted_file = output_dir / f\"bill_of_lading_{order_number}_primary_extract.json\"\n                     ~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nTypeError: unsupported operand type(s) for /: 'NoneType' and 'str'\n",
+        "timestamp": "2025-08-17T07:50:18.265504"
+      }
+    },
+    "esad_fields": {
+      "error": "ESADFieldPopulator.populate_fields() got an unexpected keyword argument 'bill_of_lading'"
+    },
+    "success": true,
+    "error": null
+  }
+}

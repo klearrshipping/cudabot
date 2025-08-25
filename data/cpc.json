@@ -1,0 +1,650 @@
+[
+  {
+    "regime_type": "Non-Commercial Baggage",
+    "regime_type_model": "BG4",
+    "cpc": 4000,
+    "description": "Commercial Import",
+    "detail": "BG4 - 4000: Commercial Import",
+    "regime_type_id": 28
+  },
+  {
+    "regime_type": "Non-Commercial Baggage",
+    "regime_type_model": "BG4",
+    "cpc": 4500,
+    "description": "Non-Commercial",
+    "detail": "BG4 - 4500: Non-commercial passenger baggage",
+    "regime_type_id": 28
+  },
+  {
+    "regime_type": "Non-Commercial Baggage",
+    "regime_type_model": "BG4",
+    "cpc": 4600,
+    "description": "Passenger Baggage",
+    "detail": "BG4 - 4600: Passenger baggage - Non-commercial",
+    "regime_type_id": 28
+  },
+  {
+    "regime_type": "Non-Commercial Baggage",
+    "regime_type_model": "BG4",
+    "cpc": 4900,
+    "description": "Commercial Import \u2013With Uplift Applied",
+    "detail": "BG4 - 4900: Commercial import by unregistered taxpayer  (GCT ).",
+    "regime_type_id": 28
+  },
+  {
+    "regime_type": "Export",
+    "regime_type_model": "EX10",
+    "cpc": 9391,
+    "description": "Export from Free Zone after processing",
+    "detail": "EX10 - 9391: Export from a Special Economic Zone (SEZ) after Processing",
+    "regime_type_id": 26
+  },
+  {
+    "regime_type": "Export",
+    "regime_type_model": "EX11",
+    "cpc": 9500,
+    "description": "Destruction of goods",
+    "detail": "EX11 - 9500: Destruction of goods",
+    "regime_type_id": 27
+  },
+  {
+    "regime_type": "Export",
+    "regime_type_model": "EX2",
+    "cpc": 1000,
+    "description": "Export (Permanent)",
+    "detail": "EX1 - 1000: Permanent Export for resale in a foreign market",
+    "regime_type_id": 24
+  },
+  {
+    "regime_type": "Export",
+    "regime_type_model": "EX2",
+    "cpc": 2000,
+    "description": "Temporary Export for Return in Same State",
+    "detail": "EX2 - 2000: Temporary Export to be returned in same state",
+    "regime_type_id": 24
+  },
+  {
+    "regime_type": "Export",
+    "regime_type_model": "EX2",
+    "cpc": 2100,
+    "description": "Temporary Export for Repair, Restoration or Improvement",
+    "detail": "EX2 - 2100: Temporary Export to be returned after repairs or restoration in a foreign country.",
+    "regime_type_id": 24
+  },
+  {
+    "regime_type": "Export",
+    "regime_type_model": "EX2",
+    "cpc": 2171,
+    "description": "Temporary Export from In-Bond Shop forRepair, Restoration or Improvement",
+    "detail": "EX2 - 2171: Temporary Export from an In-Bond shop for repair or restoration.",
+    "regime_type_id": 24
+  },
+  {
+    "regime_type": "Export",
+    "regime_type_model": "EX2",
+    "cpc": 2200,
+    "description": "Temporary Export for Outward Processing",
+    "detail": "EX2  - 2200: Temporary Export for Processing (Outward Processing)",
+    "regime_type_id": 24
+  },
+  {
+    "regime_type": "Export",
+    "regime_type_model": "EX3",
+    "cpc": 3040,
+    "description": "Re-Export After Entry for Home Use",
+    "detail": "EX3 - 3040: Re-Export to a foreign country, after previously being imported",
+    "regime_type_id": 25
+  },
+  {
+    "regime_type": "Export",
+    "regime_type_model": "EX3",
+    "cpc": 3050,
+    "description": "Re-Export after Temporary Import in Same State",
+    "detail": "EX3 - 3050: Re-Export to a foreign market after temporary import in same state",
+    "regime_type_id": 25
+  },
+  {
+    "regime_type": "Export",
+    "regime_type_model": "EX3",
+    "cpc": 3051,
+    "description": "Re-Export after Temporary Import for Repairs, Restoration or Improvement",
+    "detail": "EX3 - 3051: Re-Export to a foreign market after temporary import for repairs or restoration.",
+    "regime_type_id": 25
+  },
+  {
+    "regime_type": "Export",
+    "regime_type_model": "EX3",
+    "cpc": 3052,
+    "description": "Re-Export after Temporary import for inward processing",
+    "detail": "EX3 - 3052: Re-Export after Temporary import for Processing (inward processing)",
+    "regime_type_id": 25
+  },
+  {
+    "regime_type": "Export",
+    "regime_type_model": "EX3",
+    "cpc": 3053,
+    "description": "Re-Export after Temporary import exhibition or entertainment",
+    "detail": "EX3 - 3053: Re-export after previous import for exhibition or entertainment",
+    "regime_type_id": 25
+  },
+  {
+    "regime_type": "Export",
+    "regime_type_model": "EX3",
+    "cpc": 3058,
+    "description": "Re-Export after Temporary Import  (LegacySystem)",
+    "detail": "EX3 - 3058: Re-export after previous import (Legacy system)",
+    "regime_type_id": 25
+  },
+  {
+    "regime_type": "Export",
+    "regime_type_model": "EX3",
+    "cpc": 3070,
+    "description": "Re-Export after Private Bonded Warehousing",
+    "detail": "EX3 - 3070: Re-export after previous import into Private Bonded Warehouse",
+    "regime_type_id": 25
+  },
+  {
+    "regime_type": "Export",
+    "regime_type_model": "EX3",
+    "cpc": 3071,
+    "description": "Re-Export after In-bond Warehousing - Accounting for DFS Sales",
+    "detail": "EX3 - 3071: Re-export after previous In-bond warehousing (Accounting for DFS Sales)",
+    "regime_type_id": 25
+  },
+  {
+    "regime_type": "Export",
+    "regime_type_model": "EX3",
+    "cpc": 3078,
+    "description": "Re-Export after Warehousing (Legacy System)",
+    "detail": "EX3 - 3078: Re-export after previous warehousing (Legacy System)",
+    "regime_type_id": 25
+  },
+  {
+    "regime_type": "Export",
+    "regime_type_model": "EX3",
+    "cpc": 3171,
+    "description": "Re-Export after In-bond - Other",
+    "detail": "EX3 - 3171: Re-export after previous In-bond warehousing (Other)",
+    "regime_type_id": 25
+  },
+  {
+    "regime_type": "Export",
+    "regime_type_model": "EX3",
+    "cpc": 8100,
+    "description": "Transit (By road to another port for Re-export)",
+    "detail": "EX8 - 8100: Transit by road to another port for Re-export",
+    "regime_type_id": 25
+  },
+  {
+    "regime_type": "Export",
+    "regime_type_model": "EX8",
+    "cpc": 9390,
+    "description": "Export from Free Zone",
+    "detail": "EX9 - 9390: Export from a Special Economic Zone (SEZ) to a foreign country",
+    "regime_type_id": 23
+  },
+  {
+    "regime_type": "Import",
+    "regime_type_model": "IM10",
+    "cpc": 9070,
+    "description": "Entry into Free Zone from bonded warehouse",
+    "detail": "IM10 - 9070: Transfer from Private Bonded Warehouse to a Special Economic Zone",
+    "regime_type_id": 18
+  },
+  {
+    "regime_type": "Import",
+    "regime_type_model": "IM11",
+    "cpc": 9090,
+    "description": "Transfer between Free Zones",
+    "detail": "IM11 - 9090: Transfer between Speacial Economic Zones (SEZ's)",
+    "regime_type_id": 17
+  },
+  {
+    "regime_type": "Import",
+    "regime_type_model": "IM12",
+    "cpc": 9098,
+    "description": "Entry for Free Zone from Legacy System",
+    "detail": "IM12 - 9098: Transfer from Legacy system to Private Bonded Warehouse",
+    "regime_type_id": 16
+  },
+  {
+    "regime_type": "Import",
+    "regime_type_model": "IM13",
+    "cpc": 9100,
+    "description": "Entry into Free Zone for Processing",
+    "detail": "IM13 - 9100: Import Entry into a Special Economic Zone for Processing",
+    "regime_type_id": 15
+  },
+  {
+    "regime_type": "Import",
+    "regime_type_model": "IM14",
+    "cpc": 9191,
+    "description": "Transfer between Free Zone for Processing",
+    "detail": "IM14 - 9191: Transfer between Special Economic Zones (SEZ's) for Processing",
+    "regime_type_id": 14
+  },
+  {
+    "regime_type": "Import",
+    "regime_type_model": "IM15",
+    "cpc": 9200,
+    "description": "Entry into Free Zone for Consumption",
+    "detail": "IM15 - 9200: Import Entry into SEZ for consumption",
+    "regime_type_id": 12
+  },
+  {
+    "regime_type": "Import",
+    "regime_type_model": "IM16",
+    "cpc": 9270,
+    "description": "Entry into Free Zone for consumption from Bonded Warehouse",
+    "detail": "IM16 - 9270: Transfer from Private Bonded Warehouse to SEZ for Consumption",
+    "regime_type_id": 13
+  },
+  {
+    "regime_type": "Import",
+    "regime_type_model": "IM17",
+    "cpc": 9390,
+    "description": "Export from Free Zone",
+    "detail": "IM17 - 9390: Import from a Special Economic Zone (SEZ) for home use",
+    "regime_type_id": 10
+  },
+  {
+    "regime_type": "Import",
+    "regime_type_model": "IM18",
+    "cpc": 9391,
+    "description": "Export from Free Zone after processing",
+    "detail": "IM18 - 9391: Import from a Special Economic Zone (SEZ) after Processing",
+    "regime_type_id": 11
+  },
+  {
+    "regime_type": "Import",
+    "regime_type_model": "IM19",
+    "cpc": 9500,
+    "description": "Destruction of goods",
+    "detail": "IM19 - 9500: Destruction of goods",
+    "regime_type_id": 19
+  },
+  {
+    "regime_type": "Import",
+    "regime_type_model": "IM20",
+    "cpc": 9700,
+    "description": "Goods sold in auction",
+    "detail": "IM20 - 9700: Goods sold in auction",
+    "regime_type_id": 20
+  },
+  {
+    "regime_type": "Import",
+    "regime_type_model": "IM4",
+    "cpc": 4000,
+    "description": "Commercial Import",
+    "detail": "IM4  - 4000: Import by registered taxpayer (GCT)",
+    "regime_type_id": 1
+  },
+  {
+    "regime_type": "Import",
+    "regime_type_model": "IM4",
+    "cpc": 4042,
+    "description": "Finalisation of Provisional Entry",
+    "detail": "IM4  - 4042: Import for home use after Provisional Entry",
+    "regime_type_id": 1
+  },
+  {
+    "regime_type": "Import",
+    "regime_type_model": "IM4",
+    "cpc": 4050,
+    "description": "Home use after Temporary Import for return in same state",
+    "detail": "IM4  - 4050: Permanent Import of goods that were previously imported on a temporary basis (in the same state).",
+    "regime_type_id": 1
+  },
+  {
+    "regime_type": "Import",
+    "regime_type_model": "IM4",
+    "cpc": 4051,
+    "description": "Home use after Temporary Import for Repair,Restoration or Improvement",
+    "detail": "IM4  - 4051: Import of goods (for home use) that were temporarily imported for repairs or restoration",
+    "regime_type_id": 1
+  },
+  {
+    "regime_type": "Import",
+    "regime_type_model": "IM4",
+    "cpc": 4052,
+    "description": "Home use after Temporary Import for Inward Processing",
+    "detail": "IM4  - 4052: Import of goods (for home use) that were temporarily imported for processing.",
+    "regime_type_id": 1
+  },
+  {
+    "regime_type": "Import",
+    "regime_type_model": "IM4",
+    "cpc": 4053,
+    "description": "Home use after Temporary Import  for Exhibition or Entertainment",
+    "detail": "IM4  - 4053: Import of goods (for home use) that were temporarily imported exhibition or entertainment.",
+    "regime_type_id": 1
+  },
+  {
+    "regime_type": "Import",
+    "regime_type_model": "IM4",
+    "cpc": 4070,
+    "description": "Ex- Warehouse",
+    "detail": "IM4  - 4070: Import from Private Bonded Warehouse (Ex-Warehouse)",
+    "regime_type_id": 1
+  },
+  {
+    "regime_type": "Import",
+    "regime_type_model": "IM4",
+    "cpc": 4071,
+    "description": "Ex- Warehouse (Duty Free Shops)",
+    "detail": "IM4  - 4071: Import from In-Bond warehouse (Duty Free Sales)",
+    "regime_type_id": 1
+  },
+  {
+    "regime_type": "Import",
+    "regime_type_model": "IM4",
+    "cpc": 4090,
+    "description": "Import from Free Zone",
+    "detail": "IM4  - 4090: Import from a Special Economic Zone",
+    "regime_type_id": 1
+  },
+  {
+    "regime_type": "Import",
+    "regime_type_model": "IM4",
+    "cpc": 4091,
+    "description": "Import from Free Zone After Processing",
+    "detail": "IM4  - 4091: Import from a Special Economic Zone after processing.",
+    "regime_type_id": 1
+  },
+  {
+    "regime_type": "Import",
+    "regime_type_model": "IM4",
+    "cpc": 4092,
+    "description": "Import for Home Use after Entry into Free Zone for Consumption",
+    "detail": "IM4  - 4092: Import of goods (for home use) previously entered into a Special Economic Zone for consumption.",
+    "regime_type_id": 1
+  },
+  {
+    "regime_type": "Import",
+    "regime_type_model": "IM4",
+    "cpc": 4200,
+    "description": "Provisional Entry",
+    "detail": "IM4  - 4200: Provisional Entry",
+    "regime_type_id": 1
+  },
+  {
+    "regime_type": "Import",
+    "regime_type_model": "IM4",
+    "cpc": 4400,
+    "description": "Short Shipment",
+    "detail": "IM4  - 4400: Entry for Short Shipment",
+    "regime_type_id": 1
+  },
+  {
+    "regime_type": "Import",
+    "regime_type_model": "IM4",
+    "cpc": 4500,
+    "description": "Non-Commercial  Import",
+    "detail": "IM4  - 4500: Import for your personal use",
+    "regime_type_id": 1
+  },
+  {
+    "regime_type": "Import",
+    "regime_type_model": "IM4",
+    "cpc": 4600,
+    "description": "Passenger Baggage",
+    "detail": "IM4  - 4600: Passenger Baggage",
+    "regime_type_id": 1
+  },
+  {
+    "regime_type": "Import",
+    "regime_type_model": "IM4",
+    "cpc": 4900,
+    "description": "Commercial Import with Uplift Applied",
+    "detail": "IM4  - 4900: Import by unregistered taxpayer (GCT ).",
+    "regime_type_id": 1
+  },
+  {
+    "regime_type": "Import",
+    "regime_type_model": "IM5",
+    "cpc": 5000,
+    "description": "Temporary Import for Return in Same State",
+    "detail": "IM5 - 5000: Temporary import to be returned in same state",
+    "regime_type_id": 3
+  },
+  {
+    "regime_type": "Import",
+    "regime_type_model": "IM5",
+    "cpc": 5058,
+    "description": "Temporary Import for Return in same State (Legacy System)",
+    "detail": "IM5 - 5058: Temporary import to be returned in same state (Legacy system)",
+    "regime_type_id": 3
+  },
+  {
+    "regime_type": "Import",
+    "regime_type_model": "IM5",
+    "cpc": 5100,
+    "description": "Temporary Import for Repair, Restoration or Improvement",
+    "detail": "IM5 - 5100 : Temporary import for repairs and restoration",
+    "regime_type_id": 3
+  },
+  {
+    "regime_type": "Import",
+    "regime_type_model": "IM5",
+    "cpc": 5200,
+    "description": "Temporary Import for Inward Processing",
+    "detail": "IM5 - 5200: Temporary import for manufacturing (inward processing)",
+    "regime_type_id": 3
+  },
+  {
+    "regime_type": "Import",
+    "regime_type_model": "IM5",
+    "cpc": 5300,
+    "description": "Temporary Import  for Exhibition or Entertainment",
+    "detail": "IM5 - 5300: Temporary import for exhibition & entertainment",
+    "regime_type_id": 3
+  },
+  {
+    "regime_type": "Import",
+    "regime_type_model": "IM6",
+    "cpc": 6010,
+    "description": "Re- Import after Permanent Export",
+    "detail": "IM6  - 6010: Re- Import after previous permanent export",
+    "regime_type_id": 8
+  },
+  {
+    "regime_type": "Import",
+    "regime_type_model": "IM6",
+    "cpc": 6020,
+    "description": "Re-Import after Temporary Export in Same State",
+    "detail": "IM6  - 6020: Re-Import after previous temporary export in same state",
+    "regime_type_id": 8
+  },
+  {
+    "regime_type": "Import",
+    "regime_type_model": "IM6",
+    "cpc": 6021,
+    "description": "Re-Import after Temporary Export for Repairs or Restoration",
+    "detail": "IM6  - 6021: Re-Import after Temporary Export for Repairs or Restoration",
+    "regime_type_id": 8
+  },
+  {
+    "regime_type": "Import",
+    "regime_type_model": "IM6",
+    "cpc": 6022,
+    "description": "Re-Import after Temporary Export for Outward Processing",
+    "detail": "IM6  - 6022: Re-Import after Temporary Export for Processing (Outward Processing)",
+    "regime_type_id": 8
+  },
+  {
+    "regime_type": "Import",
+    "regime_type_model": "IM6",
+    "cpc": 6028,
+    "description": "Re-Importation from Temporary Export (Legacy System)",
+    "detail": "IM6  - 6028: Re-Importation from Temporary Export (Legacy System)",
+    "regime_type_id": 8
+  },
+  {
+    "regime_type": "Import",
+    "regime_type_model": "IM7",
+    "cpc": 7000,
+    "description": "Warehouse (Private Bonded)",
+    "detail": "IM7 - 7000: Entry into a Private Bonded warehouse",
+    "regime_type_id": 2
+  },
+  {
+    "regime_type": "Import",
+    "regime_type_model": "IM7",
+    "cpc": 7070,
+    "description": "Transfer between Private Bonded Warehouse",
+    "detail": "IM7 - 7070: Transfer between Private Bonded Warehouse",
+    "regime_type_id": 2
+  },
+  {
+    "regime_type": "Import",
+    "regime_type_model": "IM7",
+    "cpc": 7078,
+    "description": "Warehousing from Legacy System",
+    "detail": "IM7 - 7078: Transfer from Legacy system to Private Bonded Warehouse",
+    "regime_type_id": 2
+  },
+  {
+    "regime_type": "Import",
+    "regime_type_model": "IM7",
+    "cpc": 7090,
+    "description": "Import from Free Zone to Private Bonded Warehouse",
+    "detail": "IM7 - 7090: Transfer from a Special Economic Zone to Private Bonded Warehouse",
+    "regime_type_id": 2
+  },
+  {
+    "regime_type": "Import",
+    "regime_type_model": "IM7",
+    "cpc": 7100,
+    "description": "Warehouse In bond(DFS)",
+    "detail": "IM7 - 7100: Entry into In-bond warehouse (Duty Free Sale)",
+    "regime_type_id": 2
+  },
+  {
+    "regime_type": "Import",
+    "regime_type_model": "IM7",
+    "cpc": 7130,
+    "description": "Return of item after In Bond \u2013 Duty Free Sale Accounting",
+    "detail": "IM7 - 7130: Return of item after In-Bond warehouse entry (Duty free sale accounting)",
+    "regime_type_id": 2
+  },
+  {
+    "regime_type": "Import",
+    "regime_type_model": "IM7",
+    "cpc": 7170,
+    "description": "Transfer to In bond Warehouse (DFS) from Private Bonded Warehouse",
+    "detail": "IM7 - 7170: Transfer to In-bond Warehouse (DFS) from Private Bonded Warehouse",
+    "regime_type_id": 2
+  },
+  {
+    "regime_type": "Import",
+    "regime_type_model": "IM7",
+    "cpc": 7171,
+    "description": "Transfer between In bond Warehouses(DFS)",
+    "detail": "IM7 - 7171: Transfer between In-Bond warehouses (Duty free sale)",
+    "regime_type_id": 2
+  },
+  {
+    "regime_type": "Import",
+    "regime_type_model": "IM7",
+    "cpc": 7178,
+    "description": "Transfer to In bond from Legacy System (DFS)",
+    "detail": "IM7 - 7178: Transfer to In-bond warehouse from Legacy system",
+    "regime_type_id": 2
+  },
+  {
+    "regime_type": "Import",
+    "regime_type_model": "IM8",
+    "cpc": 8000,
+    "description": "Goods Transfer (Public Bonded Warehouse)",
+    "detail": "IM8  - 8000: Goods transfer to Public Bonded Warehouse",
+    "regime_type_id": 5
+  },
+  {
+    "regime_type": "Import",
+    "regime_type_model": "IM8",
+    "cpc": 8200,
+    "description": "Transshipment (From Vessel to Vessel in the port)",
+    "detail": "IM8  - 8200: Transshipment in port, from Vessel to Vessel.",
+    "regime_type_id": 5
+  },
+  {
+    "regime_type": "Import",
+    "regime_type_model": "IM8",
+    "cpc": 8300,
+    "description": "Transfer to Queen\u2019s Warehouse",
+    "detail": "IM8  - 8300: Transfer to Queen's Warehouse",
+    "regime_type_id": 5
+  },
+  {
+    "regime_type": "Import",
+    "regime_type_model": "IM8",
+    "cpc": 8370,
+    "description": "Transit to Queens Warehouse from bonded warehouse",
+    "detail": "IM8  - 8370: Transit from Queen's Warehouse to Private Bonded Warehouse",
+    "regime_type_id": 5
+  },
+  {
+    "regime_type": "Import",
+    "regime_type_model": "IM9",
+    "cpc": 9000,
+    "description": "Free Zone Entry",
+    "detail": "IM9 - 9000: Import Entry into Special Economic Zone (SEZ)",
+    "regime_type_id": 6
+  },
+  {
+    "regime_type": "Import",
+    "regime_type_model": "IMD4",
+    "cpc": 4000,
+    "description": "Commercial Import",
+    "detail": "IMD4  - 4000: Commercial Import for immediate delivery",
+    "regime_type_id": 7
+  },
+  {
+    "regime_type": "Import",
+    "regime_type_model": "IML4",
+    "cpc": 4000,
+    "description": "Commercial Import",
+    "detail": "IML4 - 4000: Commercial Import from Legacy System",
+    "regime_type_id": 21
+  },
+  {
+    "regime_type": "Import",
+    "regime_type_model": "IMS4",
+    "cpc": 4000,
+    "description": "Commercial Import",
+    "detail": "IMS4 - 4000: Commercial Import",
+    "regime_type_id": 4
+  },
+  {
+    "regime_type": "Import",
+    "regime_type_model": "IMS4",
+    "cpc": 4500,
+    "description": "Non-Commercial Importation",
+    "detail": "IMS4 - 4500: Non-commercial Import",
+    "regime_type_id": 4
+  },
+  {
+    "regime_type": "Import",
+    "regime_type_model": "IMS4",
+    "cpc": 4600,
+    "description": "Passenger Baggage",
+    "detail": "IMS4 - 4600: Passenger Baggage",
+    "regime_type_id": 4
+  },
+  {
+    "regime_type": "Import",
+    "regime_type_model": "IMS4",
+    "cpc": 4900,
+    "description": "Commercial Import \u2013with Uplift Applied",
+    "detail": "IMS4 - 4900: Commercial import by unregistered taxpayer (GCT ).",
+    "regime_type_id": 4
+  },
+  {
+    "regime_type": "Import",
+    "regime_type_model": "IP8",
+    "cpc": 8000,
+    "description": "Transit Goods Transfer (Public Bonded Warehouse)",
+    "detail": "IP8  - 8000:  Transfer of Transit Goods (Public Bonded Warehouse)",
+    "regime_type_id": 9
+  }
+]
