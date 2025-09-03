@@ -115,16 +115,16 @@
       "description": "Processes port information for Box Field 27, returns LOCODE based on import/export scenario"
     },
     "Location of goods": {
-      "script": "esad_location.py",
-      "input_field": "location_of_goods",
+      "script": "esad_warehouse.py",
+      "input_field": "office_code_processed",
       "output_field": "goods_location_processed",
-      "description": "Processes goods location information"
+      "description": "Processes warehouse codes using office code lookup against warehouse reference data for box field 30"
     },
     "Marks and numbers of packages": {
       "script": "esad_marks.py",
-      "input_field": "marks_numbers",
-      "output_field": "marks_processed",
-      "description": "Processes package marks and numbers"
+      "input_field": "commercial_description",
+      "output_field": "field_31_marks_processed",
+      "description": "Creates field 31 marks by concatenating 'AS ADDRESSED' with commercial description"
     },
     "No. of packages": {
       "script": null,
@@ -182,9 +182,9 @@
     },
     "Statistical Units": {
       "script": null,
-      "input_field": "statistical_units",
-      "output_field": "statistical_units_processed",
-      "description": "Default statistical unit KGM (kilograms) for weight measurements - value inserted directly"
+      "input_field": null,
+      "output_field": null,
+      "description": "Reference field only - automatically populated by ASYCUDA system. No processing required."
     },
     "Invoice value (goods only)": {
       "script": "esad_cif.py",
@@ -283,6 +283,12 @@
       "input_fields": ["order_id"],
       "output_fields": ["commercial_ref_processed"],
       "dependencies": []
+    },
+    "esad_warehouse.py": {
+      "description": "Processes warehouse codes using office code lookup against warehouse reference data for box field 30",
+      "input_fields": ["office_code_processed"],
+      "output_fields": ["goods_location_processed"],
+      "dependencies": ["warehouse.csv"]
     }
   }
 }

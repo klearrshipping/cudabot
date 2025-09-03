@@ -37,6 +37,13 @@ from module.confirm_hs_code import HSCodeReconciler, reason_with_llm_fn
 from module.commodity_code import lookup_commodity_code, lookup_commodity_code_with_answers
 from module.intent_parser import parse_user_intent, IntentType
 from supabase import create_client
+# Import config from the hscode_api directory
+import os
+import sys
+current_dir = os.path.dirname(os.path.abspath(__file__))
+hscode_api_dir = current_dir
+sys.path.insert(0, hscode_api_dir)
+
 from config import SUPABASE_URL, SUPABASE_KEY
 
 # Session storage (in production, use Redis or database)
@@ -45,7 +52,7 @@ classification_sessions = {}
 class HSCodeOrchestrator:
     """Orchestrates the complete HS code classification pipeline"""
     
-    def __init__(self, verbose: bool = False):
+    def __init__(self, verbose: bool = True):
         self.verbose = verbose
         self.supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
         self.reconciler = HSCodeReconciler(self.supabase, reason_with_llm_fn, verbose=verbose)
@@ -87,7 +94,7 @@ class HSCodeOrchestrator:
             stage1_results = classify_product(product_name)
             results["stage1_classification"] = stage1_results
             
-            if not stage1_results.get("consensus_codes"):
+            if not stage1_results or not stage1_results.get("consensus_codes"):
                 error_msg = "Stage 1 failed: No HS codes generated"
                 results["errors"].append(error_msg)
                 return results
@@ -136,15 +143,26 @@ class HSCodeOrchestrator:
             print(f"──────────────────────────────────")
             
             # Use answers if provided, otherwise do initial lookup
-            if additional_context:
-                commodity_results = lookup_commodity_code_with_answers(
-                    final_hs_codes, product_name, product_info, 
-                    f"Classify {product_name}", additional_context
-                )
-            else:
-                commodity_results = lookup_commodity_code(
-                    final_hs_codes, product_name, product_info
-                )
+            try:
+                if additional_context:
+                    print(f"🔍 DEBUG: Calling lookup_commodity_code_with_answers with {len(final_hs_codes)} HS codes")
+                    commodity_results = lookup_commodity_code_with_answers(
+                        final_hs_codes, product_name, product_info, 
+                        f"Classify {product_name}", additional_context
+                    )
+                else:
+                    print(f"🔍 DEBUG: Calling lookup_commodity_code with {len(final_hs_codes)} HS codes: {final_hs_codes}")
+                    commodity_results = lookup_commodity_code(
+                        final_hs_codes, product_name, product_info
+                    )
+                
+                print(f"🔍 DEBUG: Commodity lookup returned: {type(commodity_results)} with keys: {list(commodity_results.keys()) if isinstance(commodity_results, dict) else 'Not a dict'}")
+                
+            except Exception as e:
+                print(f"❌ ERROR: Commodity lookup failed: {str(e)}")
+                import traceback
+                traceback.print_exc()
+                commodity_results = {}
             
             results["stage3_commodity_lookup"] = commodity_results
             
@@ -277,12 +295,6 @@ class SimplifiedResponse(BaseModel):
     hs_code: Optional[str]
     commodity_code: Optional[str]
     description: Optional[str]
-    status: Optional[str] = "complete"  # "complete" or "needs_clarification"
-    clarification_questions: Optional[List[ClarificationQuestion]] = None
-    session_id: Optional[str] = None
-    intent: Optional[str] = None  # The detected user intent
-    response_message: Optional[str] = None  # Contextual response message
-    additional_info: Optional[Dict[str, Any]] = None  # For duties, permits, etc.
 
 class ClassificationResponse(BaseModel):
     metadata: Dict[str, Any]
@@ -328,13 +340,10 @@ def build_classification_response(results: Dict[str, Any], product_name: str) ->
     commodity_results = results.get("stage3_commodity_lookup", {})
     selected_commodity = None
     for hs_code, codes in commodity_results.items():
-        if codes and isinstance(codes, list):
-            for code in codes:
-                if code.get("selected", False):
-                    selected_commodity = code
-                    break
-            if selected_commodity:
-                break
+        if codes and isinstance(codes, list) and len(codes) > 0:
+            # Take the first code since commodity lookup returns [best_match] with selected=True
+            selected_commodity = codes[0]
+            break
     
     # Clean up product name for title
     clean_product_name = product_name.replace("what is the commodity code for", "").replace("what is the hs code for", "").strip()
@@ -712,32 +721,40 @@ async def classify_product_endpoint(request: ClassificationRequest):
         product_name = parsed_intent.product_name
         
         # Handle different intents
-        if parsed_intent.intent == IntentType.CLASSIFICATION:
+        if parsed_intent.intent == IntentType.CLASSIFY:
             # For classification queries, run the full pipeline
             results = orchestrator.classify_complete_pipeline(product_name)
             
-            # Check if clarification is needed
-            if results.get("needs_clarification") and results.get("clarification_questions"):
-                # Store session data
-                session_id = str(uuid.uuid4())
-                classification_sessions[session_id] = {
-                    "product_name": product_name,
-                    "results": results
-                }
+            # Add debug block to see commodity extraction
+            print(f"\n🔍 DEBUGGING COMMODITY EXTRACTION:")
+            print("="*60)
+
+            commodity_results = results.get("stage3_commodity_lookup", {})
+            print(f"commodity_results type: {type(commodity_results)}")
+            print(f"commodity_results keys: {list(commodity_results.keys()) if isinstance(commodity_results, dict) else 'Not a dict'}")
+
+            for hs_code, codes in commodity_results.items():
+                print(f"\nHS Code: {hs_code}")
+                print(f"  Codes type: {type(codes)}")
+                print(f"  Codes value: {codes}")
                 
-                return {
-                    "product_name": product_name,
-                    "hs_code": None,
-                    "commodity_code": None,
-                    "description": None,
-                    "confidence": None,
-                    "status": "needs_clarification",
-                    "clarification_questions": [
-                        ClarificationQuestion(**q) for q in results["clarification_questions"]
-                    ],
-                    "session_id": session_id,
-                    "response_message": f"I need some additional information to accurately classify {product_name}."
-                }
+                if codes and isinstance(codes, list) and len(codes) > 0:
+                    selected_commodity = codes[0]
+                    print(f"  Selected commodity type: {type(selected_commodity)}")
+                    print(f"  Selected commodity keys: {list(selected_commodity.keys()) if isinstance(selected_commodity, dict) else 'Not a dict'}")
+                    if isinstance(selected_commodity, dict):
+                        print(f"  tariff_code value: {selected_commodity.get('tariff_code')}")
+                        print(f"  description value: {selected_commodity.get('description')}")
+                    break
+
+            print("="*60)
+            
+            # Check if clarification is needed - for now, return error for clarification cases
+            if results.get("needs_clarification") and results.get("clarification_questions"):
+                raise HTTPException(
+                    status_code=422, 
+                    detail=f"Additional information needed to classify '{product_name}'. Please provide more specific product details."
+                )
             
             # Extract final results for complete classification
             final_results = results.get("final_results", {})
@@ -747,30 +764,16 @@ async def classify_product_endpoint(request: ClassificationRequest):
             confirmed_code = final_results.get("confirmed_hs_code")
             selected_commodity = None
             for hs_code, codes in commodity_results.items():
-                if codes and isinstance(codes, list):
-                    for code in codes:
-                        if code.get("selected", False):
-                            selected_commodity = code
-                            break
-                    if selected_commodity:
-                        break
-            
-            # Determine confidence level
-            quality_score = final_results.get("quality_score", 0)
-            confidence_level = "high" if quality_score >= 8 else "medium" if quality_score >= 6 else "low"
-            
-            # Use the new structured response format
-            structured_response = build_classification_response(results, product_name)
+                if codes and isinstance(codes, list) and len(codes) > 0:
+                    # Take the first code since commodity lookup returns [best_match] with selected=True
+                    selected_commodity = codes[0]
+                    break
             
             return {
                 "product_name": product_name,
                 "hs_code": confirmed_code,
                 "commodity_code": selected_commodity.get("tariff_code") if selected_commodity else None,
-                "description": selected_commodity.get("description") if selected_commodity else None,
-                "confidence": confidence_level,
-                "status": "complete",
-                "intent": parsed_intent.intent.value,
-                "response_message": structured_response
+                "description": selected_commodity.get("description") if selected_commodity else None
             }
             
         elif parsed_intent.intent == IntentType.DUTIES:
@@ -789,15 +792,7 @@ async def classify_product_endpoint(request: ClassificationRequest):
                 "product_name": product_name,
                 "hs_code": confirmed_code,
                 "commodity_code": None,
-                "description": f"Duties information for {product_name}",
-                "confidence": "medium",
-                "status": "complete",
-                "intent": parsed_intent.intent.value,
-                "response_message": duty_message,
-                "additional_info": {
-                    "note": "Duty rates vary by country and trade agreements. Contact your customs broker for specific rates.",
-                    "next_steps": ["Verify country of origin", "Check applicable trade agreements", "Contact customs broker"]
-                }
+                "description": f"Duties information for {product_name}"
             }
             
         elif parsed_intent.intent == IntentType.PERMITS:
@@ -815,15 +810,7 @@ async def classify_product_endpoint(request: ClassificationRequest):
                 "product_name": product_name,
                 "hs_code": confirmed_code,
                 "commodity_code": None,
-                "description": f"Permit requirements for {product_name}",
-                "confidence": "medium",
-                "status": "complete",
-                "intent": parsed_intent.intent.value,
-                "response_message": permit_message,
-                "additional_info": {
-                    "note": "Permit requirements vary by country and product type. Always check with local authorities.",
-                    "next_steps": ["Check with local trade authority", "Verify product specifications", "Review country-specific regulations"]
-                }
+                "description": f"Permit requirements for {product_name}"
             }
             
         elif parsed_intent.intent == IntentType.RESTRICTIONS:
@@ -841,33 +828,53 @@ async def classify_product_endpoint(request: ClassificationRequest):
                 "product_name": product_name,
                 "hs_code": confirmed_code,
                 "commodity_code": None,
-                "description": f"Trade restrictions for {product_name}",
-                "confidence": "medium",
-                "status": "complete",
-                "intent": parsed_intent.intent.value,
-                "response_message": restriction_message,
-                "additional_info": {
-                    "note": "Trade restrictions change frequently. Always verify current regulations.",
-                    "next_steps": ["Check current trade restrictions", "Verify with customs authority", "Review export/import regulations"]
-                }
+                "description": f"Trade restrictions for {product_name}"
             }
             
         else:
             # For general or unknown intents, default to classification
             results = orchestrator.classify_complete_pipeline(product_name)
             
+            # Add debug block to see commodity extraction
+            print(f"\n🔍 DEBUGGING COMMODITY EXTRACTION (ELSE BRANCH):")
+            print("="*60)
+
+            commodity_results = results.get("stage3_commodity_lookup", {})
+            print(f"commodity_results type: {type(commodity_results)}")
+            print(f"commodity_results keys: {list(commodity_results.keys()) if isinstance(commodity_results, dict) else 'Not a dict'}")
+
+            for hs_code, codes in commodity_results.items():
+                print(f"\nHS Code: {hs_code}")
+                print(f"  Codes type: {type(codes)}")
+                print(f"  Codes value: {codes}")
+                
+                if codes and isinstance(codes, list) and len(codes) > 0:
+                    selected_commodity = codes[0]
+                    print(f"  Selected commodity type: {type(selected_commodity)}")
+                    print(f"  Selected commodity keys: {list(selected_commodity.keys()) if isinstance(selected_commodity, dict) else 'Not a dict'}")
+                    if isinstance(selected_commodity, dict):
+                        print(f"  tariff_code value: {selected_commodity.get('tariff_code')}")
+                        print(f"  description value: {selected_commodity.get('description')}")
+                    break
+
+            print("="*60)
+            
             final_results = results.get("final_results", {})
+            
             confirmed_code = final_results.get("confirmed_hs_code")
+            
+            # Extract selected commodity code (same logic as CLASSIFY branch)
+            selected_commodity = None
+            for hs_code, codes in commodity_results.items():
+                if codes and isinstance(codes, list) and len(codes) > 0:
+                    selected_commodity = codes[0]
+                    break
             
             return {
                 "product_name": product_name,
                 "hs_code": confirmed_code,
-                "commodity_code": None,
-                "description": f"General information for {product_name}",
-                "confidence": "medium",
-                "status": "complete",
-                "intent": parsed_intent.intent.value,
-                "response_message": f"I've analyzed {product_name} and provided its classification. Let me know if you need specific information about duties, permits, or restrictions."
+                "commodity_code": selected_commodity.get("tariff_code") if selected_commodity else None,
+                "description": selected_commodity.get("description") if selected_commodity else None
             }
             
     except Exception as e:
@@ -927,13 +934,10 @@ async def continue_classification(request: ClarificationRequest):
         # Get the selected commodity code
         selected_commodity = None
         for hs_code, codes in commodity_results.items():
-            if codes and isinstance(codes, list):
-                for code in codes:
-                    if code.get("selected", False):
-                        selected_commodity = code
-                        break
-                if selected_commodity:
-                    break
+            if codes and isinstance(codes, list) and len(codes) > 0:
+                # Take the first code since commodity lookup returns [best_match] with selected=True
+                selected_commodity = codes[0]
+                break
         
         # Clean up session
         del classification_sessions[request.session_id]
@@ -945,10 +949,7 @@ async def continue_classification(request: ClarificationRequest):
             "product_name": final_results.get("product_name", product_name),
             "hs_code": confirmed_code,
             "commodity_code": selected_commodity.get("tariff_code") if selected_commodity else None,
-            "description": selected_commodity.get("description") if selected_commodity else None,
-            "confidence": "high" if final_results.get("quality_score", 0) >= 8 else "medium" if final_results.get("quality_score", 0) >= 6 else "low",
-            "status": "complete",
-            "response_message": structured_response
+            "description": selected_commodity.get("description") if selected_commodity else None
         }
         
     except HTTPException:
@@ -974,20 +975,16 @@ async def classify_product_get(
         # Get the selected commodity code
         selected_commodity = None
         for hs_code, codes in commodity_results.items():
-            if codes and isinstance(codes, list):
-                for code in codes:
-                    if code.get("selected", False):
-                        selected_commodity = code
-                        break
-                if selected_commodity:
-                    break
+            if codes and isinstance(codes, list) and len(codes) > 0:
+                # Take the first code since commodity lookup returns [best_match] with selected=True
+                selected_commodity = codes[0]
+                break
         
         return {
             "product_name": final_results.get("product_name", "Unknown Product"),
             "hs_code": confirmed_code,
             "commodity_code": selected_commodity.get("tariff_code") if selected_commodity else None,
-            "description": selected_commodity.get("description") if selected_commodity else None,
-            "confidence": "high" if final_results.get("quality_score", 0) >= 8 else "medium" if final_results.get("quality_score", 0) >= 6 else "low"
+            "description": selected_commodity.get("description") if selected_commodity else None
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -1097,10 +1094,9 @@ async def classify_product_stream(request: ClassificationRequest):
             for hs_code, codes in commodity_results.items():
                 if codes and isinstance(codes, list):
                     total_codes += len(codes)
-                    for code in codes:
-                        if code.get("selected", True):  # Assume selected if only one
-                            selected_commodity = code
-                            break
+                    if len(codes) > 0:
+                        # Take the first code since commodity lookup returns [best_match] with selected=True
+                        selected_commodity = codes[0]
             
             if needs_clarification:
                 yield stream_thinking_step("stage3_result", "📋 **Stage 3 Analysis**\n\nFound multiple commodity codes but need additional information to select the most appropriate one.", True)

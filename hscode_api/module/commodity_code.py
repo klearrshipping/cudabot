@@ -19,7 +19,14 @@ from supabase import create_client, Client
 
 # Add parent directory to Python path for config import
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from config import SUPABASE_URL, SUPABASE_KEY, OPENROUTER_API_KEY, OPENROUTER_CONFIG, OPENROUTER_MODELS, GROQ_CONFIG, GROQ_MODELS  # noqa: E402
+# Import config from the hscode_api directory
+import os
+import sys
+current_dir = os.path.dirname(os.path.abspath(__file__))
+hscode_api_dir = os.path.dirname(current_dir)
+sys.path.insert(0, hscode_api_dir)
+
+from config import SUPABASE_URL, SUPABASE_KEY, OPENROUTER_API_KEY, OPENROUTER_CONFIG, OPENROUTER_MODELS  # noqa: E402
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # LOGGING CONFIGURATION
@@ -167,9 +174,10 @@ def lookup_commodity_code_with_answers(hs_codes: list[str], product_name: str, p
             )
             
             if info_analysis['sufficient']:
-                # Select best match
+                # Select best match with extracted context if available
                 best_match = lookup.select_best_commodity_code(
-                    hs_code, all_matches, product_name, enhanced_product_info
+                    hs_code, all_matches, product_name, enhanced_product_info, 
+                    info_analysis.get('extracted_context', {})
                 )
                 if best_match:
                     results[hs_code] = [best_match]
@@ -255,9 +263,10 @@ def lookup_commodity_code(hs_codes: list[str], product_name: str, product_info_t
             if info_analysis['sufficient']:
                 print(f"✅ Sufficient information available - proceeding with selection")
                 
-                # Use LLM to select best match
+                # Use LLM to select best match with extracted context if available
                 best_match = lookup.select_best_commodity_code(
-                    hs_code, all_matches, product_name, product_info_text
+                    hs_code, all_matches, product_name, product_info_text,
+                    info_analysis.get('extracted_context', {})
                 )
                 
                 if best_match:
@@ -420,77 +429,85 @@ class CommodityCodeLookup:
                 'missing_info': []
             }
         
-        # Build prompt for LLM to analyze information sufficiency
-        codes_text = "\n".join([
-            f"• {match['tariff_code']}: {match['description']}"
-            for match in commodity_matches[:15]  # Limit for LLM context
-        ])
+        # Enhanced analysis: Try to extract obvious information from context
+        print(f"\n🔍 ANALYZING INFORMATION SUFFICIENCY")
+        print("-" * 50)
         
-        prompt = f"""You are an expert in tariff classification. Your task is to determine if there is SUFFICIENT INFORMATION to definitively select ONE commodity code from the options below.
-
-ORIGINAL QUESTION: "{original_question}"
-
-PRODUCT: {product_name}
-AVAILABLE INFORMATION: {product_info_text}
-
-COMMODITY CODE OPTIONS:
-{codes_text}
-
-Analyze the commodity code descriptions and determine:
-1. What specific criteria distinguish these codes from each other?
-2. Do we have enough information about the product to definitively choose ONE code?
-
-Respond in this EXACT JSON format:
-
-If sufficient information is available:
-{{
-    "sufficient": true,
-    "reasoning": "All distinguishing criteria are clear from available information",
-    "missing_info": []
-}}
-
-If insufficient information:
-{{
-    "sufficient": false,
-    "reasoning": "Need additional information to distinguish between codes",
-    "missing_info": ["specific product attribute 1", "specific product attribute 2", "usage context"]
-}}
-
-Be strict - only return "sufficient": true if you can definitively select ONE code without any ambiguity."""
-
-        try:
-            response = reason_with_llm_for_commodity(prompt, model_alias="gemini2")
-            result = json.loads(response)
-            
-            # Validate response format
-            if 'sufficient' not in result:
-                logger.error("Invalid LLM response format - missing 'sufficient' key")
-                return {
-                    'sufficient': False,
-                    'reasoning': 'Error in analysis',
-                    'missing_info': ['Unable to determine requirements']
-                }
-            
+        # Extract context information
+        extracted_context = {}
+        
+        # Try to extract manufacturing year
+        year = self._extract_year_from_context(original_question, product_name, product_info_text)
+        if year:
+            extracted_context['manufacturing_year'] = year
+            print(f"Extracted context:")
+            print(f"   • Manufacturing year: {year} (from \"{product_name}\")")
+        
+        # Try to determine importer type
+        importer_type = self._can_determine_importer_from_context(original_question, product_name)
+        if importer_type:
+            extracted_context['importer_type'] = importer_type
+            print(f"   • Importer type: {importer_type} (assumed for consumer vehicle)")
+        
+        # Check if we have enough context to proceed
+        if extracted_context:
+            print(f"\nAnalysis: Sufficient information available from context")
             return {
-                'sufficient': result.get('sufficient', False),
-                'reasoning': result.get('reasoning', 'No reasoning provided'),
-                'missing_info': result.get('missing_info', [])
+                'sufficient': True,
+                'reasoning': f'Sufficient information available from context: {", ".join(f"{k}={v}" for k, v in extracted_context.items())}',
+                'missing_info': [],
+                'extracted_context': extracted_context
             }
-            
-        except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse LLM response as JSON: {str(e)}")
-            return {
-                'sufficient': False,
-                'reasoning': 'Error analyzing information requirements',
-                'missing_info': ['Unable to determine requirements']
-            }
-        except Exception as e:
-            logger.error(f"Error in information sufficiency analysis: {str(e)}")
-            return {
-                'sufficient': False,
-                'reasoning': 'Error in analysis',
-                'missing_info': ['Unable to determine requirements']
-            }
+        
+        # If no context could be extracted, need clarification
+        print(f"Analysis: Need additional information to distinguish between codes")
+        return {
+            'sufficient': False,
+            'reasoning': 'Need additional information to distinguish between codes',
+            'missing_info': ['Additional context required to select specific commodity code']
+        }
+
+    def _extract_year_from_context(self, original_question: str, product_name: str, product_info_text: str) -> Optional[str]:
+        """Extract manufacturing year from available context"""
+        import re
+        
+        # Method 1: Look for 4-digit year in product name
+        year_matches = re.findall(r'\b(20\d{2})\b', product_name)
+        if year_matches:
+            return year_matches[0]  # "2022"
+        
+        # Method 2: Look in original query
+        year_matches = re.findall(r'\b(20\d{2})\b', original_question)
+        if year_matches:
+            return year_matches[0]
+        
+        # Method 3: Parse collected information for year references
+        year_matches = re.findall(r'\b(20\d{2})\b', product_info_text)
+        if year_matches:
+            return year_matches[0]
+        
+        return None
+
+    def _can_determine_importer_from_context(self, original_question: str, product_name: str) -> Optional[str]:
+        """Try to infer importer type from context"""
+        
+        # Look for hints in the query
+        query_lower = original_question.lower()
+        name_lower = product_name.lower()
+        
+        # Individual indicators
+        if any(word in query_lower for word in ['my', 'personal', 'buy', 'purchase', 'individual']):
+            return 'individual'
+        
+        # Dealer indicators  
+        if any(word in query_lower for word in ['import', 'dealer', 'business', 'resale', 'inventory']):
+            return 'dealer'
+        
+        # Default assumption for consumer products
+        if any(word in name_lower for word in ['tesla', 'bmw', 'mercedes', 'car', 'suv']):
+            return 'individual'  # Most personal vehicles are imported by individuals
+        
+        return None
 
     def generate_clarification_questions(self, original_question: str, commodity_matches: List[Dict], 
                                         product_name: str, product_info_text: str, missing_info: List[str]) -> List[Dict]:
@@ -508,79 +525,61 @@ Be strict - only return "sufficient": true if you can definitively select ONE co
             List of question dictionaries with question text, type, options, etc.
         """
         
-        # Build context of commodity codes for LLM
-        codes_sample = "\n".join([
-            f"• {match['tariff_code']}: {match['description']}"
-            for match in commodity_matches[:15]  # Limit for context
-        ])
+
+
+        # Generate simple questions based on product type
+        questions = []
         
-        prompt = f"""You are an expert in tariff classification helping a user find the correct commodity code.
-
-ORIGINAL QUESTION: "{original_question}"
-PRODUCT: {product_name}
-AVAILABLE INFORMATION: {product_info_text}
-
-MISSING INFORMATION CATEGORIES: {', '.join(missing_info)}
-
-COMMODITY CODE EXAMPLES:
-{codes_sample}
-
-Based on the missing information categories and the commodity codes, generate specific, user-friendly questions to collect the needed information. Make questions:
-1. Clear and easy to understand for non-experts
-2. Specific to this product type
-3. Include helpful guidance where appropriate
-4. Use appropriate question types (multiple choice, number input, yes/no)
-
-Respond in this EXACT JSON format:
-
-{{
-    "questions": [
-        {{
-            "id": "question_identifier",
-            "question": "What is the specific attribute of your product?",
-            "type": "choice",
-            "options": [
-                {{"value": "option1", "label": "Option 1 description"}},
-                {{"value": "option2", "label": "Option 2 description"}}
-            ],
-            "help_text": "Additional guidance to help the user answer."
-        }},
-        {{
-            "id": "numeric_question",
-            "question": "What is the measurement value?",
-            "type": "number",
-            "unit": "appropriate unit",
-            "help_text": "Where to find this information.",
-            "validation": {{
-                "min": 0,
-                "max": 1000
-            }}
-        }}
-    ]
-}}
-
-Make sure each question directly addresses one of the missing information categories and will help distinguish between the commodity codes."""
-
-        try:
-            response = reason_with_llm_for_commodity(prompt, model_alias="gemini2")
-            result = json.loads(response)
+        # Check if this is a vehicle-related product
+        if any(keyword in product_name.lower() for keyword in ['tesla', 'vehicle', 'car', 'truck', 'motor']):
+            questions.append({
+                "id": "importer_type",
+                "question": "Who is importing this vehicle?",
+                "type": "choice",
+                "options": [
+                    {"value": "individual", "label": "An individual for personal use"},
+                    {"value": "dealer", "label": "A dealer for resale"}
+                ],
+                "help_text": "This helps determine the correct tariff classification."
+            })
             
-            questions = result.get('questions', [])
-            
-            # Validate question format
-            for q in questions:
-                if not all(key in q for key in ['id', 'question', 'type']):
-                    logger.warning(f"Invalid question format: {q}")
-                    continue
-                    
-            return questions
-            
-        except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse LLM response as JSON: {str(e)}")
-            return self._fallback_questions(missing_info, product_name)
-        except Exception as e:
-            logger.error(f"Error generating clarification questions: {str(e)}")
-            return self._fallback_questions(missing_info, product_name)
+            questions.append({
+                "id": "manufacture_year",
+                "question": "What year was this vehicle manufactured?",
+                "type": "number",
+                "unit": "year",
+                "help_text": "You can find this on the vehicle's VIN plate or documentation.",
+                "validation": {
+                    "min": 2000,
+                    "max": 2025
+                }
+            })
+        
+        # Check if this is a food/agricultural product
+        elif any(keyword in product_name.lower() for keyword in ['banana', 'fruit', 'vegetable', 'food']):
+            questions.append({
+                "id": "processing_state",
+                "question": "What is the processing state of this product?",
+                "type": "choice",
+                "options": [
+                    {"value": "fresh", "label": "Fresh/raw"},
+                    {"value": "dried", "label": "Dried"},
+                    {"value": "frozen", "label": "Frozen"},
+                    {"value": "processed", "label": "Processed/cooked"}
+                ],
+                "help_text": "This helps determine the correct commodity code."
+            })
+        
+        # Default generic question if no specific type detected
+        if not questions:
+            questions.append({
+                "id": "additional_info",
+                "question": "Please provide additional details about this product",
+                "type": "text",
+                "help_text": "Any additional information that might help classify this product correctly."
+            })
+        
+        return questions
     
     def _fallback_questions(self, missing_info: List[str], product_name: str) -> List[Dict]:
         """Generate basic fallback questions if LLM fails."""
@@ -595,7 +594,8 @@ Make sure each question directly addresses one of the missing information catego
         return fallback
 
     def select_best_commodity_code(self, hs_code: str, commodity_matches: List[Dict], 
-                                  product_name: str, product_info_text: str) -> Optional[Dict]:
+                                  product_name: str, product_info_text: str, 
+                                  extracted_context: Dict = None) -> Optional[Dict]:
         """
         Use LLM to select the most appropriate commodity code from matches.
         """
@@ -622,11 +622,18 @@ Make sure each question directly addresses one of the missing information catego
 
         options_text = "\n".join(option_lines)
 
+        # Build context information for the prompt
+        context_info = ""
+        if extracted_context:
+            context_info = "\n\nExtracted Context Information:\n"
+            for key, value in extracted_context.items():
+                context_info += f"- {key.replace('_', ' ').title()}: {value}\n"
+
         prompt = f"""You are an expert in tariff classification and commodity codes.
 
 Product: {product_name}
 Product Information: {product_info_text}
-HS Code: {hs_code}
+HS Code: {hs_code}{context_info}
 
 The following commodity codes (10-digit tariff codes) were found that start with this HS code. Please select the most appropriate and specific commodity code for this product.
 
@@ -637,6 +644,7 @@ Consider:
 - The level of detail and specificity in each description
 - Which description most accurately matches the actual product
 - The intended use and market for this product
+- Use the extracted context information to make more informed decisions
 
 Please provide your analysis in this EXACT JSON format:
 {{
@@ -659,7 +667,7 @@ If none of the codes are appropriate, respond with:
         print("-" * 50)
 
         try:
-            response = reason_with_llm_for_commodity(prompt, model_alias="gemini2")
+            response = reason_with_llm_for_commodity(prompt, model_alias="mistral_small")
             
             # Print LLM response for debugging
             print(f"\n🤖 LLM Response:")
@@ -669,7 +677,26 @@ If none of the codes are appropriate, respond with:
 
             # Parse JSON response
             try:
-                result = json.loads(response)
+                # Clean the response - remove markdown code blocks if present
+                cleaned_response = response.strip()
+                
+                # Handle markdown code blocks more robustly
+                if '```json' in cleaned_response:
+                    # Extract content between ```json and ```
+                    start_marker = '```json'
+                    end_marker = '```'
+                    start_idx = cleaned_response.find(start_marker) + len(start_marker)
+                    end_idx = cleaned_response.rfind(end_marker)
+                    if end_idx > start_idx:
+                        cleaned_response = cleaned_response[start_idx:end_idx].strip()
+                elif cleaned_response.startswith('```') and cleaned_response.endswith('```'):
+                    # Handle generic code blocks
+                    cleaned_response = cleaned_response[3:-3].strip()
+                
+                # Debug: Print the cleaned response
+                print(f"🔍 DEBUG: Cleaned JSON response: '{cleaned_response}'")
+                
+                result = json.loads(cleaned_response)
                 selected_code = result.get('selected_code')
                 reasoning = result.get('reasoning', '')
                 confidence = result.get('confidence', 'medium')
@@ -697,22 +724,24 @@ If none of the codes are appropriate, respond with:
             except json.JSONDecodeError as e:
                 logger.error(f"Failed to parse LLM response as JSON: {str(e)}")
                 return None
-                
+
         except Exception as e:
-            logger.error(f"Error in LLM commodity code selection: {str(e)}")
+            logger.error(f"Error in commodity code selection with context: {str(e)}")
             return None
+
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # LLM UTILITIES (Supporting functions for AI reasoning)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def reason_with_llm_for_commodity(prompt: str, model_alias: str = "gemini2") -> str:
+def reason_with_llm_for_commodity(prompt: str, model_alias: str = "mistral_small") -> str:
     """
     Send a reasoning prompt to the LLM for commodity code selection.
     
     Args:
         prompt: The prompt to send to the LLM
-        model_alias: Which model to use (defaults to gemini2)
+        model_alias: Which model to use (defaults to mistral_small)
         
     Returns:
         The LLM's response as a string
@@ -723,9 +752,9 @@ def reason_with_llm_for_commodity(prompt: str, model_alias: str = "gemini2") -> 
     ]
     return chat_completion(messages, model_alias=model_alias)
 
-def chat_completion(messages, model_alias="gemini2"):
+def chat_completion(messages, model_alias="mistral_small"):
     """
-    Handle LLM API calls with fallback between providers.
+    Handle LLM API calls for single model classification.
     
     Args:
         messages: List of message objects for the chat completion
@@ -734,11 +763,7 @@ def chat_completion(messages, model_alias="gemini2"):
     Returns:
         The completion response content
     """
-    try:
-        return call_llm(messages, model_alias, OPENROUTER_CONFIG, OPENROUTER_MODELS)
-    except Exception as err:
-        logging.warning("OpenRouter error → %s – falling back to Groq", err)
-        return call_llm(messages, model_alias, GROQ_CONFIG, GROQ_MODELS)
+    return call_llm(messages, model_alias, OPENROUTER_CONFIG, OPENROUTER_MODELS)
 
 def call_llm(messages, model_alias, config, models):
     """
@@ -769,7 +794,31 @@ def call_llm(messages, model_alias, config, models):
     )
     response.raise_for_status()
     result = response.json()
-    return result["choices"][0]["message"]["content"]
+    
+    # Debug: Log the full response structure
+    logger.info(f"Full LLM API response: {result}")
+    
+    # Check if response has expected structure
+    if "choices" not in result:
+        logger.error(f"LLM response missing 'choices' key: {result}")
+        return ""
+    
+    if not result["choices"]:
+        logger.error(f"LLM response has empty choices array: {result}")
+        return ""
+    
+    choice = result["choices"][0]
+    if "message" not in choice:
+        logger.error(f"LLM response choice missing 'message' key: {choice}")
+        return ""
+    
+    if "content" not in choice["message"]:
+        logger.error(f"LLM response message missing 'content' key: {choice['message']}")
+        return ""
+    
+    content = choice["message"]["content"]
+    logger.info(f"LLM response content: '{content}'")
+    return content
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # CLI INTERFACE (Only used when running as a standalone script)

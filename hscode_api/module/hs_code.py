@@ -18,11 +18,15 @@ from dataclasses import dataclass
 import requests
 from requests.exceptions import RequestException
 
-# Add parent directory to path to import config
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Import config from the hscode_api directory
+import os
+import sys
+current_dir = os.path.dirname(os.path.abspath(__file__))
+hscode_api_dir = os.path.dirname(current_dir)
+sys.path.insert(0, hscode_api_dir)
+
 from config import (
-    OPENROUTER_API_KEY, OPENROUTER_MODELS, OPENROUTER_CONFIG,
-    GROQ_MODELS, GROQ_CONFIG, GROQ_API_KEY, MODEL_FALLBACK_MAP
+    OPENROUTER_API_KEY, OPENROUTER_MODELS, OPENROUTER_CONFIG
 )
 
 # ── Logging ────────────────────────────────────────────────────────────────
@@ -54,31 +58,13 @@ def call_llm(messages, model_alias, config, models, api_key=None):
     result = response.json()
     return result["choices"][0]["message"]["content"]
 
-def chat_completion(messages, model_alias="gpt4", api_key=None):
-    # ① try OpenRouter
-    try:
-        return call_llm(
-            messages, model_alias,
-            OPENROUTER_CONFIG, OPENROUTER_MODELS,
-            api_key or OPENROUTER_API_KEY
-        )
-    except Exception as err:
-        logging.warning("OpenRouter error → %s – falling back to Groq", err)
-
-        # ② choose a Groq-compatible alias
-        groq_alias = MODEL_FALLBACK_MAP.get(model_alias, model_alias)
-        if groq_alias not in GROQ_MODELS:
-            groq_alias = "llama3_70b"          # last-resort default
-
-        # ✅ new line – tells you which Groq model is actually used
-        logging.info("Classifying with %s via Groq (%s)", model_alias, groq_alias)
-
-        # ③ call Groq with the correct key
-        return call_llm(
-            messages, groq_alias,
-            GROQ_CONFIG, GROQ_MODELS,
-            api_key=os.getenv("GROQ_API_KEY", GROQ_API_KEY)
-        )
+def chat_completion(messages, model_alias="mistral_small", api_key=None):
+    # Use OpenRouter for single model classification
+    return call_llm(
+        messages, model_alias,
+        OPENROUTER_CONFIG, OPENROUTER_MODELS,
+        api_key or OPENROUTER_API_KEY
+    )
 
 # ── Prompt templates ───────────────────────────────────────────────────────
 COLLECT_INFO_TEMPLATE = """
@@ -141,7 +127,7 @@ class HSCodeClassifier:
     """Runs Prompt 1 once (with gather-model), then Prompt 2 on each classification model."""
     def __init__(
         self,
-        gather_model: str = "gpt4",
+        gather_model: str = "gpt_5_mini",
         class_models: Optional[List[str]] = None,
         api_key: Optional[str] = None,
     ):
@@ -228,8 +214,8 @@ class HSCodeClassifier:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="HS Code Classifier – multi-model two-stage pipeline")
     parser.add_argument("product", type=str, help="Product name to classify")
-    parser.add_argument("--gather-model", default="gpt4", 
-                       help="Model for collecting product info (default: gpt4)")
+    parser.add_argument("--gather-model", default="gpt_5_mini",
+                       help="Model for collecting product info (default: gpt_5_mini)")
     parser.add_argument("--class-models", 
                        help="Comma-separated list of models for classification (default: all)")
     parser.add_argument("--output", type=str, help="Output JSON file")

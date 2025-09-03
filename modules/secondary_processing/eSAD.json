@@ -217,7 +217,9 @@
         "box_field": "31",
         "field_name": "Marks and numbers of packages",
         "description": "Hand-written or typed identifiers placed on the packages",
-        "extraction_prompt": "Find package markings, container numbers, seal numbers, or cargo identification marks. Look for 'marks', 'container_no', 'seal', or package identification codes."
+        "extraction_prompt": "Find package markings, container numbers, seal numbers, or cargo identification marks. Look for 'marks', 'container_no', 'seal', or package identification codes.",
+        "processing_method": "automated_marks_processing",
+        "script": "esad_marks"
       },
       {
         "box_field": "31",
@@ -229,7 +231,9 @@
         "box_field": "31",
         "field_name": "Kind of packages",
         "description": "Code used to describe the shape or configuration of a package",
-        "extraction_prompt": "Identify package types from descriptions like 'BOX', 'CARTON', 'PALLET', etc. Extract from commodity descriptions or package type fields."
+        "extraction_prompt": "Identify package types from descriptions like 'BOX', 'CARTON', 'PALLET', etc. Extract from commodity descriptions or package type fields.",
+        "processing_method": "automated_package_type_lookup",
+        "script": "esad_pkg"
       },
       {
         "box_field": "31",
@@ -277,7 +281,8 @@
         "box_field": "41",
         "field_name": "Statistical Units",
         "description": "Quantity of the item expressed in the unit laid down in the Common External Tariff",
-        "extraction_prompt": "Find quantity measurements in relevant units (pieces, meters, liters, etc.) from package descriptions or cargo measurements. May need conversion to CET standard units."
+        "reference_note": "This field is automatically populated by ASYCUDA system. No extraction or processing required - for reference only.",
+        "processing_method": "automated_asycuda_population"
       },
       {
         "box_field": "43",

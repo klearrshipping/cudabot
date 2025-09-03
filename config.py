@@ -1,39 +1,26 @@
 # ASYCUDA Configuration File
 
-import os
-from pathlib import Path
-
-# Load environment variables from .env file
-try:
-    from dotenv import load_dotenv
-    # Get the directory where this config.py file is located
-    current_dir = Path(__file__).parent
-    env_path = current_dir / '.env'
-    load_dotenv(env_path)
-except ImportError:
-    # python-dotenv not installed, environment variables should be set manually
-    print("python-dotenv not installed. Make sure environment variables are set manually.")
-    pass
+from secret_manager import get_secret
 
 # Application Path
 JNLP_PATH = r"C:\Users\rafer\OneDrive\Desktop\AWLiveExternal.jnlp"
 
-# AsycudaLogin Credentials
-USERNAME = os.environ.get("USERNAME")
-PASSWORD = os.environ.get("PASSWORD")
+# AsycudaLogin Credentials - From Secret Manager
+USERNAME = get_secret("asycuda-username")
+PASSWORD = get_secret("asycuda-password")
 
-# Supabase Configuration
-SUPABASE_URL = os.environ.get("SUPABASE_URL")
-SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY")
-SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+# Supabase Configuration - From Secret Manager  
+SUPABASE_URL = get_secret("supabase-url")
+SUPABASE_ANON_KEY = get_secret("supabase-anon-key")
+SUPABASE_SERVICE_ROLE_KEY = get_secret("supabase-service-role-key")
 
 # Image Recognition Settings
 CONFIDENCE_LEVEL = 0.8
 WAIT_TIME = 10  # seconds to wait for application to load
 TYPE_INTERVAL = 0.1  # seconds between keystrokes when typing
 
-# Required: OpenRouter API Key for CAPTCHA solving
-OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY")
+# Required: OpenRouter API Key for CAPTCHA solving - From Secret Manager
+OPENROUTER_API_KEY = get_secret("openrouter-api-key")
 
 # OpenRouter API Configuration
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
@@ -67,21 +54,29 @@ OPENROUTER_EXTRACTION_MODELS = {
 # Backward compatibility alias for existing modules
 OPENROUTER_MODELS = OPENROUTER_EXTRACTION_MODELS
 
-# Validation: Check if critical environment variables are loaded
+# Validation: Check if all secrets are accessible
 def validate_config():
-    """Validate that all required environment variables are loaded."""
-    required_vars = [
-        'USERNAME', 'PASSWORD', 'SUPABASE_URL', 'SUPABASE_ANON_KEY', 
-        'SUPABASE_SERVICE_ROLE_KEY', 'OPENROUTER_API_KEY'
+    """Validate that all required secrets are accessible."""
+    required_secrets = [
+        ('asycuda-username', 'USERNAME'),
+        ('asycuda-password', 'PASSWORD'), 
+        ('supabase-url', 'SUPABASE_URL'),
+        ('supabase-anon-key', 'SUPABASE_ANON_KEY'),
+        ('supabase-service-role-key', 'SUPABASE_SERVICE_ROLE_KEY'),
+        ('openrouter-api-key', 'OPENROUTER_API_KEY')
     ]
     
-    missing_vars = []
-    for var in required_vars:
-        if not globals().get(var):
-            missing_vars.append(var)
+    missing_secrets = []
+    for secret_name, var_name in required_secrets:
+        try:
+            value = get_secret(secret_name)
+            if not value:
+                missing_secrets.append(secret_name)
+        except Exception:
+            missing_secrets.append(secret_name)
     
-    if missing_vars:
-        raise ValueError(f"Missing required environment variables: {', '.join(missing_vars)}")
+    if missing_secrets:
+        raise ValueError(f"Cannot access required secrets: {', '.join(missing_secrets)}")
     
     return True
 

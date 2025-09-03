@@ -5,10 +5,25 @@ import requests
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from supabase import create_client, Client
-from config import SUPABASE_URL, SUPABASE_KEY, OPENROUTER_API_KEY, OPENROUTER_CONFIG, OPENROUTER_MODELS, GROQ_CONFIG, GROQ_MODELS
+# Import config from the hscode_api directory
+import os
+import sys
+current_dir = os.path.dirname(os.path.abspath(__file__))
+hscode_api_dir = os.path.dirname(current_dir)
+sys.path.insert(0, hscode_api_dir)
+
+from config import SUPABASE_URL, SUPABASE_KEY, OPENROUTER_API_KEY, OPENROUTER_CONFIG, OPENROUTER_MODELS
 import re
 import json
 from datetime import datetime
+
+# Import LLM function with error handling
+try:
+    from .commodity_code import reason_with_llm_for_commodity
+    COMMODITY_LLM_AVAILABLE = True
+except ImportError as e:
+    print(f"Warning: Could not import reason_with_llm_for_commodity: {e}")
+    COMMODITY_LLM_AVAILABLE = False
 
 # ───────────────────────────── LLM Helper ──────────────────────────────
 def call_llm(messages, model_alias, config, models):
@@ -29,12 +44,8 @@ def call_llm(messages, model_alias, config, models):
     result = response.json()
     return result["choices"][0]["message"]["content"]
 
-def chat_completion(messages, model_alias="gpt4"):
-    try:
-        return call_llm(messages, model_alias, OPENROUTER_CONFIG, OPENROUTER_MODELS)
-    except Exception as err:
-        logging.warning("OpenRouter error → %s – falling back to Groq", err)
-        return call_llm(messages, model_alias, GROQ_CONFIG, GROQ_MODELS)
+def chat_completion(messages, model_alias="mistral_small"):
+    return call_llm(messages, model_alias, OPENROUTER_CONFIG, OPENROUTER_MODELS)
 
 # ───────────────────────────── Reasoning Function ──────────────────────────────
 def reason_with_llm_fn(prompt: str, hs_code: str = None) -> str:
@@ -42,7 +53,7 @@ def reason_with_llm_fn(prompt: str, hs_code: str = None) -> str:
         {"role": "system", "content": "You are an expert in HS Code classification. Always respond in the exact format requested."},
         {"role": "user", "content": prompt}
     ]
-    return chat_completion(messages, model_alias="gpt4")
+    return chat_completion(messages, model_alias="mistral_small")
 
 class HSCodeReconciler:
     def __init__(self, supabase_client: Client, reason_with_llm_fn, verbose=True):
@@ -135,6 +146,7 @@ class HSCodeReconciler:
             print(f"🔍 DEBUG: Collected {len(all_options)} total options")
             for i, opt in enumerate(all_options):
                 print(f"   Option {i+1}: {opt['formatted_code']} from {opt['source']}")
+                print(f"      Description: {opt.get('description', 'No description available')}")
 
             if not all_options:
                 # No matches found anywhere
@@ -627,15 +639,30 @@ Consider:
                 'overall_errors': [f"All {len(reconciliation_results)} inputs failed to resolve"]
             }
         
-        # Find the most common code
-        most_common = max(code_counts.items(), key=lambda x: x[1])
-        confirmed_code = most_common[0]
-        count = most_common[1]
+        # DEBUG: Print what we're about to compare
+        if self.verbose:
+            print(f"🔍 DEBUG: About to compare {len(valid_results)} valid results:")
+            for i, result in enumerate(valid_results):
+                print(f"   Result {i+1}: {result.get('resolved_hs_code')} - {result.get('description', 'No description')}")
+        
+        # Use LLM to compare all valid results and select the best match
+        try:
+            confirmed_code, count, reasoning = self._llm_compare_results(valid_results, product_name)
+        except Exception as e:
+            print(f"🔍 DEBUG: Error in _llm_compare_results: {str(e)}")
+            # Fall back to old logic
+            most_common = max(code_counts.items(), key=lambda x: x[1])
+            confirmed_code = most_common[0]
+            count = most_common[1]
+            reasoning = "Fallback selection due to LLM error"
+        
         total = len(reconciliation_results)
+        
+
         
         # DEBUG: Print final selection
         if self.verbose:
-            print(f"🔍 DEBUG: Final confirmed_code = {confirmed_code} (appeared {count}/{total} times)")
+            print(f"🔍 DEBUG: Final confirmed_code = {confirmed_code} (LLM selected from {len(valid_results)} options)")
         
         # Determine consensus type
         if count == total:
@@ -683,6 +710,7 @@ Consider:
             'confirmed_hs_code': confirmed_code,
             'summary_text': summary,
             'description': description,
+            'reasoning': reasoning,
             'consensus': consensus,
             'consensus_count': count,
             'total_inputs': total,
@@ -691,6 +719,99 @@ Consider:
             'overall_warnings': list(set(all_warnings)),
             'overall_errors': list(set(all_errors))
         }
+    
+    def _llm_compare_results(self, valid_results, product_name):
+        """Use LLM to compare all valid results and select the best match for the product"""
+        
+        print(f"\n🔍 DEBUG: _llm_compare_results called with {len(valid_results)} results")
+        
+        if len(valid_results) == 1:
+            # Only one result, but still show the reasoning
+            result = valid_results[0]
+            selected_code = result.get('resolved_hs_code')
+            reasoning = result.get('reasoning', 'No reasoning provided')
+            
+            print(f"\n🤖 STAGE 2 FINAL SELECTION:")
+            print(f"   Selected: {selected_code}")
+            print(f"   Reasoning: {reasoning}")
+            
+            return selected_code, 1, reasoning
+        
+        # Build comparison prompt
+        options_text = ""
+        for i, result in enumerate(valid_results, 1):
+            code = result.get('resolved_hs_code')
+            description = result.get('description', 'No description available')
+            confidence = result.get('match_score', 0)
+            reasoning = result.get('reasoning', 'No reasoning provided')
+            options_text += f"{i}. {code}: {description} (confidence: {confidence:.2f})\n"
+            options_text += f"   Reasoning: {reasoning}\n\n"
+        
+        prompt = f"""You are an expert in tariff classification. Compare these HS code options for the product "{product_name}" and select the most appropriate one.
+
+PRODUCT: {product_name}
+
+HS CODE OPTIONS:
+{options_text}
+
+IMPORTANT: You must select the MOST SPECIFIC code that accurately describes the product. Consider:
+- Which code is most specific to the product type (prefer specific over generic)
+- Which code best matches the product's characteristics and context
+- Which code is most accurate for classification purposes
+- ALWAYS prefer more specific codes over generic ones when both are valid
+- Look at the detailed reasoning provided for each option
+
+For a 2022 Tesla Model Y (electric vehicle, individual importer, less than 3 years old), you should prefer:
+- 8703.80 (electric vehicles) over 8703.00 (generic motor vehicles)
+- 8703.80 with specific conditions over 8703.80 without conditions
+
+Respond in this EXACT JSON format:
+{{
+    "selected_code": "8703.80",
+    "reasoning": "Explanation of why this code is the best choice"
+}}"""
+
+        if not COMMODITY_LLM_AVAILABLE:
+            print("⚠️  LLM comparison unavailable - using first result")
+            return valid_results[0].get('resolved_hs_code'), 1, "LLM import failed"
+        
+        try:
+            print(f"🔍 DEBUG: Calling LLM with prompt...")
+            response = reason_with_llm_for_commodity(prompt, model_alias="mistral_small")
+            print(f"🔍 DEBUG: LLM response received: {response[:100]}...")
+            
+            # Parse JSON response
+            try:
+                result = json.loads(response)
+                selected_code = result.get('selected_code')
+                reasoning = result.get('reasoning', 'No reasoning provided')
+                
+                # Print the LLM's reasoning
+                print(f"\n🤖 LLM COMPARISON RESULT:")
+                print(f"   Selected: {selected_code}")
+                print(f"   Reasoning: {reasoning}")
+                print(f"   Full LLM Response: {response}")
+                
+                # Find the matching result
+                for result in valid_results:
+                    if result.get('resolved_hs_code') == selected_code:
+                        return selected_code, 1, reasoning
+                
+                # If LLM response doesn't match any option, fall back to first result
+                if self.verbose:
+                    print(f"🔍 DEBUG: LLM selected {selected_code} but it doesn't match any option, using first result")
+                return valid_results[0].get('resolved_hs_code'), 1, "Fallback to first result"
+                
+            except json.JSONDecodeError as e:
+                if self.verbose:
+                    print(f"🔍 DEBUG: Failed to parse LLM JSON response: {str(e)}")
+                # Fall back to first result if JSON parsing fails
+                return valid_results[0].get('resolved_hs_code'), 1, "Fallback due to JSON parsing error"
+            
+        except Exception as e:
+            print(f"🔍 DEBUG: LLM comparison failed: {str(e)}, using first result")
+            print(f"🔍 DEBUG: Exception type: {type(e).__name__}")
+            return valid_results[0].get('resolved_hs_code'), 1, f"Fallback due to error: {str(e)}"
 
     def display_executive_summary(self, final_determination, product_name):
         """Display executive summary for quick decision making"""

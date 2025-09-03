@@ -1,0 +1,266 @@
+#!/usr/bin/env python3
+"""
+esad_warehouse.py
+────────────────
+Matches office codes with warehouse information from warehouse.csv.
+
+Usage:
+    python -m modules.esad_warehouse <esad_json_path>
+
+This script:
+1. Takes the office_code_processed value from eSAD results
+2. Fetches warehouse data from warehouse.csv
+3. Matches the office code with the office_id column
+4. Returns the corresponding warehouse code(s)
+"""
+
+import sys
+import json
+import csv
+from typing import List, Dict, Optional
+from pathlib import Path
+
+# Cache for warehouse data to avoid repeated file reads
+_warehouse_data_cache = None
+
+def get_warehouse_data() -> List[Dict]:
+    """Get warehouse data with caching to avoid repeated file reads."""
+    global _warehouse_data_cache
+    if _warehouse_data_cache is None:
+        csv_path = Path(__file__).parent.parent.parent / "data" / "warehouse.csv"
+        warehouses = []
+        
+        # Try different encodings to handle potential encoding issues
+        encodings = ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1']
+        
+        for encoding in encodings:
+            try:
+                with open(csv_path, 'r', encoding=encoding) as f:
+                    reader = csv.DictReader(f)
+                    for row in reader:
+                        warehouses.append({
+                            'code': row['code'],
+                            'warehouse': row['warehouse'],
+                            'office_id': row['office_id']
+                        })
+                print(f"✅ Successfully loaded warehouse data using {encoding} encoding")
+                break
+            except UnicodeDecodeError:
+                continue
+            except Exception as e:
+                print(f"❌ Error reading warehouse data with {encoding}: {e}")
+                continue
+        
+        if not warehouses:
+            raise RuntimeError("Failed to load warehouse data with any encoding")
+        
+        _warehouse_data_cache = warehouses
+    
+    return _warehouse_data_cache
+
+def get_office_code_from_json(json_path: str) -> Optional[str]:
+    """Extract office_code_processed from eSAD results JSON."""
+    try:
+        with open(json_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        
+        # Try to get office_code_processed from different possible locations
+        extracted_fields = data.get('result', {}).get('extracted_fields', {})
+        office_code = extracted_fields.get('office_code_processed')
+        
+        if not office_code:
+            # Try alternative field names
+            office_code = extracted_fields.get('office_code')
+        
+        return office_code
+        
+    except (FileNotFoundError, json.JSONDecodeError, KeyError) as e:
+        print(f"❌ Error extracting office code: {e}")
+        return None
+
+def find_warehouses_by_office_id(office_id: str, warehouses: List[Dict]) -> List[Dict]:
+    """Find all warehouses that match the given office_id."""
+    if not office_id:
+        return []
+    
+    matching_warehouses = []
+    office_id_clean = office_id.strip().upper()
+    
+    for warehouse in warehouses:
+        warehouse_office_id = warehouse['office_id'].strip().upper()
+        if warehouse_office_id == office_id_clean:
+            matching_warehouses.append(warehouse)
+    
+    return matching_warehouses
+
+def select_warehouse_interactive(warehouses: List[Dict]) -> Optional[Dict]:
+    """Interactive warehouse selection when multiple options are available."""
+    print(f"\n🔍 Multiple warehouses found. Please select one for Box Field 30:")
+    print("=" * 60)
+    
+    # Display all available warehouses with numbers
+    for i, warehouse in enumerate(warehouses, 1):
+        print(f"  {i}. {warehouse['code']} - {warehouse['warehouse']}")
+        print(f"     Office ID: {warehouse['office_id']}")
+        print()
+    
+    # Get user selection
+    while True:
+        try:
+            selection = input("Enter the number of your choice (or 'q' to quit): ").strip()
+            
+            if selection.lower() == 'q':
+                print("❌ Selection cancelled by user")
+                return None
+            
+            choice = int(selection)
+            if 1 <= choice <= len(warehouses):
+                selected_warehouse = warehouses[choice - 1]
+                print(f"✅ Selected: {selected_warehouse['code']} - {selected_warehouse['warehouse']}")
+                return selected_warehouse
+            else:
+                print(f"❌ Invalid choice. Please enter a number between 1 and {len(warehouses)}")
+                
+        except ValueError:
+            print("❌ Invalid input. Please enter a number or 'q' to quit")
+        except (KeyboardInterrupt, EOFError):
+            print("\n❌ Selection interrupted or no input available")
+            return None
+
+def process_warehouse_lookup(office_code: str, warehouses: List[Dict], auto_mode: bool = False) -> Dict[str, any]:
+    """Process warehouse lookup and return results for box field 30."""
+    if not office_code:
+        return {
+            'success': False,
+            'error': 'No office code provided',
+            'warehouses': [],
+            'office_code': None,
+            'box_30_value': None
+        }
+    
+    print(f"🏢 Looking up warehouses for office code: {office_code}")
+    
+    # Find matching warehouses
+    matching_warehouses = find_warehouses_by_office_id(office_code, warehouses)
+    
+    if matching_warehouses:
+        print(f"✅ Found {len(matching_warehouses)} warehouse(s) for office {office_code}")
+        
+        if len(matching_warehouses) == 1:
+            # Only one warehouse - use it directly
+            selected_warehouse = matching_warehouses[0]
+            print(f"📦 Single warehouse found: {selected_warehouse['code']} - {selected_warehouse['warehouse']}")
+        else:
+            # Multiple warehouses - let user choose or auto-select
+            if auto_mode:
+                # Auto mode: select first warehouse
+                selected_warehouse = matching_warehouses[0]
+                print(f"🤖 Auto mode: Selected first warehouse: {selected_warehouse['code']} - {selected_warehouse['warehouse']}")
+            else:
+                # Interactive mode: let user choose
+                selected_warehouse = select_warehouse_interactive(matching_warehouses)
+                if not selected_warehouse:
+                    # User cancelled or invalid selection
+                    return {
+                        'success': False,
+                        'error': 'No warehouse selected by user',
+                        'office_code': office_code,
+                        'warehouses': matching_warehouses,
+                        'warehouse_codes': [w['code'] for w in matching_warehouses],
+                        'count': len(matching_warehouses),
+                        'box_30_value': None
+                    }
+        
+        return {
+            'success': True,
+            'office_code': office_code,
+            'warehouses': matching_warehouses,
+            'warehouse_codes': [w['code'] for w in matching_warehouses],
+            'count': len(matching_warehouses),
+            'box_30_value': selected_warehouse['code'],
+            'selected_warehouse': selected_warehouse
+        }
+    else:
+        print(f"❌ No warehouses found for office code: {office_code}")
+        return {
+            'success': False,
+            'error': f'No warehouses found for office code: {office_code}',
+            'office_code': office_code,
+            'warehouses': [],
+            'warehouse_codes': [],
+            'count': 0,
+            'box_30_value': None
+        }
+
+def main():
+    """Main function with improved error handling."""
+    if len(sys.argv) < 2:
+        print("Usage: python -m modules.esad_warehouse <esad_json_path> [--auto]")
+        print("  --auto: Automatically select first warehouse when multiple options exist")
+        sys.exit(1)
+    
+    json_path = sys.argv[1]
+    auto_mode = "--auto" in sys.argv
+    
+    try:
+        # Get office code from eSAD results
+        office_code = get_office_code_from_json(json_path)
+        if not office_code:
+            print("❌ No office code found in eSAD results")
+            sys.exit(1)
+        
+        print(f"📋 Extracted office code: {office_code}")
+        print(f"🔧 Mode: {'🤖 Auto' if auto_mode else '👤 Interactive'}")
+        
+        # Get warehouse data
+        warehouses = get_warehouse_data()
+        print(f"📊 Loaded {len(warehouses)} warehouses from database")
+        
+        # Process warehouse lookup
+        results = process_warehouse_lookup(office_code, warehouses, auto_mode)
+        
+        # Display results
+        print(f"\n🏢 Warehouse Lookup Results for Box Field 30:")
+        print("=" * 60)
+        print(f"Office Code: {results['office_code']}")
+        print(f"Status: {'✅ Success' if results['success'] else '❌ Failed'}")
+        print(f"Warehouses Found: {results['count']}")
+        
+        if results['success']:
+            print(f"\n📦 Box Field 30 - Location of Goods:")
+            print(f"   Selected Warehouse Code: {results['box_30_value']}")
+            print(f"   Warehouse Name: {results['selected_warehouse']['warehouse']}")
+            print(f"   Office ID: {results['selected_warehouse']['office_id']}")
+            
+            if results['count'] > 1:
+                print(f"\n📋 All Available Warehouses:")
+                for i, warehouse in enumerate(results['warehouses'], 1):
+                    print(f"  {i}. Code: {warehouse['code']}")
+                    print(f"     Name: {warehouse['warehouse']}")
+                    print(f"     Office ID: {warehouse['office_id']}")
+                    print()
+        else:
+            print(f"Error: {results['error']}")
+        
+        # Save results to JSON file
+        output_filename = f"warehouse_lookup_{Path(json_path).stem}.json"
+        with open(output_filename, 'w', encoding='utf-8') as f:
+            json.dump(results, f, indent=2, ensure_ascii=False)
+        
+        print(f"💾 Results saved to: {output_filename}")
+        
+        # Return appropriate exit code
+        sys.exit(0 if results['success'] else 1)
+        
+    except FileNotFoundError:
+        print(f"Error: File '{json_path}' not found.")
+        sys.exit(1)
+    except json.JSONDecodeError:
+        print(f"Error: Invalid JSON in file '{json_path}'.")
+        sys.exit(1)
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
