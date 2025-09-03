@@ -8,6 +8,8 @@ env.txt
 secret-key.json
 *-key.json
 service-account*.json
+pdf-extract-*.json
+setup/*.json
 
 # Python
 __pycache__/
