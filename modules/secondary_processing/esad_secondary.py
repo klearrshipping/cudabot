@@ -31,6 +31,8 @@ from .esad_office import OfficeProcessor
 from .esad_manifest import ManifestProcessor
 from .esad_ref_number import ReferenceNumberProcessor
 from .esad_address import AddressProcessor
+from .esad_warehouse import process_warehouse_lookup, get_warehouse_data
+from .esad_product import process_commercial_description
 
 # Import database client
 from ..supabase_client import SupabaseClient
@@ -152,6 +154,32 @@ class ESADSecondaryProcessor:
                         'status': 'failed'
                     }
             
+            # Process warehouse lookup for Box Field 30 (Location of goods)
+            try:
+                logger.info(f"🔄 Processing warehouse lookup for Box Field 30...")
+                warehouse_result = self._process_warehouse_lookup(primary_data)
+                processed_results['fields']['warehouse'] = warehouse_result
+                logger.info(f"✅ Warehouse processing completed")
+            except Exception as e:
+                logger.error(f"❌ Error processing warehouse lookup: {e}")
+                processed_results['fields']['warehouse'] = {
+                    'error': str(e),
+                    'status': 'failed'
+                }
+            
+            # Process commercial description for Box Field 31 (Commercial description)
+            try:
+                logger.info(f"🔄 Processing commercial description for Box Field 31...")
+                product_result = self._process_commercial_description(primary_data)
+                processed_results['fields']['product'] = product_result
+                logger.info(f"✅ Product processing completed")
+            except Exception as e:
+                logger.error(f"❌ Error processing commercial description: {e}")
+                processed_results['fields']['product'] = {
+                    'error': str(e),
+                    'status': 'failed'
+                }
+            
             # Save results to database
             self._save_to_database(order_id, processed_results)
             
@@ -203,6 +231,90 @@ class ESADSecondaryProcessor:
                 input_data[field] = primary_data[field]
         
         return input_data if input_data else None
+    
+    def _process_warehouse_lookup(self, primary_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Process warehouse lookup for Box Field 30 (Location of goods).
+        
+        Args:
+            primary_data: Data from primary processing
+            
+        Returns:
+            Dictionary containing warehouse lookup results
+        """
+        try:
+            # Get office code from primary data
+            office_code = primary_data.get('result', {}).get('extracted_fields', {}).get('office_code_processed')
+            
+            if not office_code:
+                return {
+                    'success': False,
+                    'error': 'No office code found in primary data',
+                    'box_30_value': None
+                }
+            
+            # Get warehouse data
+            warehouses = get_warehouse_data()
+            
+            # Process warehouse lookup (auto mode for integration)
+            result = process_warehouse_lookup(office_code, warehouses, auto_mode=True)
+            
+            return {
+                'success': result['success'],
+                'office_code': result['office_code'],
+                'box_30_value': result['box_30_value'],
+                'warehouse_code': result['box_30_value'],
+                'warehouse_name': result.get('selected_warehouse', {}).get('warehouse'),
+                'warehouses_found': result['count'],
+                'error': result.get('error')
+            }
+            
+        except Exception as e:
+            return {
+                'success': False,
+                'error': f'Warehouse lookup failed: {str(e)}',
+                'box_30_value': None
+            }
+    
+    def _process_commercial_description(self, primary_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Process commercial description for Box Field 31 (Commercial description).
+        
+        Args:
+            primary_data: Data from primary processing
+            
+        Returns:
+            Dictionary containing commercial description processing results
+        """
+        try:
+            # Get commercial description from primary data
+            commercial_description = primary_data.get('result', {}).get('extracted_fields', {}).get('commercial_description')
+            
+            if not commercial_description:
+                return {
+                    'success': False,
+                    'error': 'No commercial description found in primary data',
+                    'commercial_description_processed': None
+                }
+            
+            # Process commercial description using the esad_product script (non-verbose)
+            result = process_commercial_description(commercial_description, verbose=False)
+            
+            return {
+                'success': bool(result['product_name']),
+                'original_description': result['original_description'],
+                'cleaned_description': result['cleaned_description'],
+                'commercial_description_processed': result['product_name'],
+                'product_name': result['product_name'],
+                'error': None if result['product_name'] else 'Failed to extract product name'
+            }
+            
+        except Exception as e:
+            return {
+                'success': False,
+                'error': f'Commercial description processing failed: {str(e)}',
+                'commercial_description_processed': None
+            }
     
     def _save_to_database(self, order_id: str, processed_results: Dict[str, Any]):
         """

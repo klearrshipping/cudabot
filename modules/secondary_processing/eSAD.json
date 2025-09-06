@@ -211,7 +211,9 @@
         "box_field": "30",
         "field_name": "Location of goods",
         "description": "Transit shed or temporary storage area where the goods are stored",
-        "extraction_prompt": "Identify where goods are stored pending customs clearance. May be inferred from berth number, terminal, warehouse, or storage facility information."
+        "extraction_prompt": "AUTOMATED: This field is automatically populated by the esad_warehouse script using office code lookup against warehouse reference data. No LLM processing required.",
+        "processing_method": "automated_warehouse_lookup",
+        "script": "esad_warehouse"
       },
       {
         "box_field": "31",
@@ -239,7 +241,9 @@
         "box_field": "31",
         "field_name": "Commercial description",
         "description": "Commercial description of the goods (must be precise for identification)",
-        "extraction_prompt": "Extract detailed commodity description from 'commodity', 'description_of_goods', or cargo manifest details. Should be specific enough for tariff classification."
+        "extraction_prompt": "AUTOMATED: This field is automatically processed by the esad_product script to standardize and clean commercial descriptions. No LLM processing required.",
+        "processing_method": "automated_product_standardization",
+        "script": "esad_product"
       },
       {
         "box_field": "33",

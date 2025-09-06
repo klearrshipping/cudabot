@@ -266,11 +266,13 @@
       "output_fields": ["transaction_type_processed"],
       "dependencies": ["financial_transaction_final.csv"]
     },
-    "esad_product.py": {
-      "description": "Processes commodity information using CPC reference data",
-      "input_fields": ["commodity_description", "commodity_code"],
-      "output_fields": ["commercial_description_processed", "commodity_code_processed"],
-      "dependencies": ["cpc_codes.csv"]
+    "esad_product": {
+      "description": "Processes commercial descriptions to standardize and clean product names for Box Field 31 - integrated into secondary processing",
+      "input_fields": ["commercial_description"],
+      "output_fields": ["commercial_description_processed", "product_name"],
+      "dependencies": [],
+      "processing_method": "automated_product_standardization",
+      "integrated": true
     },
     "esad_weight.py": {
       "description": "Processes and validates weight information",
@@ -284,11 +286,13 @@
       "output_fields": ["commercial_ref_processed"],
       "dependencies": []
     },
-    "esad_warehouse.py": {
-      "description": "Processes warehouse codes using office code lookup against warehouse reference data for box field 30",
+    "esad_warehouse": {
+      "description": "Processes warehouse codes using office code lookup against warehouse reference data for box field 30 - integrated into secondary processing",
       "input_fields": ["office_code_processed"],
-      "output_fields": ["goods_location_processed"],
-      "dependencies": ["warehouse.csv"]
+      "output_fields": ["goods_location_processed", "box_30_value"],
+      "dependencies": ["warehouse.csv"],
+      "processing_method": "automated_warehouse_lookup",
+      "integrated": true
     }
   }
 }

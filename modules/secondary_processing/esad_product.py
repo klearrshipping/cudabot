@@ -17,6 +17,7 @@ This script:
 import sys
 import json
 import re
+import requests
 from typing import Optional, Dict, List
 from modules.core.llm_client import LLMClient
 
@@ -81,8 +82,8 @@ def parse_llm_response(raw_response: str) -> Optional[str]:
             return product_match.group(1).strip()
         return None
 
-def ask_llm_for_product_name(description: str) -> Optional[str]:
-    """Get the standardized product name using LLM."""
+def ask_llm_for_product_name(description: str, verbose: bool = False) -> Optional[str]:
+    """Get the specific product name using LLM."""
     if not description or description.lower() in ['not specified', 'none', '']:
         return None
     
@@ -91,14 +92,28 @@ def ask_llm_for_product_name(description: str) -> Optional[str]:
     # Clean the description first
     cleaned_description = clean_commercial_description(description)
     
+    if verbose:
+        print(f"\n📦 Processing commercial description:")
+        print(f"   Original: '{description}'")
+        print(f"   Cleaned: '{cleaned_description}'")
+    
     prompt = f"""
 You are a customs documentation expert. Given the commercial description from a customs document: '{description}'
 
 Cleaned description: '{cleaned_description}'
 
-Your task is to extract and standardize the main product name. Focus on the actual product, not shipping details, quantities, or container information.
+Your task is to extract a clean, specific product name from the description. Include the brand name and primary product type, plus key model identifiers when present. Remove excessive technical specifications, marketing language, and verbose details.
 
-Return ONLY a valid JSON object with a single field 'product_name', e.g. {{"product_name": "Footwear"}}, where the value is the standardized product name. Use clear, simple product names. Do not return any explanation or extra text.
+Examples:
+- "2022 Tesla Model Y imported by an individual" → "2022 Tesla Model Y"
+- "Apple iPhone 14 Pro smartphones" → "Apple iPhone 14 Pro smartphone"
+- "EF ECOFLOW Solar Generator DELTA 2 Max 2048Wh with 4X100W 12V Solar Panels, High Efficiency Monocrystalline PV Modules, 2400W LFP Portable Power Station, AC + Solar Fast Dual Charging For Camping RV" → "EF ECOFLOW Solar Generator"
+- "Nike Air Max 270 React Running Shoes Men's Size 10 Black/White Mesh Upper with Air Cushioning Technology" → "Nike Air Max 270 Running Shoes"
+- "Samsung 65-inch QLED 4K Smart TV Model QN65Q80A with HDR10+ and Alexa Built-in 2023 Model" → "Samsung 65-inch QLED Smart TV"
+
+Return ONLY a valid JSON object with a single field 'product_name', e.g. {{"product_name": "2022 Tesla Model Y"}}. 
+Keep brand names, essential product types, and key model identifiers. Remove technical specs, marketing language, and excessive details.
+Do NOT return generic categories like "Electric Vehicle" or "Electronics".
 """
     
     # Use Kimi as primary, Mistral as backup
@@ -107,60 +122,98 @@ Return ONLY a valid JSON object with a single field 'product_name', e.g. {{"prod
         "mistralai/mistral-small-3.1-24b-instruct:free"   # Backup - Mistral
     ]
     
-    results = {}
-    
     # Test models with early termination
     for model in models:
         model_name = model.split('/')[-1].split(':')[0]
-        print(f"\n🧪 Testing model: {model_name}")
+        if verbose:
+            print(f"\n🧪 Testing model: {model_name}")
         try:
             raw_response = llm.send_prompt(prompt, model=model)
             product_name = parse_llm_response(raw_response)
             
             if product_name:
-                print(f"✅ {model_name} returned: {product_name}")
-                results[model_name] = product_name
-                # Early termination after first success
-                break
+                if verbose:
+                    print(f"✅ {model_name} returned: {product_name}")
+                return product_name
             else:
-                print(f"❌ {model_name} did not return a valid product name.")
-                results[model_name] = None
+                if verbose:
+                    print(f"❌ {model_name} did not return a valid product name.")
                 
         except Exception as e:
-            print(f"❌ {model_name} exception: {e}")
-            results[model_name] = None
+            if verbose:
+                print(f"❌ {model_name} exception: {e}")
     
-    # Show results from tested models
-    print(f"\n📊 Model Results:")
-    print("=" * 40)
-    for model_name, product_name in results.items():
-        status = "✅ SUCCESS" if product_name else "❌ FAILED"
-        print(f"   {model_name}: {product_name if product_name else 'No response'} ({status})")
-    
-    # Return the first successful result, or None if all failed
-    for model_name, product_name in results.items():
-        if product_name:
-            return product_name
-    
-    print("🔄 All models failed to extract product name.")
+    if verbose:
+        print("🔥 All models failed to extract product name.")
     return None
 
-def process_commercial_description(description: str) -> Dict[str, str]:
-    """Process commercial description and return standardized product information."""
+def classify_with_hs_api(product_name: str, verbose: bool = False) -> Optional[Dict[str, str]]:
+    """Classify product using HS Code API."""
+    if not product_name:
+        return None
+    
+    API_BASE_URL = "http://localhost:5000"
+    
+    if verbose:
+        print(f"\n🔍 Classifying with HS Code API: {product_name}")
+    
+    try:
+        response = requests.post(
+            f"{API_BASE_URL}/classify",
+            json={"product_name": product_name, "verbose": verbose},
+            headers={"Content-Type": "application/json"},
+            timeout=120
+        )
+        
+        if response.status_code == 200:
+            result = response.json()
+            if verbose:
+                print(f"✅ HS Code API returned:")
+                print(f"   HS Code: {result.get('hs_code', 'N/A')}")
+                print(f"   Commodity Code: {result.get('commodity_code', 'N/A')}")
+                print(f"   Description: {result.get('description', 'N/A')}")
+            return result
+        else:
+            if verbose:
+                print(f"❌ HS Code API error: {response.text}")
+            return None
+            
+    except requests.exceptions.ConnectionError:
+        if verbose:
+            print("❌ HS Code API connection failed. Make sure the API is running on http://localhost:5000")
+        return None
+    except requests.exceptions.Timeout:
+        if verbose:
+            print("❌ HS Code API request timed out")
+        return None
+    except Exception as e:
+        if verbose:
+            print(f"❌ HS Code API error: {str(e)}")
+        return None
+
+def process_commercial_description(description: str, verbose: bool = False, get_hs_code: bool = True) -> Dict[str, str]:
+    """Process commercial description and return standardized product information with optional HS code classification."""
     results = {
         'original_description': description,
         'cleaned_description': clean_commercial_description(description),
-        'product_name': None
+        'product_name': None,
+        'hs_code': None,
+        'commodity_code': None,
+        'hs_description': None
     }
     
     if description and description.lower() not in ['not specified', 'none', '']:
-        print(f"\n📦 Processing commercial description:")
-        print(f"   Original: '{description}'")
-        print(f"   Cleaned: '{results['cleaned_description']}'")
-        
         # Get product name from LLM
-        product_name = ask_llm_for_product_name(description)
+        product_name = ask_llm_for_product_name(description, verbose=verbose)
         results['product_name'] = product_name
+        
+        # Optionally get HS code classification
+        if get_hs_code and product_name:
+            hs_result = classify_with_hs_api(product_name, verbose=verbose)
+            if hs_result:
+                results['hs_code'] = hs_result.get('hs_code')
+                results['commodity_code'] = hs_result.get('commodity_code')
+                results['hs_description'] = hs_result.get('description')
         
     return results
 
@@ -188,9 +241,20 @@ def main():
         print(f"   Cleaned Description: {results['cleaned_description']}")
         print(f"   Standardized Product Name: {results['product_name'] if results['product_name'] else 'FAILED'}")
         
+        # Display HS Code results if available
+        if results['hs_code']:
+            print(f"\n📋 HS Code Classification:")
+            print(f"   HS Code: {results['hs_code']}")
+            print(f"   Commodity Code: {results['commodity_code']}")
+            print(f"   Description: {results['hs_description']}")
+        elif results['product_name']:
+            print(f"\n⚠️  Product name extracted but HS Code API unavailable")
+        
         # Summary
         if results['product_name']:
-            print(f"\n✅ Successfully extracted product name: {results['product_name']}")
+            print(f"\n✅ Successfully processed product: {results['product_name']}")
+            if results['hs_code']:
+                print(f"✅ HS Code classification: {results['hs_code']}")
         else:
             print(f"\n❌ Failed to extract product name")
         
