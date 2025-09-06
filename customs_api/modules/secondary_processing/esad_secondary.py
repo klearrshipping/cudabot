@@ -1,0 +1,430 @@
+"""
+ESAD Secondary Processing Orchestrator
+
+This script orchestrates all secondary processing modules to enhance and validate
+ESAD field data extracted from primary processing. It coordinates the execution
+of various secondary processing scripts and saves results to the esad_fields_processed table.
+"""
+
+import json
+import logging
+from pathlib import Path
+from typing import Dict, Any, List, Optional
+from datetime import datetime
+
+# Import secondary processing modules
+from modules.secondary_processing.esad_regime import RegimeTypeProcessor
+from modules.secondary_processing.esad_trans_type import TransactionTypeProcessor
+from modules.secondary_processing.esad_incoterms import IncotermsProcessor
+from modules.secondary_processing.esad_currency import CurrencyProcessor
+from modules.secondary_processing.esad_amount import AmountProcessor
+from modules.secondary_processing.esad_transport import TransportProcessor
+from modules.secondary_processing.esad_location import LocationProcessor
+from modules.secondary_processing.esad_marks import MarksProcessor
+from modules.secondary_processing.esad_pkg import PackageProcessor
+from modules.secondary_processing.esad_product import ProductProcessor
+from modules.secondary_processing.esad_country import CountryProcessor
+from modules.secondary_processing.esad_weight import WeightProcessor
+from modules.secondary_processing.esad_procedure import ProcedureProcessor
+from modules.secondary_processing.esad_document import DocumentProcessor
+from modules.secondary_processing.esad_office import OfficeProcessor
+from modules.secondary_processing.esad_manifest import ManifestProcessor
+from modules.secondary_processing.esad_ref_number import ReferenceNumberProcessor
+from modules.secondary_processing.esad_address import AddressProcessor
+from modules.secondary_processing.esad_warehouse import process_warehouse_lookup, get_warehouse_data
+from modules.secondary_processing.esad_product import process_commercial_description
+
+# Import database client
+from modules.core.supabase_client import SupabaseClient
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+
+class ESADSecondaryProcessor:
+    """
+    Orchestrates secondary processing for ESAD fields.
+    
+    This class coordinates the execution of various secondary processing modules
+    and saves the enhanced data to the esad_fields_processed table.
+    """
+    
+    def __init__(self, config: Dict[str, Any]):
+        """
+        Initialize the secondary processor.
+        
+        Args:
+            config: Configuration dictionary containing API keys and settings
+        """
+        self.config = config
+        self.supabase_client = SupabaseClient(config)
+        
+        # Initialize all secondary processing modules
+        self.processors = {
+            'regime_type': RegimeTypeProcessor(config),
+            'transaction_type': TransactionTypeProcessor(config),
+            'incoterms': IncotermsProcessor(config),
+            'currency': CurrencyProcessor(config),
+            'amount': AmountProcessor(config),
+            'transport': TransportProcessor(config),
+            'location': LocationProcessor(config),
+            'marks': MarksProcessor(config),
+            'package': PackageProcessor(config),
+            'product': ProductProcessor(config),
+            'country': CountryProcessor(config),
+            'weight': WeightProcessor(config),
+            'procedure': ProcedureProcessor(config),
+            'document': DocumentProcessor(config),
+            'office': OfficeProcessor(config),
+            'manifest': ManifestProcessor(config),
+            'reference_number': ReferenceNumberProcessor(config),
+            'address': AddressProcessor(config)
+        }
+        
+        # Load field mappings
+        self.field_mappings = self._load_field_mappings()
+        
+        logger.info("✅ ESAD Secondary Processor initialized with all modules")
+    
+    def _load_field_mappings(self) -> Dict[str, str]:
+        """Load ESAD field mappings from field_mapping.json"""
+        try:
+            mapping_file = Path(__file__).parent / "field_mapping.json"
+            with open(mapping_file, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            
+            # Extract field mappings from the JSON structure
+            mappings = {}
+            for field_name, field_info in data.get("field_script_mapping", {}).items():
+                output_field = field_info.get("output_field")
+                if output_field:
+                    mappings[field_name] = output_field
+            
+            logger.info(f"✅ Loaded {len(mappings)} field mappings from field_mapping.json")
+            return mappings
+            
+        except Exception as e:
+            logger.error(f"❌ Error loading field mappings: {e}")
+            return {}
+    
+    def process_order(self, order_id: str, primary_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Process an order through all secondary processing modules.
+        
+        Args:
+            order_id: The order identifier
+            primary_data: Data extracted from primary processing
+            
+        Returns:
+            Dictionary containing all processed ESAD fields
+        """
+        logger.info(f"🔄 Starting secondary processing for order: {order_id}")
+        
+        try:
+            # Initialize results dictionary
+            processed_results = {
+                'order_id': order_id,
+                'processing_timestamp': datetime.now().isoformat(),
+                'fields': {}
+            }
+            
+            # Process each field through appropriate secondary processor
+            for field_name, processor in self.processors.items():
+                try:
+                    logger.info(f"🔄 Processing {field_name}...")
+                    
+                    # Get input data for this processor
+                    input_data = self._get_input_data_for_processor(field_name, primary_data)
+                    
+                    if input_data:
+                        # Process the data
+                        result = processor.process(input_data)
+                        
+                        # Store the result
+                        processed_results['fields'][field_name] = result
+                        logger.info(f"✅ {field_name} processing completed")
+                    else:
+                        logger.warning(f"⚠️ No input data found for {field_name}")
+                        
+                except Exception as e:
+                    logger.error(f"❌ Error processing {field_name}: {e}")
+                    processed_results['fields'][field_name] = {
+                        'error': str(e),
+                        'status': 'failed'
+                    }
+            
+            # Process warehouse lookup for Box Field 30 (Location of goods)
+            try:
+                logger.info(f"🔄 Processing warehouse lookup for Box Field 30...")
+                warehouse_result = self._process_warehouse_lookup(primary_data)
+                processed_results['fields']['warehouse'] = warehouse_result
+                logger.info(f"✅ Warehouse processing completed")
+            except Exception as e:
+                logger.error(f"❌ Error processing warehouse lookup: {e}")
+                processed_results['fields']['warehouse'] = {
+                    'error': str(e),
+                    'status': 'failed'
+                }
+            
+            # Process commercial description for Box Field 31 (Commercial description)
+            try:
+                logger.info(f"🔄 Processing commercial description for Box Field 31...")
+                product_result = self._process_commercial_description(primary_data)
+                processed_results['fields']['product'] = product_result
+                logger.info(f"✅ Product processing completed")
+            except Exception as e:
+                logger.error(f"❌ Error processing commercial description: {e}")
+                processed_results['fields']['product'] = {
+                    'error': str(e),
+                    'status': 'failed'
+                }
+            
+            # Save results to database
+            self._save_to_database(order_id, processed_results)
+            
+            logger.info(f"✅ Secondary processing completed for order: {order_id}")
+            return processed_results
+            
+        except Exception as e:
+            logger.error(f"❌ Fatal error in secondary processing: {e}")
+            raise
+    
+    def _get_input_data_for_processor(self, processor_name: str, primary_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """
+        Extract relevant input data for a specific processor from primary data.
+        
+        Args:
+            processor_name: Name of the processor
+            primary_data: Data from primary processing
+            
+        Returns:
+            Relevant input data for the processor
+        """
+        # Map processor names to input field names
+        processor_input_mapping = {
+            'regime_type': ['regime_type', 'transaction_type'],
+            'transaction_type': ['transaction_type', 'payment_terms'],
+            'incoterms': ['delivery_terms', 'freight_terms'],
+            'currency': ['currency', 'currency_code'],
+            'amount': ['amount', 'total_amount', 'invoice_amount'],
+            'transport': ['transport_mode', 'vessel', 'flight_number'],
+            'location': ['port_of_loading', 'port_of_destination', 'location'],
+            'marks': ['marks', 'container_number', 'seal_number'],
+            'package': ['package_type', 'package_count', 'package_description'],
+            'product': ['commodity_description', 'product_name'],
+            'country': ['country', 'origin_country', 'destination_country'],
+            'weight': ['weight', 'gross_weight', 'net_weight'],
+            'procedure': ['procedure_code', 'customs_procedure'],
+            'document': ['document_number', 'reference_number'],
+            'office': ['office_code', 'customs_office'],
+            'manifest': ['manifest_number', 'registration_number'],
+            'reference_number': ['order_id', 'invoice_number', 'po_number'],
+            'address': ['address', 'shipper_address', 'consignee_address']
+        }
+        
+        input_fields = processor_input_mapping.get(processor_name, [])
+        input_data = {}
+        
+        for field in input_fields:
+            if field in primary_data:
+                input_data[field] = primary_data[field]
+        
+        return input_data if input_data else None
+    
+    def _process_warehouse_lookup(self, primary_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Process warehouse lookup for Box Field 30 (Location of goods).
+        
+        Args:
+            primary_data: Data from primary processing
+            
+        Returns:
+            Dictionary containing warehouse lookup results
+        """
+        try:
+            # Get office code from primary data
+            office_code = primary_data.get('result', {}).get('extracted_fields', {}).get('office_code_processed')
+            
+            if not office_code:
+                return {
+                    'success': False,
+                    'error': 'No office code found in primary data',
+                    'box_30_value': None
+                }
+            
+            # Get warehouse data
+            warehouses = get_warehouse_data()
+            
+            # Process warehouse lookup (auto mode for integration)
+            result = process_warehouse_lookup(office_code, warehouses, auto_mode=True)
+            
+            return {
+                'success': result['success'],
+                'office_code': result['office_code'],
+                'box_30_value': result['box_30_value'],
+                'warehouse_code': result['box_30_value'],
+                'warehouse_name': result.get('selected_warehouse', {}).get('warehouse'),
+                'warehouses_found': result['count'],
+                'error': result.get('error')
+            }
+            
+        except Exception as e:
+            return {
+                'success': False,
+                'error': f'Warehouse lookup failed: {str(e)}',
+                'box_30_value': None
+            }
+    
+    def _process_commercial_description(self, primary_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Process commercial description for Box Field 31 (Commercial description).
+        
+        Args:
+            primary_data: Data from primary processing
+            
+        Returns:
+            Dictionary containing commercial description processing results
+        """
+        try:
+            # Get commercial description from primary data
+            commercial_description = primary_data.get('result', {}).get('extracted_fields', {}).get('commercial_description')
+            
+            if not commercial_description:
+                return {
+                    'success': False,
+                    'error': 'No commercial description found in primary data',
+                    'commercial_description_processed': None
+                }
+            
+            # Process commercial description using the esad_product script (non-verbose)
+            result = process_commercial_description(commercial_description, verbose=False)
+            
+            return {
+                'success': bool(result['product_name']),
+                'original_description': result['original_description'],
+                'cleaned_description': result['cleaned_description'],
+                'commercial_description_processed': result['product_name'],
+                'product_name': result['product_name'],
+                'error': None if result['product_name'] else 'Failed to extract product name'
+            }
+            
+        except Exception as e:
+            return {
+                'success': False,
+                'error': f'Commercial description processing failed: {str(e)}',
+                'commercial_description_processed': None
+            }
+    
+    def _save_to_database(self, order_id: str, processed_results: Dict[str, Any]):
+        """
+        Save processed results to the esad_fields_processed table.
+        
+        Args:
+            order_id: The order identifier
+            processed_results: Results from secondary processing
+        """
+        try:
+            logger.info(f"💾 Saving secondary processing results to database for order: {order_id}")
+            
+            # Prepare data for database insertion
+            db_data = {
+                'order_id': order_id,
+                'processing_status': 'completed',
+                'validation_status': 'unvalidated',
+                'processed_at': datetime.now().isoformat()
+            }
+            
+            # Add processed field values
+            for field_name, result in processed_results['fields'].items():
+                if isinstance(result, dict) and 'value' in result:
+                    # Map field name to database column
+                    db_column = self.field_mappings.get(field_name)
+                    if db_column:
+                        db_data[db_column] = result['value']
+            
+            # Insert into esad_fields_processed table
+            response = self.supabase_client.table('esad_fields_processed').insert(db_data).execute()
+            
+            if response.data:
+                logger.info(f"✅ Successfully saved {len(response.data)} records to database")
+            else:
+                logger.warning("⚠️ No data was inserted into database")
+                
+        except Exception as e:
+            logger.error(f"❌ Error saving to database: {e}")
+            raise
+    
+    def get_processing_summary(self, order_id: str) -> Dict[str, Any]:
+        """
+        Get a summary of secondary processing results for an order.
+        
+        Args:
+            order_id: The order identifier
+            
+        Returns:
+            Summary of processing results
+        """
+        try:
+            # Query the database for processing results
+            response = self.supabase_client.table('esad_fields_processed')\
+                .select('*')\
+                .eq('order_id', order_id)\
+                .execute()
+            
+            if response.data:
+                return {
+                    'order_id': order_id,
+                    'total_fields_processed': len(response.data),
+                    'processing_status': 'completed',
+                    'last_updated': response.data[0].get('updated_at'),
+                    'fields': response.data
+                }
+            else:
+                return {
+                    'order_id': order_id,
+                    'total_fields_processed': 0,
+                    'processing_status': 'not_found',
+                    'message': 'No processing results found for this order'
+                }
+                
+        except Exception as e:
+            logger.error(f"❌ Error retrieving processing summary: {e}")
+            return {
+                'order_id': order_id,
+                'error': str(e),
+                'processing_status': 'error'
+            }
+
+
+def main():
+    """Main function for testing the secondary processor."""
+    # Load configuration
+    config = {
+        'SUPABASE_URL': 'your_supabase_url',
+        'SUPABASE_KEY': 'your_supabase_key'
+    }
+    
+    # Initialize processor
+    processor = ESADSecondaryProcessor(config)
+    
+    # Example usage
+    order_id = "ORD-20250817-001"
+    primary_data = {
+        'regime_type': 'import',
+        'transaction_type': 'sale',
+        'currency': 'USD',
+        'amount': 1500.00
+    }
+    
+    # Process the order
+    results = processor.process_order(order_id, primary_data)
+    print(f"Processing results: {json.dumps(results, indent=2)}")
+    
+    # Get summary
+    summary = processor.get_processing_summary(order_id)
+    print(f"Processing summary: {json.dumps(summary, indent=2)}")
+
+
+if __name__ == "__main__":
+    main()

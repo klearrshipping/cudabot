@@ -20,7 +20,7 @@ def generate_order_number() -> str:
         str: Unique order number
     """
     try:
-        from modules.core.supabase_client import get_supabase_client
+        from customs_api.modules.core.supabase_client import get_supabase_client
         
         # Get current date
         today = datetime.now().strftime("%Y%m%d")
@@ -91,7 +91,7 @@ def get_order_by_number(order_number: str) -> Optional[dict]:
         dict: Order data or None if not found
     """
     try:
-        from modules.core.supabase_client import get_supabase_client
+        from customs_api.modules.core.supabase_client import get_supabase_client
         
         supabase = get_supabase_client()
         result = supabase.table("orders").select("*").eq("order_number", order_number).execute()
