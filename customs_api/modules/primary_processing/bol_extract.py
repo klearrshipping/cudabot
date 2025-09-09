@@ -88,6 +88,9 @@ class FlexibleFormExtractor:
             
             extracted_data["_metadata"] = metadata
             
+            # BOL Number Validation and Recheck
+            extracted_data = self._validate_and_fix_bol_number(extracted_data, image_data_url)
+            
             # Save to database if available and requested
             if save_to_db and DB_AVAILABLE and order_number:
                 try:
@@ -126,9 +129,9 @@ Extract the information in this EXACT JSON structure:
     "consignee_tel#": "consignee telephone number if available",
     "shipper": "shipper company name",
     "shipper_address": "complete shipper address",
-    "master_bill_of_lading": "master bill of lading number",
+    "bill_of_lading": "primary bill of lading number (main BOL number for tracking)",
+    "master_bill_of_lading": "master bill of lading number (only if different from main BOL)",
     "voyage_number": "voyage number",
-    "bill_of_lading": "house bill of lading number",
     "last_departure_date": "last departure date (DD/MM/YYYY format)",
     "port_of_origin": "port of origin",
     "port_of_loading": "port of loading",
@@ -528,6 +531,108 @@ Be comprehensive in extracting ALL charges from any charges/fees table found in 
             return "Bill of Lading"
         else:
             return "Shipping Document"
+    
+    def _validate_and_fix_bol_number(self, extracted_data: Dict[str, Any], image_data_url: str) -> Dict[str, Any]:
+        """
+        Validate that BOL number is present and attempt to fix if missing
+        
+        Args:
+            extracted_data: Initial extraction results
+            image_data_url: Image data for re-extraction if needed
+            
+        Returns:
+            Dict: Updated extraction data with BOL number fixed if possible
+        """
+        # Check if bill_of_lading field is empty or null
+        bol_number = extracted_data.get('bill_of_lading')
+        master_bol = extracted_data.get('master_bill_of_lading')
+        
+        # If bill_of_lading is empty but master_bill_of_lading has a value, move it
+        if (not bol_number or bol_number.strip() == '' or bol_number.lower() == 'null') and master_bol:
+            print(f"⚠️ BOL number missing in 'bill_of_lading' field, found in 'master_bill_of_lading': {master_bol}")
+            print(f"🔄 Moving BOL number from master_bill_of_lading to bill_of_lading")
+            extracted_data['bill_of_lading'] = master_bol
+            extracted_data['master_bill_of_lading'] = None
+            print(f"✅ BOL number fixed: {master_bol}")
+            return extracted_data
+        
+        # If both fields are empty, try to re-extract with a focused prompt
+        if (not bol_number or bol_number.strip() == '' or bol_number.lower() == 'null') and \
+           (not master_bol or master_bol.strip() == '' or master_bol.lower() == 'null'):
+            print(f"❌ No BOL number found in either field - attempting re-extraction")
+            return self._recheck_bol_number(extracted_data, image_data_url)
+        
+        # If we have a valid BOL number, validate it
+        if bol_number and bol_number.strip() and bol_number.lower() != 'null':
+            print(f"✅ BOL number validation passed: {bol_number}")
+            return extracted_data
+        
+        return extracted_data
+    
+    def _recheck_bol_number(self, extracted_data: Dict[str, Any], image_data_url: str) -> Dict[str, Any]:
+        """
+        Re-extract BOL number using a focused prompt
+        
+        Args:
+            extracted_data: Current extraction results
+            image_data_url: Image data for re-extraction
+            
+        Returns:
+            Dict: Updated extraction data with BOL number if found
+        """
+        try:
+            print(f"🔍 Attempting BOL number re-extraction...")
+            
+            # Create a focused prompt just for BOL number extraction
+            bol_focus_prompt = """You are a document analysis specialist. Your task is to find the Bill of Lading (BOL) number in this document.
+
+CRITICAL: You MUST respond with ONLY a valid JSON object containing the BOL number.
+
+Look for:
+- "Bill of Lading" or "B/L" followed by a number
+- "BOL" followed by a number  
+- "House Bill" followed by a number
+- Any alphanumeric code that looks like a BOL number (typically 8-15 characters)
+
+Respond with this EXACT JSON format:
+{
+    "bill_of_lading": "the_bol_number_you_find",
+    "master_bill_of_lading": "master_bol_if_different",
+    "bol_confidence": "high/medium/low"
+}
+
+If you cannot find a BOL number, use null for bill_of_lading.
+Return ONLY the JSON object, no additional text."""
+
+            # Send focused request
+            response = self._send_to_openrouter_with_image(bol_focus_prompt, image_data_url)
+            bol_data = self._parse_openrouter_response(response)
+            
+            # Check if we found a BOL number
+            found_bol = bol_data.get('bill_of_lading')
+            if found_bol and found_bol.strip() and found_bol.lower() != 'null':
+                print(f"✅ BOL number found during recheck: {found_bol}")
+                extracted_data['bill_of_lading'] = found_bol
+                extracted_data['master_bill_of_lading'] = bol_data.get('master_bill_of_lading')
+                
+                # Add recheck metadata
+                if '_metadata' in extracted_data:
+                    extracted_data['_metadata']['bol_recheck'] = True
+                    extracted_data['_metadata']['bol_confidence'] = bol_data.get('bol_confidence', 'unknown')
+            else:
+                print(f"❌ BOL number recheck failed - no BOL number found")
+                if '_metadata' in extracted_data:
+                    extracted_data['_metadata']['bol_recheck'] = False
+                    extracted_data['_metadata']['bol_validation_failed'] = True
+            
+            return extracted_data
+            
+        except Exception as e:
+            print(f"❌ BOL number recheck failed with error: {e}")
+            if '_metadata' in extracted_data:
+                extracted_data['_metadata']['bol_recheck'] = False
+                extracted_data['_metadata']['bol_recheck_error'] = str(e)
+            return extracted_data
 
     def save_results(self, data: Dict[str, Any], output_dir: Path = None) -> Path:
         """Save extraction results to JSON file"""

@@ -9,7 +9,7 @@ Usage:
 
 This script:
 1. Extracts commercial_description from eSAD results
-2. Uses LLM (Mistral, Kimi, DeepSeek) to identify and standardize the product name
+2. Uses LLM (Mistral, Kimi) to identify and standardize the product name
 3. Returns a clean, standardized product name
 4. Handles various commercial description formats
 """
@@ -84,13 +84,20 @@ def parse_llm_response(raw_response: str) -> Optional[str]:
 
 def ask_llm_for_product_name(description: str, verbose: bool = False) -> Optional[str]:
     """Get the specific product name using LLM."""
+    print(f"\n🔍 DEBUG: ask_llm_for_product_name called")
+    print(f"   Description: {description}")
+    print(f"   Verbose: {verbose}")
+    
     if not description or description.lower() in ['not specified', 'none', '']:
+        print(f"❌ DEBUG: Description is invalid or empty, returning None")
         return None
     
+    print(f"🔍 DEBUG: Initializing LLM client...")
     llm = LLMClient()
     
     # Clean the description first
     cleaned_description = clean_commercial_description(description)
+    print(f"🔍 DEBUG: Cleaned description: {cleaned_description}")
     
     if verbose:
         print(f"\n📦 Processing commercial description:")
@@ -125,48 +132,81 @@ Do NOT return generic categories like "Electric Vehicle" or "Electronics".
     # Test models with early termination
     for model in models:
         model_name = model.split('/')[-1].split(':')[0]
+        print(f"🔍 DEBUG: Testing model: {model_name}")
         if verbose:
             print(f"\n🧪 Testing model: {model_name}")
         try:
+            print(f"🔍 DEBUG: Sending prompt to LLM...")
             raw_response = llm.send_prompt(prompt, model=model)
+            print(f"🔍 DEBUG: LLM raw response: {raw_response}")
             product_name = parse_llm_response(raw_response)
+            print(f"🔍 DEBUG: Parsed product name: {product_name}")
             
             if product_name:
+                print(f"✅ DEBUG: {model_name} successfully returned: {product_name}")
                 if verbose:
                     print(f"✅ {model_name} returned: {product_name}")
                 return product_name
             else:
+                print(f"❌ DEBUG: {model_name} did not return a valid product name")
                 if verbose:
                     print(f"❌ {model_name} did not return a valid product name.")
                 
         except Exception as e:
+            print(f"❌ DEBUG: {model_name} failed with error: {e}")
             if verbose:
                 print(f"❌ {model_name} exception: {e}")
     
+    print(f"❌ DEBUG: All models failed to extract product name")
     if verbose:
         print("🔥 All models failed to extract product name.")
     return None
 
-def classify_with_hs_api(product_name: str, verbose: bool = False) -> Optional[Dict[str, str]]:
-    """Classify product using HS Code API."""
+def classify_with_hs_api(product_name: str, verbose: bool = False, order_id: str = None, 
+                        contextual_data: Dict[str, Any] = None) -> Optional[Dict[str, str]]:
+    """Classify product using HS Code API with optional rich contextual data."""
+    print(f"\n🔍 DEBUG: classify_with_hs_api called")
+    print(f"   Product name: {product_name}")
+    print(f"   Verbose: {verbose}")
+    print(f"   Order ID: {order_id}")
+    print(f"   Has contextual data: {bool(contextual_data)}")
+    
     if not product_name:
+        print(f"❌ DEBUG: No product name provided, returning None")
         return None
     
     API_BASE_URL = "http://localhost:5000"
+    print(f"🔍 DEBUG: Using API URL: {API_BASE_URL}")
     
     if verbose:
         print(f"\n🔍 Classifying with HS Code API: {product_name}")
+        if order_id:
+            print(f"   Order ID: {order_id}")
+        if contextual_data:
+            print(f"   Contextual data keys: {list(contextual_data.keys())}")
     
     try:
+        payload = {"product_name": product_name, "verbose": verbose}
+        if order_id:
+            payload["order_id"] = order_id
+        if contextual_data:
+            payload["contextual_data"] = contextual_data
+        
+        print(f"🔍 DEBUG: Sending payload to HSCode API: {payload}")
+            
         response = requests.post(
             f"{API_BASE_URL}/classify",
-            json={"product_name": product_name, "verbose": verbose},
+            json=payload,
             headers={"Content-Type": "application/json"},
             timeout=120
         )
         
+        print(f"🔍 DEBUG: HSCode API response status: {response.status_code}")
+        print(f"🔍 DEBUG: HSCode API response headers: {dict(response.headers)}")
+        
         if response.status_code == 200:
             result = response.json()
+            print(f"🔍 DEBUG: HSCode API response body: {result}")
             if verbose:
                 print(f"✅ HS Code API returned:")
                 print(f"   HS Code: {result.get('hs_code', 'N/A')}")
@@ -174,25 +214,110 @@ def classify_with_hs_api(product_name: str, verbose: bool = False) -> Optional[D
                 print(f"   Description: {result.get('description', 'N/A')}")
             return result
         else:
+            print(f"❌ DEBUG: HSCode API error response: {response.text}")
             if verbose:
                 print(f"❌ HS Code API error: {response.text}")
             return None
             
-    except requests.exceptions.ConnectionError:
+    except requests.exceptions.ConnectionError as e:
+        print(f"❌ DEBUG: Connection error to HSCode API: {e}")
         if verbose:
             print("❌ HS Code API connection failed. Make sure the API is running on http://localhost:5000")
         return None
-    except requests.exceptions.Timeout:
+    except requests.exceptions.Timeout as e:
+        print(f"❌ DEBUG: Timeout error to HSCode API: {e}")
         if verbose:
             print("❌ HS Code API request timed out")
         return None
     except Exception as e:
+        print(f"❌ DEBUG: Unexpected error calling HSCode API: {e}")
+        import traceback
+        traceback.print_exc()
         if verbose:
             print(f"❌ HS Code API error: {str(e)}")
         return None
 
-def process_commercial_description(description: str, verbose: bool = False, get_hs_code: bool = True) -> Dict[str, str]:
+def _build_contextual_data_from_primary(primary_data: Dict[str, Any], product_name: str) -> Optional[Dict[str, Any]]:
+    """
+    Build contextual data from primary processing results for enhanced HS Code API calls.
+    
+    Args:
+        primary_data: Data from primary processing (invoice, BOL, etc.)
+        product_name: Cleaned product name
+        
+    Returns:
+        Contextual data dictionary for HS Code API
+    """
+    try:
+        # Extract data from primary processing results
+        extracted_fields = primary_data.get('result', {}).get('extracted_fields', {})
+        
+        # Build contextual data structure
+        contextual_data = {}
+        
+        # Buyer information
+        buyer_name = extracted_fields.get('buyer_name', '')
+        buyer_address = extracted_fields.get('buyer_address', '')
+        if buyer_name or buyer_address:
+            contextual_data['buyer_info'] = {
+                'name': buyer_name,
+                'address': buyer_address
+            }
+        
+        # Supplier information
+        supplier_name = extracted_fields.get('supplier_name', '')
+        supplier_address = extracted_fields.get('supplier_address', '')
+        if supplier_name or supplier_address:
+            contextual_data['supplier_info'] = {
+                'name': supplier_name,
+                'address': supplier_address
+            }
+        
+        # Product details
+        commercial_description = extracted_fields.get('commercial_description', '')
+        if commercial_description:
+            contextual_data['product_details'] = {
+                'description': product_name,
+                'original_description': commercial_description
+            }
+        
+        # Shipping information
+        port_of_loading = extracted_fields.get('port_of_loading', '')
+        port_of_destination = extracted_fields.get('port_of_destination', '')
+        weight = extracted_fields.get('weight', '')
+        package_type = extracted_fields.get('package_type', '')
+        
+        if any([port_of_loading, port_of_destination, weight, package_type]):
+            contextual_data['shipping_info'] = {
+                'port_of_origin': port_of_loading,
+                'port_of_destination': port_of_destination,
+                'weight': weight,
+                'package_type': package_type
+            }
+        
+        # Document metadata
+        contextual_data['document_metadata'] = {
+            'extraction_confidence': primary_data.get('extraction_confidence', 'unknown'),
+            'processing_method': primary_data.get('_metadata', {}).get('processing_method', 'unknown')
+        }
+        
+        print(f"🔍 DEBUG: Built contextual data with {len(contextual_data)} sections")
+        return contextual_data if contextual_data else None
+        
+    except Exception as e:
+        print(f"❌ DEBUG: Error building contextual data: {e}")
+        return None
+
+def process_commercial_description(description: str, verbose: bool = False, get_hs_code: bool = True, 
+                                 order_id: str = None, primary_data: Dict[str, Any] = None) -> Dict[str, str]:
     """Process commercial description and return standardized product information with optional HS code classification."""
+    print(f"\n🔍 DEBUG: process_commercial_description called")
+    print(f"   Description: {description}")
+    print(f"   Verbose: {verbose}")
+    print(f"   Get HS Code: {get_hs_code}")
+    print(f"   Order ID: {order_id}")
+    print(f"   Has primary data: {bool(primary_data)}")
+    
     results = {
         'original_description': description,
         'cleaned_description': clean_commercial_description(description),
@@ -202,19 +327,47 @@ def process_commercial_description(description: str, verbose: bool = False, get_
         'hs_description': None
     }
     
+    print(f"🔍 DEBUG: Initial results: {results}")
+    
     if description and description.lower() not in ['not specified', 'none', '']:
+        print(f"🔍 DEBUG: Description is valid, proceeding with processing")
+        
         # Get product name from LLM
+        print(f"🔍 DEBUG: Calling ask_llm_for_product_name...")
         product_name = ask_llm_for_product_name(description, verbose=verbose)
+        print(f"🔍 DEBUG: ask_llm_for_product_name returned: {product_name}")
         results['product_name'] = product_name
         
         # Optionally get HS code classification
         if get_hs_code and product_name:
-            hs_result = classify_with_hs_api(product_name, verbose=verbose)
+            print(f"🔍 DEBUG: get_hs_code=True and product_name exists, calling classify_with_hs_api...")
+            
+            # Build contextual data from primary processing results if available
+            contextual_data = None
+            if primary_data:
+                contextual_data = _build_contextual_data_from_primary(primary_data, product_name)
+                print(f"🔍 DEBUG: Built contextual data: {list(contextual_data.keys()) if contextual_data else 'None'}")
+            
+            hs_result = classify_with_hs_api(
+                product_name, 
+                verbose=verbose, 
+                order_id=order_id,
+                contextual_data=contextual_data
+            )
+            print(f"🔍 DEBUG: classify_with_hs_api returned: {hs_result}")
             if hs_result:
                 results['hs_code'] = hs_result.get('hs_code')
                 results['commodity_code'] = hs_result.get('commodity_code')
                 results['hs_description'] = hs_result.get('description')
+                print(f"🔍 DEBUG: Updated results with HS code data: {results}")
+            else:
+                print(f"❌ DEBUG: classify_with_hs_api returned None or empty result")
+        else:
+            print(f"🔍 DEBUG: Skipping HS code classification - get_hs_code={get_hs_code}, product_name={product_name}")
+    else:
+        print(f"❌ DEBUG: Description is invalid or empty, skipping processing")
         
+    print(f"🔍 DEBUG: Final results: {results}")
     return results
 
 def main():

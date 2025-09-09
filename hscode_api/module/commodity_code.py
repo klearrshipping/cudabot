@@ -15,6 +15,7 @@ import argparse
 import re
 from datetime import datetime
 from typing import List, Dict, Optional, Any
+from pathlib import Path
 
 import requests
 from supabase import create_client, Client
@@ -42,6 +43,278 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# FLEXIBLE CONTEXT RESOLUTION SYSTEM
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def resolve_context(product_name: str, contextual_data: Dict[str, Any] = None, 
+                   order_id: str = None, original_query: str = None) -> Dict[str, Any]:
+    """
+    Flexible context resolution supporting multiple scenarios:
+    1. Basic request (no context) - extract from query
+    2. Order-based context (order_id lookup) - fetch from database
+    3. Direct context (contextual_data provided) - use provided data
+    
+    Args:
+        product_name: Name of the product
+        contextual_data: Direct contextual data from request
+        order_id: Order ID for database lookup
+        original_query: Original user query for context extraction
+        
+    Returns:
+        Resolved context dictionary for classification
+    """
+    print(f"\n🔍 FLEXIBLE CONTEXT RESOLUTION")
+    print("-" * 50)
+    print(f"Product: {product_name}")
+    print(f"Has contextual_data: {bool(contextual_data)}")
+    print(f"Has order_id: {bool(order_id)}")
+    print(f"Has original_query: {bool(original_query)}")
+    
+    context = {}
+    
+    # Scenario 1: Direct context provided (most rich)
+    if contextual_data:
+        print("✅ Using direct contextual data")
+        context = _process_direct_context(contextual_data)
+        
+    # Scenario 2: Order-based context lookup (rich)
+    elif order_id:
+        print(f"✅ Using order-based context for {order_id}")
+        order_context = get_order_context_by_id(order_id)
+        if order_context:
+            context = order_context.get('extracted_context', {})
+            # Also include raw document data
+            context.update({
+                'file_data': order_context.get('file_data', {}),
+                'order_number': order_context.get('order_number', ''),
+                'order_id': order_id
+            })
+        else:
+            print(f"❌ No order context found, falling back to query-based")
+            context = extract_context_from_query(original_query or product_name, product_name, "")
+    
+    # Scenario 3: Basic request (minimal context)
+    else:
+        print("✅ Using basic query-based context")
+        context = extract_context_from_query(original_query or product_name, product_name, "")
+    
+    print(f"📊 Resolved context keys: {list(context.keys())}")
+    return context
+
+def _process_direct_context(contextual_data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Process direct contextual data into standardized format for classification.
+    
+    Args:
+        contextual_data: Direct context data from API request
+        
+    Returns:
+        Processed context in standardized format
+    """
+    print(f"\n🔄 PROCESSING DIRECT CONTEXTUAL DATA")
+    print("-" * 50)
+    
+    processed_context = {}
+    
+    # Process buyer information
+    buyer_info = contextual_data.get('buyer_info', {})
+    if buyer_info:
+        processed_context['importer_type'] = _determine_importer_type_from_buyer(buyer_info)
+        processed_context['usage_purpose'] = _determine_usage_purpose_from_buyer(buyer_info)
+        print(f"✅ Processed buyer info: {buyer_info.get('name', 'Unknown')}")
+    
+    # Process supplier information
+    supplier_info = contextual_data.get('supplier_info', {})
+    if supplier_info:
+        processed_context['supplier_name'] = supplier_info.get('name', '')
+        processed_context['supplier_address'] = supplier_info.get('address', '')
+        print(f"✅ Processed supplier info: {supplier_info.get('name', 'Unknown')}")
+    
+    # Process product details
+    product_details = contextual_data.get('product_details', {})
+    if product_details:
+        processed_context['product_specifications'] = _extract_product_specs_from_details(product_details)
+        processed_context['value_category'] = _determine_value_category_from_details(product_details)
+        processed_context['quantity_category'] = _determine_quantity_category_from_details(product_details)
+        print(f"✅ Processed product details: {product_details.get('description', 'Unknown')}")
+    
+    # Process shipping information
+    shipping_info = contextual_data.get('shipping_info', {})
+    if shipping_info:
+        processed_context['origin_country'] = _extract_origin_country_from_shipping(shipping_info)
+        processed_context['size_weight_category'] = _determine_size_weight_from_shipping(shipping_info)
+        print(f"✅ Processed shipping info: {shipping_info.get('port_of_origin', 'Unknown')}")
+    
+    # Process document metadata
+    doc_metadata = contextual_data.get('document_metadata', {})
+    if doc_metadata:
+        processed_context['product_age_category'] = _determine_age_from_metadata(doc_metadata)
+        processed_context['extraction_confidence'] = doc_metadata.get('extraction_confidence', 'unknown')
+        print(f"✅ Processed document metadata: {doc_metadata.get('invoice_date', 'Unknown date')}")
+    
+    print(f"📊 Processed context keys: {list(processed_context.keys())}")
+    return processed_context
+
+def _determine_importer_type_from_buyer(buyer_info: Dict[str, Any]) -> str:
+    """Determine importer type from buyer information."""
+    buyer_name = buyer_info.get('name', '').upper()
+    
+    # Check for commercial indicators
+    commercial_patterns = [
+        r'(INC|LLC|LTD|CORP|COMPANY|CO\.|ENTERPRISE)',
+        r'(IMPORT|EXPORT|TRADING|WHOLESALE|RETAIL)',
+    ]
+    
+    for pattern in commercial_patterns:
+        if re.search(pattern, buyer_name):
+            return 'dealer'
+    
+    # Check for individual name patterns
+    individual_patterns = [
+        r'^[A-Z][a-z]+ [A-Z][a-z]+$',  # First Last
+        r'^[A-Z][a-z]+ [A-Z]\. [A-Z][a-z]+$',  # First M. Last
+    ]
+    
+    for pattern in individual_patterns:
+        if re.match(pattern, buyer_name.title()):
+            return 'individual'
+    
+    # Default based on name structure
+    if len(buyer_name.split()) == 2 and all(word.isalpha() for word in buyer_name.split()):
+        return 'individual'
+    
+    return 'individual'  # Default assumption
+
+def _determine_usage_purpose_from_buyer(buyer_info: Dict[str, Any]) -> str:
+    """Determine usage purpose from buyer information."""
+    buyer_address = buyer_info.get('address', '').lower()
+    
+    # Check for residential vs commercial address patterns
+    if any(word in buyer_address for word in ['st', 'street', 'ave', 'avenue', 'rd', 'road']):
+        return 'personal'
+    
+    # Check for commercial indicators
+    commercial_indicators = ['business', 'commercial', 'industrial', 'office', 'company']
+    if any(indicator in buyer_address for indicator in commercial_indicators):
+        return 'commercial'
+    
+    return 'personal'  # Default assumption
+
+def _extract_product_specs_from_details(product_details: Dict[str, Any]) -> Dict[str, Any]:
+    """Extract product specifications from product details."""
+    specs = {}
+    description = product_details.get('description', '').lower()
+    
+    # Extract year of manufacture
+    year_match = re.search(r'\b(20\d{2})\b', description)
+    if year_match:
+        specs['year_of_manufacture'] = int(year_match.group(1))
+    
+    # Extract power specifications
+    power_match = re.search(r'(\d+)W', description)
+    if power_match:
+        specs['power_watts'] = int(power_match.group(1))
+    
+    # Extract capacity specifications
+    capacity_match = re.search(r'(\d+)Wh', description)
+    if capacity_match:
+        specs['capacity_wh'] = int(capacity_match.group(1))
+    
+    # Extract battery type
+    if 'lithium' in description:
+        specs['battery_type'] = 'lithium_ion'
+    elif 'lfp' in description:
+        specs['battery_type'] = 'LFP'
+    
+    return specs
+
+def _determine_value_category_from_details(product_details: Dict[str, Any]) -> str:
+    """Determine value category from product details."""
+    try:
+        value = product_details.get('value', 0)
+        if value < 500:
+            return 'low_value'
+        elif value < 2000:
+            return 'medium_value'
+        elif value < 10000:
+            return 'high_value'
+        else:
+            return 'very_high_value'
+    except (ValueError, TypeError):
+        return 'unknown_value'
+
+def _determine_quantity_category_from_details(product_details: Dict[str, Any]) -> str:
+    """Determine quantity category from product details."""
+    try:
+        quantity = product_details.get('quantity', 1)
+        if quantity == 1:
+            return 'single_unit'
+        elif quantity <= 5:
+            return 'small_quantity'
+        elif quantity <= 20:
+            return 'medium_quantity'
+        else:
+            return 'bulk_quantity'
+    except (ValueError, TypeError):
+        return 'single_unit'
+
+def _extract_origin_country_from_shipping(shipping_info: Dict[str, Any]) -> str:
+    """Extract origin country from shipping information."""
+    port_of_origin = shipping_info.get('port_of_origin', '')
+    if 'UNITED STATES' in port_of_origin or 'USA' in port_of_origin:
+        return 'USA'
+    elif 'CHINA' in port_of_origin:
+        return 'CHINA'
+    elif 'GERMANY' in port_of_origin:
+        return 'GERMANY'
+    elif 'JAPAN' in port_of_origin:
+        return 'JAPAN'
+    return 'unknown'
+
+def _determine_size_weight_from_shipping(shipping_info: Dict[str, Any]) -> str:
+    """Determine size/weight category from shipping information."""
+    try:
+        weight_str = shipping_info.get('weight', '0 KGS')
+        weight_kg = float(re.findall(r'[\d.]+', weight_str)[0])
+        
+        if weight_kg < 10:
+            return 'lightweight'
+        elif weight_kg < 50:
+            return 'medium_weight'
+        elif weight_kg < 200:
+            return 'heavy'
+        else:
+            return 'very_heavy'
+    except (ValueError, IndexError):
+        return 'unknown_weight'
+
+def _determine_age_from_metadata(doc_metadata: Dict[str, Any]) -> str:
+    """Determine product age from document metadata."""
+    try:
+        from datetime import datetime
+        current_date = datetime.now()
+        
+        # Try to extract date from various fields
+        date_str = doc_metadata.get('invoice_date') or doc_metadata.get('date')
+        if date_str:
+            # Parse various date formats
+            for fmt in ['%Y-%m-%d', '%B %d, %Y', '%m/%d/%Y']:
+                try:
+                    doc_date = datetime.strptime(date_str, fmt)
+                    age_years = (current_date - doc_date).days / 365.25
+                    
+                    if age_years <= 3:
+                        return 'three_years_and_less'
+                    else:
+                        return 'exceeding_three_years'
+                except ValueError:
+                    continue
+        
+        return 'three_years_and_less'  # Default for new purchases
+    except Exception:
+        return 'three_years_and_less'
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # MAIN ENTRY POINTS (Called by app.py or external systems)
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -55,11 +328,21 @@ def interactive_commodity_lookup(hs_codes: list[str], product_name: str, product
         product_name: Name of the product  
         product_info_text: Additional product information
         original_question: The original user question
+        order_id: Order ID for context-aware auto-answers
         
     Returns:
         Final commodity code selection
     """
     
+    # Use enhanced lookup with context auto-answers if order_id provided
+    if order_id:
+        print(f"\n🤖 USING ENHANCED LOOKUP WITH CONTEXT AUTO-ANSWERS")
+        print(f"Order ID: {order_id}")
+        return lookup_commodity_code_with_context_auto_answers(
+            hs_codes, product_name, product_info_text, original_question, int(order_id)
+        )
+    
+    # Fallback to manual interactive mode
     # Initial lookup
     result = lookup_commodity_code(hs_codes, product_name, product_info_text, original_question)
     
@@ -171,16 +454,13 @@ def lookup_commodity_code_with_answers(hs_codes: list[str], product_name: str, p
             # Run LLM analysis with enhanced product information
             print(f"│   └── [LLM] Running LLM analysis with user answers...")
             
-            # Check if sufficient information for analysis
-            info_analysis = lookup.analyze_if_sufficient_info(
-                original_question, all_matches, product_name, enhanced_product_info, order_id
-            )
+            # Extract classification attributes needed
+            classification_attributes = lookup.extract_classification_attributes(all_matches)
             
-            if info_analysis['sufficient']:
-                # Select best match with extracted context if available
+            if not classification_attributes:
+                # No distinguishing attributes - can select directly
                 best_match = lookup.select_best_commodity_code(
-                    hs_code, all_matches, product_name, enhanced_product_info, 
-                    info_analysis.get('extracted_context', {})
+                    hs_code, all_matches, product_name, enhanced_product_info, {}
                 )
                 if best_match:
                     results[hs_code] = [best_match]
@@ -188,15 +468,12 @@ def lookup_commodity_code_with_answers(hs_codes: list[str], product_name: str, p
                     results[hs_code] = []
             else:
                 # Still need more clarification
-                questions = lookup.generate_clarification_questions(
-                    original_question, all_matches, product_name, 
-                    enhanced_product_info, info_analysis['missing_attributes']
-                )
+                questions = lookup.generate_questions_for_attributes(classification_attributes)
                 
                 results[hs_code] = {
                     'requires_clarification': True,
-                    'reasoning': info_analysis['reasoning'],
-                    'missing_info': info_analysis['missing_info'],
+                    'reasoning': 'Classification attributes found',
+                    'missing_info': [q['question'] for q in questions],
                     'questions': questions,
                     'available_codes': all_matches,
                     'original_question': original_question,
@@ -210,7 +487,8 @@ def lookup_commodity_code_with_answers(hs_codes: list[str], product_name: str, p
     return results
 
 def lookup_commodity_code(hs_codes: list[str], product_name: str, product_info_text: str, 
-                         original_question: str = "", order_id: str = None) -> dict:
+                         original_question: str = "", order_id: str = None, 
+                         resolved_context: Dict[str, Any] = None) -> dict:
     """
     Main function called by app.py to lookup commodity codes with LLM selection.
     
@@ -219,6 +497,8 @@ def lookup_commodity_code(hs_codes: list[str], product_name: str, product_info_t
         product_name: Name of the product
         product_info_text: Additional product information
         original_question: The original user question for context
+        order_id: Order ID for context lookup
+        resolved_context: Pre-resolved context data
         
     Returns:
         Dictionary mapping HS codes to their selected best commodity code or clarification request
@@ -253,23 +533,20 @@ def lookup_commodity_code(hs_codes: list[str], product_name: str, product_info_t
             for match in all_matches:
                 print(f"   • {match['tariff_code']}: {match['description']}")
             
-            # STEP 1: Check if we have sufficient information to proceed
-            print(f"\n[ANALYZING] INFORMATION SUFFICIENCY")
+            # STEP 1: Extract classification attributes needed
+            print(f"\n[ANALYZING] CLASSIFICATION ATTRIBUTES")
             print("-" * 50)
             
-            info_analysis = lookup.analyze_if_sufficient_info(
-                original_question, all_matches, product_name, product_info_text, order_id
-            )
+            classification_attributes = lookup.extract_classification_attributes(all_matches)
             
-            print(f"Analysis: {info_analysis['reasoning']}")
+            print(f"Found {len(classification_attributes)} classification attribute(s)")
             
-            if info_analysis['sufficient']:
-                print(f"[OK] Sufficient information available - proceeding with selection")
+            if not classification_attributes:
+                print(f"[OK] No distinguishing attributes - can select directly")
                 
-                # Use LLM to select best match with extracted context if available
+                # Use LLM to select best match
                 best_match = lookup.select_best_commodity_code(
-                    hs_code, all_matches, product_name, product_info_text,
-                    info_analysis.get('extracted_context', {})
+                    hs_code, all_matches, product_name, product_info_text, {}
                 )
                 
                 if best_match:
@@ -287,17 +564,14 @@ def lookup_commodity_code(hs_codes: list[str], product_name: str, product_info_t
                     print(f"│   └── [X] LLM rejected all commodity codes as inappropriate")
                     results[hs_code] = []
             else:
-                print(f"[X] Insufficient information - clarification needed")
-                print(f"Missing information: {', '.join(info_analysis['missing_info'])}")
+                print(f"[X] Classification attributes found - clarification needed")
+                print(f"Required attributes: {[attr['name'] for attr in classification_attributes]}")
                 
-                # Generate specific questions using LLM
+                # Generate specific questions for the required attributes
                 print(f"\n[LLM] GENERATING CLARIFICATION QUESTIONS")
                 print("-" * 50)
                 
-                questions = lookup.generate_clarification_questions(
-                    original_question, all_matches, product_name, 
-                    product_info_text, info_analysis['missing_attributes']
-                )
+                questions = lookup.generate_questions_for_attributes(classification_attributes)
                 
                 print(f"Generated {len(questions)} questions:")
                 for i, q in enumerate(questions, 1):
@@ -305,15 +579,244 @@ def lookup_commodity_code(hs_codes: list[str], product_name: str, product_info_t
                     if 'help_text' in q:
                         print(f"   Help: {q['help_text']}")
                 
-                # Return clarification request with generated questions
+                # Display comprehensive context after questions are generated
+                print(f"\n[CONTEXT] AVAILABLE CONTEXT INFORMATION")
+                print("-" * 50)
+                
+                # Context Source 1: Original Query
+                if original_question:
+                    print(f"📝 ORIGINAL USER QUERY:")
+                    print(f"   {original_question}")
+                else:
+                    print(f"📝 ORIGINAL USER QUERY: Not provided")
+                
+                # Context Source 2: Product Information
+                print(f"\n📦 PRODUCT INFORMATION:")
+                print(f"   Product Name: {product_name}")
+                print(f"   Product Details: {product_info_text}")
+                
+                # Context Source 3: Order Context (if available)
+                if order_id:
+                    print(f"\n📋 ORDER CONTEXT (Order ID: {order_id}):")
+                    order_context = get_order_context_by_id(order_id)
+                    
+                    if order_context:
+                        print(f"   Order Number: {order_context.get('order_number', 'N/A')}")
+                        
+                        # Display extracted context from DocumentContextExtractor
+                        extracted_context = order_context.get('extracted_context', {})
+                        if extracted_context:
+                            print(f"   📊 EXTRACTED CONTEXT:")
+                            for key, value in extracted_context.items():
+                                print(f"      - {key}: {value}")
+                        else:
+                            print(f"   📊 EXTRACTED CONTEXT: Not available")
+                        
+                        # Display raw document data
+                        file_data = order_context.get('file_data', {})
+                        if file_data.get('bill_of_lading'):
+                            print(f"   📄 BILL OF LADING DATA:")
+                            bol_data = file_data['bill_of_lading']
+                            print(f"      - Consignee: {bol_data.get('consignee_name', 'N/A')}")
+                            print(f"      - Shipper: {bol_data.get('shipper', 'N/A')}")
+                            print(f"      - Commodity: {bol_data.get('commodity', 'N/A')}")
+                            print(f"      - Weight: {bol_data.get('weight', 'N/A')}")
+                            print(f"      - Package Type: {bol_data.get('package_type', 'N/A')}")
+                        
+                        if file_data.get('invoice'):
+                            print(f"   📄 INVOICE DATA:")
+                            invoice_data = file_data['invoice']
+                            print(f"      - Buyer: {invoice_data.get('buyer', {}).get('name', 'N/A')}")
+                            print(f"      - Supplier: {invoice_data.get('supplier', {}).get('name', 'N/A')}")
+                            print(f"      - Invoice Date: {invoice_data.get('invoice_details', {}).get('date', 'N/A')}")
+                            print(f"      - Total Amount: ${invoice_data.get('totals', {}).get('total_amount', 'N/A')}")
+                            
+                            # Show items
+                            items = invoice_data.get('items', [])
+                            if items:
+                                print(f"      - Items:")
+                                for item in items:
+                                    print(f"        * {item.get('description', 'N/A')} - Qty: {item.get('quantity', 'N/A')}")
+                    else:
+                        print(f"   Order context not available for order ID: {order_id}")
+                else:
+                    print(f"\n📋 ORDER CONTEXT: Not provided (no order_id)")
+                
+                print(f"\n[CONTEXT] END OF CONTEXT INFORMATION")
+                print("-" * 50)
+                
+                # UNIFIED APPROACH: Try to auto-answer questions using available context
+                print(f"\n🤖 ATTEMPTING AUTO-ANSWER USING AVAILABLE CONTEXT")
+                print("-" * 50)
+                
+                # Use resolved context if available, otherwise extract from sources
+                if resolved_context:
+                    print(f"✅ Using pre-resolved context: {len(resolved_context)} fields")
+                    extracted_context = resolved_context
+                elif order_id:
+                    # Scenario 2: Order-based context
+                    print(f"📋 Using order-based context (Order ID: {order_id})")
+                    order_context = get_order_context_by_id(order_id)
+                    if order_context:
+                        extracted_context = order_context.get('extracted_context', {})
+                        print(f"✅ Retrieved order context: {len(extracted_context)} fields")
+                    else:
+                        print(f"❌ No order context found for order ID: {order_id}")
+                else:
+                    # Scenario 1: Query-based context
+                    print(f"📝 Using query-based context extraction")
+                    extracted_context = extract_context_from_query(original_question, product_name, product_info_text)
+                    print(f"✅ Extracted query context: {len(extracted_context)} fields")
+                
+                # Try to map context to answers
+                if extracted_context:
+                    print(f"\n🎯 MAPPING CONTEXT TO ANSWERS")
+                    print("-" * 50)
+                    
+                    # Map context to answers using simplified logic
+                    answers = {}
+                    for i, question in enumerate(questions, 1):
+                        question_text = question.get('question', '')
+                        question_options = question.get('options', [])
+                        question_id = f'question_{i}'
+                        
+                        print(f"\nQ{i}: {question_text}")
+                        print(f"   Options: {question_options}")
+                        
+                        answer = None
+                        
+                        # Map based on question content
+                        if "importer" in question_text.lower():
+                            importer_type = extracted_context.get('importer_type', '')
+                            if importer_type == 'individual':
+                                answer = 'Individual'
+                            elif importer_type == 'dealer':
+                                answer = 'Dealer'
+                            print(f"   Context: importer_type = {importer_type}")
+                        
+                        elif "age" in question_text.lower() or "old" in question_text.lower():
+                            age_category = extracted_context.get('product_age_category', '')
+                            if age_category == 'three_years_and_less':
+                                answer = 'Three years or less since manufacture'
+                            elif age_category == 'exceeding_three_years':
+                                answer = 'Exceeding three years since manufacture'
+                            print(f"   Context: product_age_category = {age_category}")
+                        
+                        elif "propulsion" in question_text.lower() or "motor" in question_text.lower():
+                            product_specs = extracted_context.get('product_specifications', {})
+                            if product_specs.get('battery_type'):
+                                answer = 'Only electric motor'
+                            print(f"   Context: product_specifications = {product_specs}")
+                        
+                        # Check if answer matches available options
+                        if answer and answer in question_options:
+                            answers[question_id] = answer
+                            print(f"   ✅ Mapped to: {answer}")
+                        elif answer:
+                            # Try to find partial match
+                            for option in question_options:
+                                if answer.lower() in option.lower() or option.lower() in answer.lower():
+                                    answers[question_id] = option
+                                    print(f"   ✅ Partial match: {option}")
+                                    break
+                            else:
+                                print(f"   ❌ No match found for: {answer}")
+                        else:
+                            print(f"   ❌ No context mapping available")
+                    
+                    if len(answers) == len(questions):
+                        print(f"\n✅ Successfully mapped ALL {len(answers)}/{len(questions)} questions")
+                        
+                        # Use answers to select best commodity code
+                        print(f"\n🔍 SELECTING BEST COMMODITY CODE WITH ANSWERS")
+                        print("-" * 50)
+                        
+                        # Filter codes based on answers (single pass)
+                        filtered_codes = all_matches.copy()
+                        
+                        # Extract filter criteria from answers
+                        importer_filter = None
+                        age_filter = None
+                        
+                        for q_id, answer in answers.items():
+                            question = questions[int(q_id.split('_')[1])-1]
+                            question_text = question['question'].lower()
+                            
+                            if "importer" in question_text:
+                                if answer == 'Individual':
+                                    importer_filter = 'individual'
+                                elif answer == 'Dealer':
+                                    importer_filter = 'dealer'
+                            elif "age" in question_text or "old" in question_text:
+                                if 'three years and less' in answer.lower():
+                                    age_filter = 'three years and less'
+                                elif 'exceeding three years' in answer.lower():
+                                    age_filter = 'exceeding three years'
+                        
+                        # Apply all filters in one pass
+                        if importer_filter or age_filter:
+                            filtered_codes = [
+                                code for code in filtered_codes
+                                if (not importer_filter or importer_filter in code['description'].lower()) and
+                                   (not age_filter or age_filter in code['description'].lower())
+                            ]
+                        
+                        print(f"📊 Filtered to {len(filtered_codes)} codes based on answers")
+                        
+                        if filtered_codes:
+                            print(f"📋 Filtered codes:")
+                            for i, code in enumerate(filtered_codes, 1):
+                                print(f"   {i}. {code['tariff_code']}: {code['description']}")
+                            
+                            # If only one code left, select it directly
+                            if len(filtered_codes) == 1:
+                                best_match = filtered_codes[0]
+                                print(f"✅ Only one code remaining - selecting directly: {best_match['tariff_code']}")
+                                results[hs_code] = [best_match]
+                                continue
+                            
+                            # Use LLM to select best match from filtered codes
+                            best_match = lookup.select_best_commodity_code(
+                                hs_code, filtered_codes, product_name, product_info_text, extracted_context
+                            )
+                            
+                            if best_match:
+                                print(f"✅ Selected: {best_match['tariff_code']}")
+                                print(f"   Description: {best_match['description']}")
+                                results[hs_code] = [best_match]
+                                continue
+                            else:
+                                print(f"❌ LLM rejected all filtered codes")
+                        else:
+                            print(f"❌ No codes match the filtered criteria")
+                    elif answers:
+                        print(f"\n⚠️ PARTIAL ANSWERS: Only {len(answers)}/{len(questions)} questions answered")
+                        print("❌ ALL questions must be answered to proceed with classification")
+                        
+                        # Identify unanswered questions
+                        unanswered_questions = []
+                        for i, question in enumerate(questions, 1):
+                            question_id = f'question_{i}'
+                            if question_id not in answers:
+                                unanswered_questions.append(question['question'])
+                        
+                        print(f"❌ Missing answers for: {unanswered_questions}")
+                    else:
+                        print(f"❌ Could not map context to any answers")
+                else:
+                    print(f"❌ No context available for auto-answering")
+                
+                # Fallback: Return clarification request if auto-answering failed
+                print(f"\n⚠️ FALLBACK: Returning clarification request")
+                print("-" * 50)
                 results[hs_code] = {
                     'requires_clarification': True,
-                    'reasoning': info_analysis['reasoning'],
-                    'missing_info': info_analysis['missing_info'],
+                    'reasoning': 'Classification attributes found - auto-answering failed',
+                    'missing_info': [q['question'] for q in questions],
                     'questions': questions,
                     'available_codes': all_matches,
                     'original_question': original_question,
-                    'code_count': len(all_matches)  # Add explicit count for debugging
+                    'code_count': len(all_matches)
                 }
                 
         except Exception as e:
@@ -574,6 +1077,534 @@ class DocumentContextExtractor:
         
         return specs
 
+def get_order_context_by_id(order_id: int) -> Dict[str, Any]:
+    """
+    Retrieve order context (BOL and invoice data) by order ID and extract structured context.
+    
+    Args:
+        order_id: Order ID to retrieve context for
+        
+    Returns:
+        Dictionary containing order context data with extracted structured context
+    """
+    try:
+        # Import here to avoid circular imports
+        import sys
+        import os
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        # Go up from hscode_api/module to hscode_api, then to root, then to customs_api
+        root_dir = os.path.dirname(os.path.dirname(current_dir))
+        customs_api_dir = os.path.join(root_dir, "customs_api")
+        sys.path.insert(0, customs_api_dir)
+        
+        from modules.core.supabase_client import get_order_extractions
+        
+        # Get order extractions from database
+        order_data = get_order_extractions(order_id)
+        if not order_data:
+            print(f"❌ No order data found for order ID: {order_id}")
+            return {}
+        
+        # Also try to get processed data from files
+        order_number = order_data['order']['order_number']
+        processed_data_dir = Path(customs_api_dir) / "processed_data" / "orders" / order_number / "primary_process"
+        
+        context = {
+            'order_id': order_id,
+            'order_number': order_number,
+            'database_data': order_data,
+            'file_data': {},
+            'extracted_context': {}
+        }
+        
+        # Try to load processed files
+        bol_file = processed_data_dir / f"bill_of_lading_{order_number}_primary_extract.json"
+        invoice_file = processed_data_dir / f"invoice_{order_number}_primary_extract.json"
+        
+        bol_data = None
+        invoice_data = None
+        
+        if bol_file.exists():
+            with open(bol_file, 'r', encoding='utf-8') as f:
+                bol_data = json.load(f)
+                context['file_data']['bill_of_lading'] = bol_data
+        
+        if invoice_file.exists():
+            with open(invoice_file, 'r', encoding='utf-8') as f:
+                invoice_data = json.load(f)
+                context['file_data']['invoice'] = invoice_data
+        
+        # Use existing DocumentContextExtractor to extract structured context
+        if bol_data and invoice_data:
+            print(f"📋 Extracting structured context using DocumentContextExtractor...")
+            extractor = DocumentContextExtractor()
+            extracted_context = extractor.extract_context_from_documents(bol_data, invoice_data)
+            context['extracted_context'] = extracted_context
+            
+            print(f"✅ Extracted context attributes:")
+            for key, value in extracted_context.items():
+                print(f"   - {key}: {value}")
+        else:
+            print(f"⚠️  Missing document data - cannot extract structured context")
+            if not bol_data:
+                print(f"   - Bill of lading file not found: {bol_file}")
+            if not invoice_data:
+                print(f"   - Invoice file not found: {invoice_file}")
+        
+        return context
+        
+    except Exception as e:
+        print(f"❌ Error getting order context for {order_id}: {e}")
+        return {}
+
+def extract_context_from_query(original_question: str, product_name: str, product_info_text: str) -> Dict[str, Any]:
+    """
+    Extract context information from user query and product information for auto-answering clarification questions.
+    
+    Args:
+        original_question: The original user question
+        product_name: Name of the product
+        product_info_text: Additional product information
+        
+    Returns:
+        Dictionary with extracted context information
+    """
+    context = {}
+    
+    print(f"\n🔍 EXTRACTING CONTEXT FROM QUERY AND PRODUCT INFO")
+    print("-" * 50)
+    
+    # Extract importer type from query
+    query_lower = original_question.lower()
+    if "individual" in query_lower or "personal" in query_lower:
+        context['importer_type'] = 'individual'
+        print(f"✅ Detected importer type: individual")
+    elif "dealer" in query_lower or "company" in query_lower or "business" in query_lower:
+        context['importer_type'] = 'dealer'
+        print(f"✅ Detected importer type: dealer")
+    
+    # Extract vehicle age from query (look for year references)
+    import re
+    from datetime import datetime
+    year_match = re.search(r'\b(20\d{2})\b', original_question)
+    if year_match:
+        year = int(year_match.group(1))
+        current_year = datetime.now().year  # Use actual current year
+        age_years = current_year - year
+        if age_years <= 3:
+            context['product_age_category'] = 'three_years_and_less'
+            print(f"✅ Detected vehicle age: {age_years} years (≤3 years)")
+        else:
+            context['product_age_category'] = 'exceeding_three_years'
+            print(f"✅ Detected vehicle age: {age_years} years (>3 years)")
+    
+    # Extract propulsion type from product info and query
+    combined_text = (original_question + " " + product_name + " " + product_info_text).lower()
+    if any(keyword in combined_text for keyword in ['electric', 'battery', 'tesla', 'ev', 'electric motor']):
+        context['product_specifications'] = {'battery_type': 'lithium_ion'}
+        print(f"✅ Detected propulsion type: electric")
+    
+    # Extract usage purpose
+    if "personal" in query_lower or "individual" in query_lower:
+        context['usage_purpose'] = 'personal'
+        print(f"✅ Detected usage: personal")
+    elif "commercial" in query_lower or "business" in query_lower:
+        context['usage_purpose'] = 'commercial'
+        print(f"✅ Detected usage: commercial")
+    
+    print(f"\n📊 EXTRACTED CONTEXT: {context}")
+    return context
+
+def map_context_to_answers(questions: List[Dict], extracted_context: Dict[str, Any]) -> Dict[str, str]:
+    """
+    Map extracted context directly to question answers using predefined mappings.
+    
+    Args:
+        questions: List of clarification questions from commodity code lookup
+        extracted_context: Structured context extracted by DocumentContextExtractor
+        
+    Returns:
+        Dictionary mapping question IDs to answers
+    """
+    answers = {}
+    
+    print(f"\n🎯 MAPPING EXTRACTED CONTEXT TO ANSWERS")
+    print("-" * 50)
+    
+    for i, question in enumerate(questions, 1):
+        question_id = question.get('id', f'question_{i}')
+        question_text = question.get('question', '')
+        question_options = question.get('options', [])
+        
+        print(f"\nQ{i}: {question_text}")
+        print(f"   Options: {question_options}")
+        
+        # Map context to answers based on question type
+        answer = None
+        
+        # Importer Type mapping
+        if "importer" in question_text.lower() or "type of importer" in question_text.lower():
+            importer_type = extracted_context.get('importer_type', '')
+            if importer_type == 'individual':
+                answer = 'Individual'
+            elif importer_type == 'dealer':
+                answer = 'Dealer'
+            print(f"   Context: importer_type = {importer_type}")
+        
+        # Vehicle Age mapping
+        elif "age" in question_text.lower() or "old" in question_text.lower():
+            age_category = extracted_context.get('product_age_category', '')
+            if age_category == 'three_years_and_less':
+                answer = 'Three years or less since manufacture'
+            elif age_category == 'exceeding_three_years':
+                answer = 'Exceeding three years since manufacture'
+            print(f"   Context: product_age_category = {age_category}")
+        
+        # Propulsion Type mapping
+        elif "propulsion" in question_text.lower() or "motor" in question_text.lower():
+            # Check product specifications for propulsion type
+            product_specs = extracted_context.get('product_specifications', {})
+            
+            # Look for electric motor indicators in product specs
+            if product_specs.get('battery_type'):
+                answer = 'Only electric motor'
+            elif product_specs.get('has_solar_panels'):
+                answer = 'Only electric motor'
+            print(f"   Context: product_specifications = {product_specs}")
+        
+        # Usage Purpose mapping
+        elif "usage" in question_text.lower() or "purpose" in question_text.lower():
+            usage_purpose = extracted_context.get('usage_purpose', '')
+            if usage_purpose == 'personal':
+                answer = 'Personal use'
+            elif usage_purpose == 'commercial':
+                answer = 'Commercial use'
+            print(f"   Context: usage_purpose = {usage_purpose}")
+        
+        # Value Category mapping
+        elif "value" in question_text.lower() or "price" in question_text.lower():
+            value_category = extracted_context.get('value_category', '')
+            if value_category == 'low_value':
+                answer = 'Low value (under $500)'
+            elif value_category == 'medium_value':
+                answer = 'Medium value ($500-$2000)'
+            elif value_category == 'high_value':
+                answer = 'High value ($2000-$10000)'
+            elif value_category == 'very_high_value':
+                answer = 'Very high value (over $10000)'
+            print(f"   Context: value_category = {value_category}")
+        
+        # Quantity Category mapping
+        elif "quantity" in question_text.lower() or "number" in question_text.lower():
+            quantity_category = extracted_context.get('quantity_category', '')
+            if quantity_category == 'single_unit':
+                answer = 'Single unit'
+            elif quantity_category == 'small_quantity':
+                answer = 'Small quantity (2-5 units)'
+            elif quantity_category == 'medium_quantity':
+                answer = 'Medium quantity (6-20 units)'
+            elif quantity_category == 'bulk_quantity':
+                answer = 'Bulk quantity (20+ units)'
+            print(f"   Context: quantity_category = {quantity_category}")
+        
+        # Check if answer matches available options
+        if answer and answer in question_options:
+            answers[question_id] = answer
+            print(f"   ✅ Mapped to: {answer}")
+        elif answer:
+            # Try to find partial match
+            for option in question_options:
+                if answer.lower() in option.lower() or option.lower() in answer.lower():
+                    answers[question_id] = option
+                    print(f"   ✅ Partial match: {option}")
+                    break
+            else:
+                print(f"   ❌ No match found for: {answer}")
+        else:
+            print(f"   ❌ No context mapping available")
+    
+    print(f"\n📊 MAPPING RESULTS: {len(answers)}/{len(questions)} questions answered")
+    return answers
+
+def generate_context_aware_answers(questions: List[Dict], order_context: Dict[str, Any]) -> Dict[str, str]:
+    """
+    Generate answers to clarification questions using order context.
+    First tries direct mapping, then falls back to LLM if needed.
+    
+    Args:
+        questions: List of clarification questions from commodity code lookup
+        order_context: Order context data (BOL, invoice, etc.)
+        
+    Returns:
+        Dictionary mapping question IDs to answers
+    """
+    try:
+        # Get extracted context from DocumentContextExtractor
+        extracted_context = order_context.get('extracted_context', {})
+        
+        if not extracted_context:
+            print("❌ No extracted context available - cannot generate answers")
+            return {}
+        
+        print(f"\n🤖 GENERATING CONTEXT-AWARE ANSWERS")
+        print("-" * 50)
+        print(f"Using order: {order_context.get('order_number', 'Unknown')}")
+        
+        # First try direct mapping from extracted context
+        answers = map_context_to_answers(questions, extracted_context)
+        
+        # Check if we need LLM for remaining questions
+        unanswered_questions = []
+        for i, question in enumerate(questions, 1):
+            question_id = question.get('id', f'question_{i}')
+            if question_id not in answers:
+                unanswered_questions.append(question)
+        
+        if unanswered_questions:
+            print(f"\n🔄 {len(unanswered_questions)} questions need LLM analysis...")
+            
+            # Fall back to LLM for complex questions
+            llm_answers = _generate_llm_answers(unanswered_questions, order_context)
+            answers.update(llm_answers)
+        
+        print(f"\n✅ FINAL RESULTS: {len(answers)}/{len(questions)} questions answered")
+        for q_id, answer in answers.items():
+            print(f"   {q_id}: {answer}")
+        
+        return answers
+        
+    except Exception as e:
+        print(f"[ERROR] Error generating context-aware answers: {e}")
+        return {}
+
+def _generate_llm_answers(questions: List[Dict], order_context: Dict[str, Any]) -> Dict[str, str]:
+    """
+    Fallback LLM-based answer generation for complex questions.
+    """
+    try:
+        # Extract relevant data from context
+        bol_data = order_context.get('file_data', {}).get('bill_of_lading', {})
+        invoice_data = order_context.get('file_data', {}).get('invoice', {})
+        extracted_context = order_context.get('extracted_context', {})
+        
+        # Build context summary for LLM
+        context_summary = "ORDER CONTEXT:\n\n"
+        
+        # Add extracted context
+        context_summary += "EXTRACTED CONTEXT:\n"
+        for key, value in extracted_context.items():
+            context_summary += f"- {key}: {value}\n"
+        context_summary += "\n"
+        
+        # Add raw document data
+        if bol_data:
+            context_summary += "BILL OF LADING:\n"
+            context_summary += f"- Consignee: {bol_data.get('consignee_name', 'N/A')}\n"
+            context_summary += f"- Commodity: {bol_data.get('commodity', 'N/A')}\n\n"
+        
+        if invoice_data:
+            context_summary += "INVOICE:\n"
+            context_summary += f"- Buyer: {invoice_data.get('buyer', {}).get('name', 'N/A')}\n"
+            context_summary += f"- Total Amount: {invoice_data.get('totals', {}).get('total_amount', 'N/A')}\n\n"
+        
+        # Build questions for LLM
+        questions_text = "REMAINING QUESTIONS:\n"
+        for i, q in enumerate(questions, 1):
+            questions_text += f"{i}. {q.get('question', 'N/A')}\n"
+            questions_text += f"   Options: {q.get('options', [])}\n\n"
+        
+        # Create LLM prompt
+        prompt = f"""You are a customs classification expert. Based on the order context provided, answer the remaining clarification questions.
+
+{context_summary}
+
+{questions_text}
+
+Return ONLY a JSON object with question IDs as keys and selected option values as values.
+
+Example format:
+{{
+  "question_1": "Selected Option",
+  "question_2": "Another Option"
+}}"""
+        
+        print(f"[LLM] Analyzing remaining questions with LLM...")
+        response = reason_with_llm_fn(prompt)
+        
+        # Parse JSON response
+        import json
+        try:
+            cleaned_response = response.strip()
+            if cleaned_response.startswith('```json'):
+                cleaned_response = cleaned_response[7:]
+            if cleaned_response.endswith('```'):
+                cleaned_response = cleaned_response[:-3]
+            cleaned_response = cleaned_response.strip()
+            
+            llm_answers = json.loads(cleaned_response)
+            print(f"[LLM] Generated {len(llm_answers)} additional answers")
+            return llm_answers
+            
+        except json.JSONDecodeError as e:
+            print(f"[ERROR] Failed to parse LLM response: {e}")
+            return {}
+            
+    except Exception as e:
+        print(f"[ERROR] LLM fallback failed: {e}")
+        return {}
+
+def lookup_commodity_code_with_context_auto_answers(hs_codes: list[str], product_name: str, product_info_text: str, 
+                                                   original_question: str = "", order_id: int = None) -> dict:
+    """
+    Enhanced commodity code lookup that automatically answers clarification questions using order context.
+    
+    Args:
+        hs_codes: List of HS codes
+        product_name: Name of the product
+        product_info_text: Additional product information
+        original_question: The original user question
+        order_id: Order ID to retrieve context from
+        
+    Returns:
+        Dictionary with commodity code results and auto-answered questions
+    """
+    print(f"\n🚀 ENHANCED COMMODITY CODE LOOKUP WITH CONTEXT AUTO-ANSWERS")
+    print("=" * 70)
+    
+    # Step 1: Get order context if order_id provided
+    order_context = {}
+    if order_id:
+        print(f"\n📋 RETRIEVING ORDER CONTEXT")
+        print("-" * 50)
+        order_context = get_order_context_by_id(order_id)
+        if order_context:
+            print(f"✅ Retrieved context for order: {order_context.get('order_number', 'Unknown')}")
+        else:
+            print(f"❌ No context found for order ID: {order_id}")
+    
+    # Step 2: Run initial commodity code lookup
+    print(f"\n🔍 RUNNING INITIAL COMMODITY CODE LOOKUP")
+    print("-" * 50)
+    initial_result = lookup_commodity_code(hs_codes, product_name, product_info_text, original_question, order_id)
+    
+    # Step 3: Check if clarification is needed and auto-answer if context available
+    enhanced_result = {}
+    
+    for hs_code, result in initial_result.items():
+        if isinstance(result, dict) and result.get('requires_clarification') and order_context:
+            print(f"\n🤖 AUTO-ANSWERING QUESTIONS FOR {hs_code}")
+            print("-" * 50)
+            
+            # Get questions from the result
+            questions = result.get('questions', [])
+            if not questions:
+                print(f"❌ No questions found for {hs_code}")
+                enhanced_result[hs_code] = result
+                continue
+            
+            # Display comprehensive context before generating answers
+            print(f"\n[CONTEXT] AVAILABLE CONTEXT INFORMATION")
+            print("-" * 50)
+            
+            # Context Source 1: Original Query
+            if original_question:
+                print(f"📝 ORIGINAL USER QUERY:")
+                print(f"   {original_question}")
+            else:
+                print(f"📝 ORIGINAL USER QUERY: Not provided")
+            
+            # Context Source 2: Product Information
+            print(f"\n📦 PRODUCT INFORMATION:")
+            print(f"   Product Name: {product_name}")
+            print(f"   Product Details: {product_info_text}")
+            
+            # Context Source 3: Order Context
+            print(f"\n📋 ORDER CONTEXT (Order ID: {order_id}):")
+            print(f"   Order Number: {order_context.get('order_number', 'N/A')}")
+            
+            # Display extracted context from DocumentContextExtractor
+            extracted_context = order_context.get('extracted_context', {})
+            if extracted_context:
+                print(f"   📊 EXTRACTED CONTEXT:")
+                for key, value in extracted_context.items():
+                    print(f"      - {key}: {value}")
+            else:
+                print(f"   📊 EXTRACTED CONTEXT: Not available")
+            
+            # Display raw document data
+            file_data = order_context.get('file_data', {})
+            if file_data.get('bill_of_lading'):
+                print(f"   📄 BILL OF LADING DATA:")
+                bol_data = file_data['bill_of_lading']
+                print(f"      - Consignee: {bol_data.get('consignee_name', 'N/A')}")
+                print(f"      - Shipper: {bol_data.get('shipper', 'N/A')}")
+                print(f"      - Commodity: {bol_data.get('commodity', 'N/A')}")
+                print(f"      - Weight: {bol_data.get('weight', 'N/A')}")
+                print(f"      - Package Type: {bol_data.get('package_type', 'N/A')}")
+            
+            if file_data.get('invoice'):
+                print(f"   📄 INVOICE DATA:")
+                invoice_data = file_data['invoice']
+                print(f"      - Buyer: {invoice_data.get('buyer', {}).get('name', 'N/A')}")
+                print(f"      - Supplier: {invoice_data.get('supplier', {}).get('name', 'N/A')}")
+                print(f"      - Invoice Date: {invoice_data.get('invoice_details', {}).get('date', 'N/A')}")
+                print(f"      - Total Amount: ${invoice_data.get('totals', {}).get('total_amount', 'N/A')}")
+                
+                # Show items
+                items = invoice_data.get('items', [])
+                if items:
+                    print(f"      - Items:")
+                    for item in items:
+                        print(f"        * {item.get('description', 'N/A')} - Qty: {item.get('quantity', 'N/A')}")
+            
+            print(f"\n[CONTEXT] END OF CONTEXT INFORMATION")
+            print("-" * 50)
+            
+            # Generate context-aware answers
+            auto_answers = generate_context_aware_answers(questions, order_context)
+            
+            if auto_answers:
+                print(f"✅ Generated {len(auto_answers)} auto-answers")
+                
+                # Re-run lookup with auto-answers
+                print(f"\n🔄 RE-RUNNING LOOKUP WITH AUTO-ANSWERS")
+                print("-" * 50)
+                
+                # Convert auto-answers to the format expected by lookup_commodity_code_with_answers
+                user_answers = {}
+                for i, question in enumerate(questions, 1):
+                    answer_key = str(i)
+                    if answer_key in auto_answers:
+                        # Map the answer back to the question's option values
+                        selected_answer = auto_answers[answer_key]
+                        question_options = question.get('options', [])
+                        
+                        # Find matching option value
+                        for option in question_options:
+                            if isinstance(option, dict) and option.get('label') == selected_answer:
+                                user_answers[question.get('id', f'question_{i}')] = option.get('value', selected_answer)
+                                break
+                            elif isinstance(option, str) and option == selected_answer:
+                                user_answers[question.get('id', f'question_{i}')] = selected_answer
+                                break
+                        else:
+                            # Fallback to direct value
+                            user_answers[question.get('id', f'question_{i}')] = selected_answer
+                
+                # Re-run with answers
+                final_result = lookup_commodity_code_with_answers(
+                    [hs_code], product_name, product_info_text, original_question, user_answers, order_id
+                )
+                
+                enhanced_result[hs_code] = final_result.get(hs_code, result)
+            else:
+                print(f"❌ Failed to generate auto-answers for {hs_code}")
+                enhanced_result[hs_code] = result
+        else:
+            enhanced_result[hs_code] = result
+    
+    return enhanced_result
+
 def build_enhanced_product_context(bill_of_lading_path: str, invoice_path: str, 
                                   product_name: str, product_info: str) -> str:
     """
@@ -692,664 +1723,220 @@ class CommodityCodeLookup:
             logger.error(f"Error looking up commodity codes for {hs_code}: {str(e)}")
             return []
 
-    def analyze_if_sufficient_info(self, original_question: str, commodity_matches: List[Dict], 
-                                  product_name: str, product_info_text: str, order_id: str = None) -> Dict:
+    def extract_classification_attributes(self, commodity_matches: List[Dict]) -> List[Dict]:
         """
-        Determine if we have sufficient information to make a definitive commodity code selection.
-        Completely generic approach that discovers attributes dynamically from descriptions.
+        Extract classification attributes needed to distinguish between HS codes.
+        Returns a simple list of attributes with their options.
         """
-        
-        if len(commodity_matches) == 1:
-            return {
-                'sufficient': True,
-                'reasoning': 'Only one commodity code match found',
-                'missing_info': [],
-                'extracted_context': {}
-            }
-        
-        print(f"\n[EXTRACTING] DISTINGUISHING ATTRIBUTES")
-        print("-" * 50)
-        
-        # STEP 1: Use LLM to extract contextual attributes that distinguish codes
-        print(f"[STEP 1] Analyzing commodity code descriptions to find distinguishing attributes...")
-        distinguishing_attributes = self._extract_contextual_attributes_with_llm(commodity_matches)
-        print(f"[RESULT] Found {len(distinguishing_attributes)} distinguishing attribute(s): {distinguishing_attributes}")
-        
-        if not distinguishing_attributes:
-            print(f"[DECISION] No distinguishing attributes found - treating as sufficient")
-            return {
-                'sufficient': True,
-                'reasoning': 'No distinguishing attributes found between commodity codes',
-                'missing_info': [],
-                'missing_attributes': [],
-                'extracted_context': {},
-                'distinguishing_attributes': []
-            }
-        
-        # STEP 2: Check product context for those specific attributes
-        print(f"\n[STEP 2] Checking product context for each attribute...")
-        print(f"[CONTEXT] Product: '{product_name}'")
-        print(f"[CONTEXT] Info: '{product_info_text}'")
-        print(f"[CONTEXT] Question: '{original_question}'")
-        
-        found_context = self._check_product_context_for_attributes(
-            distinguishing_attributes, product_name, product_info_text, original_question, order_id
-        )
-        
-        print(f"[RESULT] Found context for {len(found_context)} attribute(s):")
-        for attr, value in found_context.items():
-            print(f"   - {attr}: '{value}'")
-        
-        # STEP 3: Decide sufficiency
-        print(f"\n[STEP 3] Determining information sufficiency...")
-        missing_attributes = [attr for attr in distinguishing_attributes if attr not in found_context]
-        
-        print(f"[ANALYSIS] Distinguishing attributes: {distinguishing_attributes}")
-        print(f"[ANALYSIS] Found in context: {list(found_context.keys())}")
-        print(f"[ANALYSIS] Missing from context: {missing_attributes}")
-        
-        if not missing_attributes:
-            print(f"\n[DECISION] SUFFICIENT: All distinguishing attributes found in product context")
-            print(f"[REASONING] We have enough information to distinguish between the commodity codes")
-            return {
-                'sufficient': True,
-                'reasoning': f'Found all distinguishing attributes: {list(found_context.keys())}',
-                'missing_info': [],
-                'missing_attributes': [],
-                'extracted_context': found_context,
-                'distinguishing_attributes': distinguishing_attributes
-            }
-        
-        # Generate questions for missing attributes
-        print(f"\n[DECISION] INSUFFICIENT: Missing {len(missing_attributes)} distinguishing attribute(s)")
-        print(f"[REASONING] Cannot distinguish between commodity codes without: {', '.join(missing_attributes)}")
-        
-        questions = self._generate_targeted_questions(missing_attributes)
-        print(f"[QUESTIONS] Generated {len(questions)} clarification question(s):")
-        for i, question in enumerate(questions, 1):
-            print(f"   {i}. {question}")
-        
-        return {
-            'sufficient': False,
-            'reasoning': f'Missing attributes: {", ".join(missing_attributes)}',
-            'missing_info': questions,
-            'missing_attributes': missing_attributes,
-            'extracted_context': found_context,
-            'distinguishing_attributes': distinguishing_attributes
-        }
-
-    def _extract_contextual_attributes_with_llm(self, commodity_matches: List[Dict]) -> List[str]:
-        """Use LLM to identify contextual attributes that distinguish between tariff codes."""
-        if len(commodity_matches) < 2:
+        if len(commodity_matches) <= 1:
             return []
         
-        # Prepare descriptions for LLM analysis
-        descriptions = []
-        for i, match in enumerate(commodity_matches):
-            descriptions.append(f"{i+1}. {match['tariff_code']}: {match['description']}")
+        print(f"\n[EXTRACTING] CLASSIFICATION ATTRIBUTES")
+        print("-" * 50)
         
-        descriptions_text = "\n".join(descriptions)
+        # Build HS codes list for the prompt
+        hs_codes_text = ""
+        for match in commodity_matches:
+            hs_codes_text += f"• {match['tariff_code']}: {match['description']}\n"
         
-        # Improved prompt with clear examples and format
-        prompt = f"""You are a tariff classification expert. Analyze these commodity code descriptions and identify the key attributes that distinguish between them for customs classification purposes.
+        # Use the clean prompt structure
+        prompt = f"""You are given a set of HS codes and their descriptions.
+Your task is not to return the HS code, but to extract the classification attributes that are necessary to decide between them.
 
-TARIFF CODES:
-{descriptions_text}
+HS Codes:
+{hs_codes_text.strip()}
 
-Your task is to identify the distinguishing attributes that differentiate these codes. Look for patterns like:
-- Importer type (individuals, dealers, companies)
-- Product age/condition (new, used, years since manufacture)
-- Usage purpose (commercial, personal, industrial)
-- Physical characteristics (size, weight, capacity, material)
-- Origin or destination requirements
-- Licensing or permit requirements
+Output Requirement:
+Return a structured list of attributes that must be determined to select the correct code. Do not return the HS codes themselves.
 
-EXAMPLE:
-For codes about vehicles imported by individuals vs dealers with different age limits, the attributes would be:
-- importer_type
-- vehicle_age_category
+Example Output Format (JSON):
 
-OUTPUT FORMAT:
-List only the distinguishing attribute names, one per line, using lowercase with underscores for multi-word attributes:
-
-importer_type
-vehicle_age_category
-usage_purpose
-
-DISTINGUISHING ATTRIBUTES:"""
+{{
+  "attributes": [
+    {{"name": "Importer Type", "options": ["Individual", "Dealer"]}},
+    {{"name": "Vehicle Age", "options": ["Three years or less since manufacture", "Exceeding three years since manufacture"]}},
+    {{"name": "Propulsion Type", "options": ["Only electric motor"]}}
+  ]
+}}"""
         
         try:
-            print(f"[LLM] Sending improved prompt to extract attributes...")
+            print(f"[LLM] Extracting classification attributes...")
             response = reason_with_llm_fn(prompt)
             print(f"[LLM] Raw response: {response}")
             
-            # Simplified parsing - extract lines that look like attribute names
-            attributes = []
-            lines = response.strip().split('\n')
-            
-            for line in lines:
-                line = line.strip()
+            # Parse JSON response - handle markdown code blocks
+            import json
+            try:
+                # Clean the response to extract JSON from markdown code blocks
+                cleaned_response = response.strip()
+                if cleaned_response.startswith('```json'):
+                    cleaned_response = cleaned_response[7:]  # Remove ```json
+                if cleaned_response.endswith('```'):
+                    cleaned_response = cleaned_response[:-3]  # Remove ```
+                cleaned_response = cleaned_response.strip()
                 
-                # Skip empty lines, headers, and explanatory text
-                if not line or line.startswith('#') or line.startswith('DISTINGUISHING') or line.startswith('OUTPUT'):
-                    continue
-                    
-                # Remove any numbering, bullets, or markdown
-                clean_line = line.lstrip('0123456789. -•*')
+                result = json.loads(cleaned_response)
+                attributes = result.get("attributes", [])
+                print(f"[RESULT] Extracted {len(attributes)} classification attribute(s):")
+                for attr in attributes:
+                    print(f"   - {attr.get('name', 'Unknown')}: {attr.get('options', [])}")
+                return attributes
+            except json.JSONDecodeError as e:
+                print(f"[ERROR] Failed to parse JSON response: {e}")
+                print(f"[ERROR] Raw response: {response}")
+                print(f"[ERROR] Cleaned response: {cleaned_response}")
+                return self._retry_with_alternative_llm(commodity_matches)
                 
-                # Remove quotes and extra formatting
-                clean_line = clean_line.replace('"', '').replace("'", '').replace('`', '').strip()
-                
-                # Check if it looks like an attribute name (lowercase, underscores, reasonable length)
-                if (clean_line and 
-                    len(clean_line) > 2 and 
-                    clean_line.islower() and 
-                    '_' in clean_line and
-                    clean_line.replace('_', '').replace(' ', '').isalpha()):
-                    
-                    attributes.append(clean_line)
-                    print(f"[PARSING] Added attribute: '{clean_line}'")
-                
-                # Also handle space-separated attributes that need conversion
-                elif (clean_line and 
-                      len(clean_line) > 2 and 
-                      ' ' in clean_line and
-                      clean_line.replace(' ', '').isalpha()):
-                    
-                    # Convert spaces to underscores
-                    converted = clean_line.lower().replace(' ', '_')
-                    attributes.append(converted)
-                    print(f"[PARSING] Converted and added: '{clean_line}' -> '{converted}'")
-            
-            print(f"[RESULT] Extracted {len(attributes)} attributes: {attributes}")
-            
-            # If we didn't get any attributes, try a more direct approach
-            if not attributes:
-                print("[FALLBACK] No attributes found, trying direct extraction...")
-                return self._direct_attribute_extraction(commodity_matches)
-            
-            # Remove duplicates while preserving order
-            unique_attributes = []
-            seen = set()
-            for attr in attributes:
-                if attr not in seen:
-                    unique_attributes.append(attr)
-                    seen.add(attr)
-            
-            return unique_attributes
-            
         except Exception as e:
-            print(f"[ERROR] Error extracting attributes with LLM: {e}")
-            return self._direct_attribute_extraction(commodity_matches)
+            print(f"[ERROR] LLM extraction failed: {e}, trying alternative LLM...")
+            return self._retry_with_alternative_llm(commodity_matches)
+    
+    def _retry_with_alternative_llm(self, commodity_matches: List[Dict]) -> List[Dict]:
+        """Retry attribute extraction with an alternative LLM approach."""
+        print(f"[RETRY] Trying alternative LLM approach...")
+        
+        # Build HS codes list for the prompt
+        hs_codes_text = ""
+        for match in commodity_matches:
+            hs_codes_text += f"• {match['tariff_code']}: {match['description']}\n"
+        
+        # Simpler prompt for alternative LLM
+        prompt = f"""Analyze these HS codes and identify the key attributes that distinguish them:
 
-    def _direct_attribute_extraction(self, commodity_matches: List[Dict]) -> List[str]:
-        """Fallback method to extract attributes using text analysis patterns."""
-        print("[FALLBACK] Using direct text analysis to extract attributes...")
+{hs_codes_text.strip()}
+
+Return ONLY a JSON array of attributes in this format:
+[
+  {{"name": "Attribute Name", "options": ["Option 1", "Option 2"]}}
+]"""
         
-        descriptions = [match['description'].lower() for match in commodity_matches]
-        attributes = []
-        
-        # Common patterns in tariff classifications
-        patterns = {
-            'importer_type': ['individual', 'dealer', 'company', 'commercial', 'business'],
-            'vehicle_age': ['year', 'old', 'new', 'age', 'manufacture'],
-            'usage_purpose': ['commercial', 'personal', 'industrial', 'domestic'],
-            'weight_category': ['kg', 'ton', 'gram', 'weight', 'heavy', 'light'],
-            'size_category': ['large', 'small', 'medium', 'size', 'dimension'],
-            'material_type': ['steel', 'aluminum', 'plastic', 'wood', 'metal'],
-            'power_type': ['electric', 'manual', 'hydraulic', 'pneumatic'],
-            'capacity_range': ['capacity', 'volume', 'liter', 'gallon']
-        }
-        
-        # Check which patterns appear in the descriptions
-        for pattern_name, keywords in patterns.items():
-            pattern_found = False
-            for desc in descriptions:
-                if any(keyword in desc for keyword in keywords):
-                    # Check if there's variation in this attribute across descriptions
-                    variations = set()
-                    for desc in descriptions:
-                        for keyword in keywords:
-                            if keyword in desc:
-                                variations.add(keyword)
-                    
-                    # If we have multiple variations, it's a distinguishing attribute
-                    if len(variations) > 1:
-                        attributes.append(pattern_name)
-                        pattern_found = True
-                        print(f"[PATTERN] Found distinguishing attribute: {pattern_name} with variations: {variations}")
-                        break
+        try:
+            print(f"[LLM] Retrying with alternative prompt...")
+            response = reason_with_llm_fn(prompt)
+            print(f"[LLM] Alternative response: {response}")
             
-            if pattern_found:
-                continue
-        
-        # Also look for numeric patterns (age ranges, weight limits, etc.)
-        numeric_pattern_found = False
-        for desc in descriptions:
-            if any(char.isdigit() for char in desc):
-                if not numeric_pattern_found:
-                    # Check if numbers vary across descriptions
-                    numbers_in_descriptions = []
-                    for d in descriptions:
-                        import re
-                        numbers = re.findall(r'\d+', d)
-                        numbers_in_descriptions.extend(numbers)
-                    
-                    if len(set(numbers_in_descriptions)) > 1:
-                        attributes.append('numeric_specification')
-                        numeric_pattern_found = True
-                        print(f"[PATTERN] Found numeric variations: {set(numbers_in_descriptions)}")
-        
-        print(f"[FALLBACK] Extracted {len(attributes)} attributes using pattern matching: {attributes}")
-        return attributes
-
-    def _retry_llm_attribute_extraction(self, commodity_matches: List[Dict]) -> List[str]:
-        """Retry LLM attribute extraction with a more structured prompt."""
-        if len(commodity_matches) < 2:
+            # Parse JSON response - handle markdown code blocks
+            import json
+            try:
+                # Clean the response to extract JSON from markdown code blocks
+                cleaned_response = response.strip()
+                if cleaned_response.startswith('```json'):
+                    cleaned_response = cleaned_response[7:]  # Remove ```json
+                if cleaned_response.endswith('```'):
+                    cleaned_response = cleaned_response[:-3]  # Remove ```
+                cleaned_response = cleaned_response.strip()
+                
+                result = json.loads(cleaned_response)
+                if isinstance(result, list):
+                    attributes = result
+                else:
+                    attributes = result.get("attributes", [])
+                
+                print(f"[RESULT] Alternative LLM extracted {len(attributes)} attribute(s):")
+                for attr in attributes:
+                    print(f"   - {attr.get('name', 'Unknown')}: {attr.get('options', [])}")
+                return attributes
+            except json.JSONDecodeError as e:
+                print(f"[ERROR] Alternative LLM also failed to return valid JSON: {e}")
+                print(f"[ERROR] Raw response: {response}")
+                print(f"[ERROR] Cleaned response: {cleaned_response}")
+                return []
+                
+        except Exception as e:
+            print(f"[ERROR] Alternative LLM also failed: {e}")
             return []
-        
-        # Create a more structured comparison
-        comparison_text = "TARIFF CODE COMPARISON:\n"
-        for i, match in enumerate(commodity_matches):
-            comparison_text += f"Code {i+1}: {match['tariff_code']}\n"
-            comparison_text += f"Description: {match['description']}\n\n"
-        
-        # More direct prompt
-        retry_prompt = f"""{comparison_text}
-
-Identify what makes these tariff codes different from each other. What are the key distinguishing factors?
-
-Output only the attribute names that differentiate these codes, one per line, using this format:
-- Use lowercase letters only
-- Use underscores instead of spaces
-- Examples: importer_type, vehicle_age, usage_purpose
-
-ATTRIBUTES:"""
-        
-        try:
-            print(f"[RETRY] Sending structured prompt to LLM...")
-            response = reason_with_llm_fn(retry_prompt)
-            print(f"[RETRY] LLM response: {response}")
-            
-            # Simple parsing for the retry
-            attributes = []
-            for line in response.strip().split('\n'):
-                line = line.strip().lower()
-                
-                # Remove common prefixes and clean up
-                line = line.lstrip('- •*0123456789. ')
-                line = line.replace('"', '').replace("'", '')
-                
-                # Check if it's a valid attribute name
-                if (line and len(line) > 2 and 
-                    line.replace('_', '').isalpha() and
-                    ('_' in line or ' ' not in line)):
-                    
-                    # Convert spaces to underscores if needed
-                    if ' ' in line:
-                        line = line.replace(' ', '_')
-                    
-                    attributes.append(line)
-                    print(f"[RETRY] Extracted: {line}")
-            
-            return attributes
-            
-        except Exception as e:
-            print(f"[RETRY] Error in retry attempt: {e}")
-            return self._direct_attribute_extraction(commodity_matches)
-
-    def _check_product_context_for_attributes(self, attributes: List[str], product_name: str, 
-                                            product_info: str, original_question: str, 
-                                            order_id: str = None) -> Dict:
-        """Look for specific attributes in product context, using order documents if available."""
-        found_context = {}
-        
-        # Try to load order-specific context if order_id is provided
-        order_context = None
-        if order_id:
-            order_context = self._load_order_context(order_id)
-        
-        if order_context:
-            print(f"[CONTEXT] Using order-specific context for order {order_id}")
-            # Use document-based context extraction
-            found_context = self._extract_attributes_from_order_context(attributes, order_context)
-        else:
-            print(f"[CONTEXT] Using basic text analysis (no order context available)")
-            # Fallback to basic text analysis
-            found_context = self._extract_attributes_from_text(attributes, product_name, product_info, original_question)
-        
-        return found_context
     
-    def _load_order_context(self, order_id: str) -> Optional[Dict[str, Any]]:
-        """Load context from order documents."""
-        try:
-            # Construct file paths
-            base_path = f"processed_data/orders/{order_id}/primary_process"
-            bol_path = f"{base_path}/bill_of_lading_{order_id}_primary_extract.json"
-            invoice_path = f"{base_path}/invoice_{order_id}_primary_extract.json"
-            
-            # Check if files exist
-            if not os.path.exists(bol_path) or not os.path.exists(invoice_path):
-                print(f"[WARNING] Order documents not found for {order_id}")
-                return None
-            
-            # Load documents
-            with open(bol_path, 'r') as f:
-                bill_of_lading = json.load(f)
-            
-            with open(invoice_path, 'r') as f:
-                invoice = json.load(f)
-            
-            # Extract context using DocumentContextExtractor
-            extractor = DocumentContextExtractor()
-            context = extractor.extract_context_from_documents(bill_of_lading, invoice)
-            
-            print(f"[CONTEXT] Loaded order context: {list(context.keys())}")
-            return context
-            
-        except Exception as e:
-            print(f"[ERROR] Failed to load order context for {order_id}: {e}")
-            return None
-    
-    def _extract_attributes_from_order_context(self, attributes: List[str], order_context: Dict[str, Any]) -> Dict[str, str]:
-        """Extract specific attributes from order document context."""
-        found_context = {}
-        
-        # Map LLM-extracted attributes to document context attributes
-        attribute_mapping = {
-            'importer_type': 'importer_type',
-            'vehicle_age_category': 'product_age_category',
-            'usage_purpose': 'usage_purpose',
-            'value_category': 'value_category',
-            'quantity_category': 'quantity_category',
-            'size_weight_category': 'size_weight_category',
-            'origin_country': 'origin_country'
-        }
-        
-        for attr in attributes:
-            print(f"\n[ATTRIBUTE] Checking '{attr}' in order context...")
-            
-            # Check if we have a direct mapping
-            if attr in attribute_mapping:
-                mapped_attr = attribute_mapping[attr]
-                if mapped_attr in order_context:
-                    found_context[attr] = str(order_context[mapped_attr])
-                    print(f"   [MATCH] Found '{attr}' -> '{mapped_attr}': {order_context[mapped_attr]}")
-                else:
-                    print(f"   [NO MATCH] Mapped attribute '{mapped_attr}' not found in order context")
-            else:
-                # Check if the attribute exists directly in order context
-                if attr in order_context:
-                    found_context[attr] = str(order_context[attr])
-                    print(f"   [MATCH] Found '{attr}': {order_context[attr]}")
-                else:
-                    print(f"   [NO MATCH] Attribute '{attr}' not found in order context")
-        
-        return found_context
-    
-    def _extract_attributes_from_text(self, attributes: List[str], product_name: str, 
-                                    product_info: str, original_question: str) -> Dict[str, str]:
-        """Fallback method: extract attributes from basic text analysis."""
-        found_context = {}
-        all_text = f"{original_question} {product_name} {product_info}".lower()
-        
-        print(f"[CONTEXT] Analyzing text: '{all_text[:100]}{'...' if len(all_text) > 100 else ''}'")
-        
-        for attr in attributes:
-            print(f"\n[ATTRIBUTE] Checking '{attr}'...")
-            attr_lower = attr.lower()
-            found = False
-            reason = ""
-            
-            # Check if the attribute name itself appears in the text
-            if attr.replace('_', ' ') in all_text or attr in all_text:
-                found_context[attr] = 'found'
-                found = True
-                reason = f"Attribute name '{attr}' found in text"
-                print(f"   [MATCH] {reason}")
-            
-            # Generic pattern matching - look for words that might relate to this attribute
-            else:
-                # Extract the core word from the attribute name
-                core_word = attr_lower.replace('_', ' ').split()[-1]  # Get the last word
-                
-                # Look for the core word or related terms in the text
-                if core_word in all_text:
-                    found_context[attr] = 'detected'
-                    found = True
-                    reason = f"Core word '{core_word}' found in text"
-                    print(f"   [MATCH] {reason}")
-                else:
-                    print(f"   [NO MATCH] Core word '{core_word}' not found in text")
-            
-            if not found:
-                print(f"   [NO MATCH] No patterns matched for attribute '{attr}'")
-        
-        return found_context
-
-    def _generate_targeted_questions(self, missing_attributes: List[str]) -> List[str]:
-        """Generate questions only for missing attributes."""
+    def generate_questions_for_attributes(self, attributes: List[Dict]) -> List[Dict]:
+        """Generate clarification questions for the required attributes."""
         questions = []
         
-        for attr in missing_attributes:
-            # Convert attribute name to a human-readable question
-            attr_display = attr.replace('_', ' ').title()
+        for attr in attributes:
+            attr_name = attr.get('name', 'Unknown')
+            options = attr.get('options', [])
             
-            # Generate context-appropriate questions based on attribute name patterns
-            if 'type' in attr.lower():
-                questions.append(f"What {attr_display.lower()} applies to this product?")
-            elif 'age' in attr.lower() or 'year' in attr.lower():
-                questions.append(f"What {attr_display.lower()} applies to this product?")
-            elif 'class' in attr.lower():
-                questions.append(f"What {attr_display.lower()} applies to this product?")
-            elif 'size' in attr.lower() or 'weight' in attr.lower() or 'capacity' in attr.lower():
-                questions.append(f"What {attr_display.lower()} applies to this product?")
+            if attr_name == "Importer Type":
+                questions.append({
+                    "question": "What type of importer are you?",
+                    "type": "multiple_choice",
+                    "options": options,
+                    "help_text": "Select whether you are importing as an individual or as a dealer/company."
+                })
+            elif attr_name == "Vehicle Age":
+                questions.append({
+                    "question": "How old is the vehicle?",
+                    "type": "multiple_choice", 
+                    "options": options,
+                    "help_text": "Select the age category based on years since manufacture."
+                })
             else:
-                # Generic question for any attribute
-                questions.append(f"What {attr_display.lower()} applies to this product?")
+                # Generic question for other attributes
+                questions.append({
+                    "question": f"Please specify: {attr_name}",
+                    "type": "multiple_choice",
+                    "options": options,
+                    "help_text": f"Select the appropriate option for {attr_name.lower()}."
+                })
         
         return questions
 
-    def generate_clarification_questions(self, original_question: str, commodity_matches: List[Dict], 
-                                        product_name: str, product_info_text: str, missing_attributes: List[str]) -> List[Dict]:
-        """
-        Generate questions based on missing attributes, not product type detection.
-        
-        Args:
-            original_question: The original user question
-            commodity_matches: List of matching commodity codes
-            product_name: Name of the product
-            product_info_text: Available product information
-            missing_attributes: List of missing attribute names
-            
-        Returns:
-            List of question dictionaries with question text, type, options, etc.
-        """
-        return self._generate_targeted_questions(missing_attributes)
-    
-    def _fallback_questions(self, missing_info: List[str], product_name: str) -> List[Dict]:
-        """Generate basic fallback questions if LLM fails."""
-        fallback = []
-        for i, info in enumerate(missing_info):
-            fallback.append({
-                'id': f'question_{i+1}',
-                'question': f'Please provide information about: {info}',
-                'type': 'text',
-                'help_text': f'This information is needed to classify {product_name} correctly.'
-            })
-        return fallback
-
     def select_best_commodity_code(self, hs_code: str, commodity_matches: List[Dict], 
-                                  product_name: str, product_info_text: str, 
-                                  extracted_context: Dict = None) -> Optional[Dict]:
-        """
-        Use LLM to select the most appropriate commodity code from matches.
-        """
-        if not commodity_matches or not self.use_llm_selection:
+                                 product_name: str, product_info_text: str, 
+                                 extracted_context: Dict[str, str] = None) -> Optional[Dict]:
+        """Select the best commodity code using LLM with extracted context."""
+        if not commodity_matches:
             return None
-            
+        
         if len(commodity_matches) == 1:
-            # Only one match, return it with high confidence
-            selected = {
-                **commodity_matches[0],
-                'confidence': 0.95,
-                'reasoning': 'Only one commodity code match found',
-                'selection_method': 'single_match',
-                'selected': True  # Mark as selected
-            }
-            return selected
+            return commodity_matches[0]
         
-        # Build options for LLM
-        option_lines = []
-        for idx, match in enumerate(commodity_matches[:10]):  # Limit to top 10 for LLM
-            option_lines.append(f"{idx+1}. {match['tariff_code']}")
-            option_lines.append(f"   Description: {match['description']}")
-            option_lines.append("")
-
-        options_text = "\n".join(option_lines)
-
-        # Build context information for the prompt
-        context_info = ""
+        # Prepare context for LLM selection
+        context_text = f"Product: {product_name}\nInfo: {product_info_text}"
         if extracted_context:
-            context_info = "\n\nExtracted Context Information:\n"
-            for key, value in extracted_context.items():
-                context_info += f"- {key.replace('_', ' ').title()}: {value}\n"
+            context_text += f"\nExtracted Context: {extracted_context}"
+        
+        # Create commodity codes list
+        codes_text = "Available commodity codes:\n"
+        for i, match in enumerate(commodity_matches):
+            codes_text += f"{i+1}. {match['tariff_code']}: {match['description']}\n"
+        
+        prompt = f"""You are a customs classification expert. Select the most appropriate commodity code based on the product information.
 
-        prompt = f"""You are an expert in tariff classification and commodity codes.
+{context_text}
 
-Product: {product_name}
-Product Information: {product_info_text}
-HS Code: {hs_code}{context_info}
+{codes_text}
 
-The following commodity codes (10-digit tariff codes) were found that start with this HS code. Please select the most appropriate and specific commodity code for this product.
+Select the best matching commodity code and return ONLY the tariff code number (e.g., 8703800010).
 
-{options_text}
-
-Consider:
-- The product's specific characteristics and use
-- The level of detail and specificity in each description
-- Which description most accurately matches the actual product
-- The intended use and market for this product
-- Use the extracted context information to make more informed decisions
-
-Please provide your analysis in this EXACT JSON format:
-{{
-    "selected_code": "0706101000",  // The exact tariff code you selected, or "NONE" if none are suitable
-    "reasoning": "Explanation of why this code is most appropriate",
-    "confidence": "high"  // Must be one of: "high", "medium", "low"
-}}
-
-If none of the codes are appropriate, respond with:
-{{
-    "selected_code": "NONE",
-    "reasoning": "Explanation of why none are suitable",
-    "confidence": "low"
-}}"""
-
-        # Print the prompt for debugging
-        print(f"\n[LLM] PROMPT:")
-        print("-" * 50)
-        print(prompt)
-        print("-" * 50)
-
+If none of the codes are appropriate, return "NONE"."""
+        
         try:
-            response = reason_with_llm_for_commodity(prompt, model_alias="mistral_small")
+            print(f"[LLM] Selecting best commodity code...")
+            response = reason_with_llm_fn(prompt)
+            print(f"[LLM] Selection response: {response}")
             
-            # Print LLM response for debugging
-            print(f"\n[LLM] RESPONSE:")
-            print("-" * 50)
-            print(response)
-            print("-" * 50)
-
-            # Parse JSON response
-            try:
-                # Clean the response - remove markdown code blocks if present
-                cleaned_response = response.strip()
-                
-                # Handle markdown code blocks more robustly
-                if '```json' in cleaned_response:
-                    # Extract content between ```json and ```
-                    start_marker = '```json'
-                    end_marker = '```'
-                    start_idx = cleaned_response.find(start_marker) + len(start_marker)
-                    end_idx = cleaned_response.rfind(end_marker)
-                    if end_idx > start_idx:
-                        cleaned_response = cleaned_response[start_idx:end_idx].strip()
-                elif cleaned_response.startswith('```') and cleaned_response.endswith('```'):
-                    # Handle generic code blocks
-                    cleaned_response = cleaned_response[3:-3].strip()
-                
-                # Debug: Print the cleaned response
-                print(f"[DEBUG] Cleaned JSON response: '{cleaned_response}'")
-                
-                result = json.loads(cleaned_response)
-                selected_code = result.get('selected_code')
-                reasoning = result.get('reasoning', '')
-                confidence = result.get('confidence', 'medium')
-
-                if selected_code == 'NONE':
-                    return None
-
-                # Find the matching commodity code
-                for match in commodity_matches:
-                    if match['tariff_code'] == selected_code:
-                        # Convert confidence to score
-                        confidence_scores = {'high': 0.95, 'medium': 0.7, 'low': 0.4}
-                        selected = {
-                            **match,
-                            'confidence': confidence_scores.get(confidence, 0.7),
-                            'reasoning': reasoning,
-                            'selection_method': 'llm_selected',
-                            'selected': True  # Mark as selected
-                        }
-                        return selected
-
-                logger.warning(f"Selected code {selected_code} not found in matches")
+            # Parse response
+            selected_code = response.strip()
+            if selected_code == "NONE":
+                print(f"[RESULT] LLM rejected all codes as inappropriate")
                 return None
-
-            except json.JSONDecodeError as e:
-                logger.error(f"Failed to parse LLM response as JSON: {str(e)}")
-                return None
-
-        except Exception as e:
-            logger.error(f"Error in commodity code selection with context: {str(e)}")
+            
+            # Clean up response - remove brackets if present
+            if selected_code.startswith('[') and selected_code.endswith(']'):
+                selected_code = selected_code[1:-1]
+            
+            # Find the selected code
+            for match in commodity_matches:
+                if match['tariff_code'] == selected_code:
+                    print(f"[RESULT] Selected: {selected_code}")
+                    return match
+            
+            print(f"[ERROR] Selected code {selected_code} not found in matches")
+            print(f"[DEBUG] Available codes: {[m['tariff_code'] for m in commodity_matches]}")
             return None
-
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# LLM UTILITIES (Supporting functions for AI reasoning)
-# ═══════════════════════════════════════════════════════════════════════════════
-
-def reason_with_llm_for_commodity(prompt: str, model_alias: str = "mistral_small") -> str:
-    """
-    Send a reasoning prompt to the LLM for commodity code selection.
-    
-    Args:
-        prompt: The prompt to send to the LLM
-        model_alias: Which model to use (defaults to mistral_small)
-        
-    Returns:
-        The LLM's response as a string
-    """
-    messages = [
-        {"role": "system", "content": "You are an expert in tariff classification and commodity codes. You MUST respond with valid JSON only, with no additional text or explanation. Your response should be parseable by json.loads()."},
-        {"role": "user", "content": prompt}
-    ]
-    return chat_completion(messages, model_alias=model_alias)
-
-def chat_completion(messages, model_alias="mistral_small"):
-    """
-    Handle LLM API calls for single model classification.
-    
-    Args:
-        messages: List of message objects for the chat completion
-        model_alias: Which model configuration to use
-        
-    Returns:
-        The completion response content
-    """
-    return call_llm(messages, model_alias, OPENROUTER_CONFIG, OPENROUTER_MODELS)
+            
+        except Exception as e:
+            print(f"[ERROR] Error selecting commodity code: {e}")
+            return None
 
 def reason_with_llm_fn(prompt: str, hs_code: str = None) -> str:
     """
@@ -1361,6 +1948,12 @@ def reason_with_llm_fn(prompt: str, hs_code: str = None) -> str:
         {"role": "user", "content": prompt}
     ]
     return chat_completion(messages, model_alias="mistral_small")
+
+def reason_with_llm_for_commodity(prompt: str, hs_code: str = None) -> str:
+    """
+    Alias for reason_with_llm_fn to maintain compatibility with confirm_hs_code.py
+    """
+    return reason_with_llm_fn(prompt, hs_code)
 
 def call_llm(messages, model_alias, config, models):
     """
@@ -1401,176 +1994,90 @@ def call_llm(messages, model_alias, config, models):
         return ""
     
     if not result["choices"]:
-        logger.error(f"LLM response has empty choices array: {result}")
+        logger.error(f"LLM response has empty 'choices' array: {result}")
         return ""
     
     choice = result["choices"][0]
+    
+    # Check if choice has expected structure
     if "message" not in choice:
-        logger.error(f"LLM response choice missing 'message' key: {choice}")
+        logger.error(f"LLM choice missing 'message' key: {choice}")
         return ""
     
     if "content" not in choice["message"]:
-        logger.error(f"LLM response message missing 'content' key: {choice['message']}")
+        logger.error(f"LLM message missing 'content' key: {choice['message']}")
         return ""
     
     content = choice["message"]["content"]
     logger.info(f"LLM response content: '{content}'")
     return content
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# CLI INTERFACE (Only used when running as a standalone script)
-# ═══════════════════════════════════════════════════════════════════════════════
-
-def parse_args() -> argparse.Namespace:
-    """Parse command line arguments for CLI usage."""
-    parser = argparse.ArgumentParser(description="Lookup commodity codes with LLM selection.")
-    parser.add_argument(
-        "--product", "-p", help="Product name (free text)", default=None
-    )
-    parser.add_argument(
-        "--hs-codes",
-        "-c",
-        help="Comma-separated list of 6-digit HS codes",
-        default=None,
-    )
-    parser.add_argument(
-        "--input",
-        "-i",
-        help="Path to JSON file produced by hs_code.py (overrides other flags)",
-        default=None,
-    )
-    parser.add_argument(
-        "--no-llm",
-        action="store_true",
-        help="Disable LLM selection, return all matches"
-    )
-    return parser.parse_args()
-
-def read_input(args: argparse.Namespace) -> tuple[str | None, List[str]]:
+def chat_completion(messages, model_alias="mistral_small"):
     """
-    Read input from various sources based on CLI arguments.
+    Handle LLM API calls for single model classification.
     
-    Returns (product_name, [hs_codes]).
-    Precedence: --input file > --hs-codes flag > STDIN.
+    Args:
+        messages: List of message objects for the chat completion
+        model_alias: Which model configuration to use
+        
+    Returns:
+        The response content from the LLM
     """
-    # 1. JSON file
-    if args.input:
-        try:
-            with open(args.input, "r", encoding="utf-8") as f:
-                payload = json.load(f)
-            product = payload.get("product")
-            hs_codes = payload.get("hs_codes", "")
-            return product, _split_codes(hs_codes)
-        except Exception as exc:  # noqa: BLE001
-            logger.error("Failed to read %s: %s", args.input, exc)
-            sys.exit(1)
-
-    # 2. Command-line codes
-    if args.hs_codes:
-        return args.product, _split_codes(args.hs_codes)
-
-    # 3. STDIN fallback
+    config = OPENROUTER_CONFIG
+    models = OPENROUTER_MODELS
+    
+    if model_alias not in models:
+        logger.error(f"Unknown model alias: {model_alias}")
+        return ""
+    
     try:
-        stdin_data = sys.stdin.read().strip()
-        if not stdin_data:
-            raise ValueError("No input provided.")
-        payload = json.loads(stdin_data)
-        product = payload.get("product")
-        hs_codes = payload.get("hs_codes", "")
-        return product, _split_codes(hs_codes)
-    except Exception as exc:  # noqa: BLE001
-        logger.error("Missing or invalid input: %s", exc)
-        sys.exit(1)
-
-def _split_codes(raw: str) -> List[str]:
-    """Split comma-separated HS codes into a list."""
-    return [code.strip() for code in raw.split(",") if code.strip()]
-
-def main() -> None:
-    """Main CLI entry point with interactive question/answer support."""
-    args = parse_args()
-    product_name, hs_codes = read_input(args)
-
-    if not hs_codes:
-        logger.error("At least one HS code is required.")
-        sys.exit(1)
-
-    # Use interactive lookup for CLI
-    if not args.no_llm:
-        print("🚀 Starting interactive commodity code lookup...")
-        original_question = f"What is the commodity code for {product_name}" if product_name else "Find commodity codes"
-        
-        matches = interactive_commodity_lookup(
-            hs_codes, 
-            product_name or "Unknown Product", 
-            "", 
-            original_question
-        )
-        
-        print(f"\n" + "="*60)
-        print("FINAL RESULTS")
-        print("="*60)
-        
-        for hs_code, result in matches.items():
-            if isinstance(result, list) and result:
-                selected = result[0]
-                print(f"\n[OK] {hs_code}: {selected['tariff_code']}")
-                print(f"   Description: {selected['description']}")
-                print(f"   Confidence: {selected.get('confidence', 'N/A')}")
-                print(f"   Reasoning: {selected.get('reasoning', 'N/A')}")
-            elif isinstance(result, dict) and result.get('requires_clarification'):
-                print(f"\n[X] {hs_code}: Still requires clarification")
-            else:
-                print(f"\n[X] {hs_code}: No suitable commodity code found")
-    else:
-        # Original non-LLM mode
-        lookup = CommodityCodeLookup(SUPABASE_URL, SUPABASE_KEY, use_llm_selection=False)
-        matches = lookup.find_matching_codes(hs_codes)
-
-        output = {
-            "product": product_name,
-            "matches": {
-                hs: {"count": len(codes), "codes": codes} for hs, codes in matches.items()
-            },
-        }
-        print(json.dumps(output, indent=2, ensure_ascii=False))
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# SCRIPT EXECUTION
-# ═══════════════════════════════════════════════════════════════════════════════
+        return call_llm(messages, model_alias, config, models)
+    except Exception as e:
+        logger.error(f"LLM API call failed: {e}")
+        return ""
 
 def test_context_extraction():
     """Test the context extraction with sample data."""
+    extractor = DocumentContextExtractor()
     
-    # Sample data from your files
+    # Sample data
     bill_of_lading = {
-        "consignee_name": "RAFER JOHNSON",
-        "shipper": "AMAZON",
-        "weight": "78.93 KGM",
-        "commodity": "2 CTNS STC: SOLAR GENERATOR X20250109665963 MARKS:",
-        "port_of_origin": "MIAMI, UNITED STATES OF AMERICA",
-        "reported_date": "13/01/2025"
+        'consignee_name': 'John Smith',
+        'port_of_origin': 'UNITED STATES',
+        'weight': '2000 KGM'
     }
     
     invoice = {
-        "supplier": {"name": "EcoFlow Inc."},
-        "buyer": {"name": "Andria Scott"},
-        "invoice_details": {"date": "2024-10-10"},
-        "items": [{
-            "description": "EF ECOFLOW Solar Generator DELTA 2 Max 2048Wh with 4X100W 12V Solar Panels, High Efficiency Monocrystalline PV Modules, 2400W LFP Portable Power Station, AC + Solar Fast Dual Charging For Camping RV",
-            "quantity": 1.0
-        }],
-        "totals": {"total_amount": 1496.93}
+        'buyer': {'name': 'John Smith', 'address': '123 Main St'},
+        'items': [{'description': 'Tesla Model Y 2023 Electric SUV', 'quantity': 1}],
+        'totals': {'total_amount': 50000}
     }
     
-    extractor = DocumentContextExtractor()
     context = extractor.extract_context_from_documents(bill_of_lading, invoice)
-    
-    print("Extracted Context:")
+    print("Extracted context:")
     for key, value in context.items():
         print(f"  {key}: {value}")
-    
-    return context
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="Commodity Code Lookup with LLM Selection")
+    parser.add_argument("--hs-codes", nargs="+", required=True, help="HS codes to look up")
+    parser.add_argument("--product-name", required=True, help="Name of the product")
+    parser.add_argument("--product-info", required=True, help="Additional product information")
+    parser.add_argument("--question", default="", help="Original user question")
+    parser.add_argument("--interactive", action="store_true", help="Run in interactive mode")
+    
+    args = parser.parse_args()
+    
+    if args.interactive:
+        result = interactive_commodity_lookup(
+            args.hs_codes, args.product_name, args.product_info, args.question
+        )
+    else:
+        result = lookup_commodity_code(
+            args.hs_codes, args.product_name, args.product_info, args.question
+        )
+    
+    print("\n" + "="*60)
+    print("FINAL RESULT")
+    print("="*60)
+    print(json.dumps(result, indent=2))

@@ -46,9 +46,9 @@ def delete_order(order_id: str):
     try:
         # Paths to check and delete
         order_paths = [
-            f"processed_data/orders/{order_id}",
-            f"orders/{order_id}",
-            f"uploads/{order_id}"
+            f"customs_api/processed_data/orders/{order_id}",
+            f"customs_api/uploads/orders/{order_id}",
+            f"test/processed_data/orders/{order_id}"
         ]
         
         for path in order_paths:
@@ -72,17 +72,19 @@ def delete_order(order_id: str):
 def cleanup_temp_files():
     """Clean up temporary and cache files"""
     try:
-        # Remove Python cache
-        if os.path.exists("__pycache__"):
-            try:
-                shutil.rmtree("__pycache__")
-                print("✅ Cleaned: __pycache__")
-            except PermissionError:
-                print(f"🔄 Permission denied, trying force deletion for: __pycache__")
-                force_delete_directory("__pycache__")
+        # Remove Python cache directories
+        cache_dirs = ["__pycache__", "customs_api/__pycache__", "hscode_api/__pycache__", "shared/__pycache__"]
+        for cache_dir in cache_dirs:
+            if os.path.exists(cache_dir):
+                try:
+                    shutil.rmtree(cache_dir)
+                    print(f"✅ Cleaned: {cache_dir}")
+                except PermissionError:
+                    print(f"🔄 Permission denied, trying force deletion for: {cache_dir}")
+                    force_delete_directory(cache_dir)
             
         # Remove other temp directories if empty
-        temp_dirs = ["temp", "temp_processing_output"]
+        temp_dirs = ["temp", "temp_processing_output", "customs_api/temp"]
         for temp_dir in temp_dirs:
             if os.path.exists(temp_dir):
                 try:
@@ -146,8 +148,8 @@ def main():
     # First, remove any orders that were created
     print("🗑️ Removing created orders and associated files...")
     
-    # Check for orders in processed_data/orders
-    orders_dir = "processed_data/orders"
+    # Check for orders in customs_api/processed_data/orders
+    orders_dir = "customs_api/processed_data/orders"
     if os.path.exists(orders_dir):
         for order_folder in os.listdir(orders_dir):
             order_path = os.path.join(orders_dir, order_folder)
@@ -160,10 +162,11 @@ def main():
             except Exception as e:
                 print(f"❌ Error deleting {order_folder}: {e}")
     
-    # Check for orders in orders directory
-    if os.path.exists("orders"):
-        for order_folder in os.listdir("orders"):
-            order_path = os.path.join("orders", order_folder)
+    # Check for orders in customs_api/uploads/orders
+    uploads_dir = "customs_api/uploads/orders"
+    if os.path.exists(uploads_dir):
+        for order_folder in os.listdir(uploads_dir):
+            order_path = os.path.join(uploads_dir, order_folder)
             try:
                 shutil.rmtree(order_path)
                 print(f"✅ Deleted order: {order_folder}")
@@ -173,13 +176,14 @@ def main():
             except Exception as e:
                 print(f"❌ Error deleting {order_folder}: {e}")
     
-    # Check for orders in uploads directory
-    if os.path.exists("uploads"):
-        for order_folder in os.listdir("uploads"):
-            order_path = os.path.join("uploads", order_folder)
+    # Check for orders in test/processed_data/orders
+    test_orders_dir = "test/processed_data/orders"
+    if os.path.exists(test_orders_dir):
+        for order_folder in os.listdir(test_orders_dir):
+            order_path = os.path.join(test_orders_dir, order_folder)
             try:
                 shutil.rmtree(order_path)
-                print(f"✅ Deleted order: {order_folder}")
+                print(f"✅ Deleted test order: {order_folder}")
             except PermissionError:
                 print(f"🔄 Permission denied, trying force deletion for: {order_folder}")
                 force_delete_directory(order_path)

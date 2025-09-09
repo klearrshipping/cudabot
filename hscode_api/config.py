@@ -24,8 +24,8 @@ OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 OPENROUTER_HEADERS = {
     "Authorization": f"Bearer {OPENROUTER_API_KEY}",
     "Content-Type": "application/json",
-    "HTTP-Referer": "https://github.com/your-repo",  # Optional. Site URL for rankings on openrouter.ai.
-    "X-Title": "CUDA Project",  # Optional. Site title for rankings on openrouter.ai.
+    "HTTP-Referer": "<YOUR_SITE_URL>",  # Optional. Site URL for rankings on openrouter.ai.
+    "X-Title": "<YOUR_SITE_NAME>",  # Optional. Site title for rankings on openrouter.ai.
 }
 
 # OpenRouter Models - General Purpose (Used for general AI tasks)
@@ -42,15 +42,9 @@ OPENROUTER_GENERAL_MODELS = {
         "temperature": 0.7,
         "max_tokens": 1000
     },
-    "deepseek_v3_base": {
-        "name": "deepseek/deepseek-v3.1-base",
-        "description": "DeepSeek V3.1 Base",
-        "temperature": 0.7,
-        "max_tokens": 1000
-    },
-    "ernie_4_5": {
-        "name": "baidu/ernie-4.5-21b-a3b",
-        "description": "Baidu ERNIE 4.5 21B A3B",
+    "claude_sonnet_4": {
+        "name": "anthropic/claude-sonnet-4",
+        "description": "Anthropic Claude Sonnet 4",
         "temperature": 0.7,
         "max_tokens": 1000
     },
@@ -68,8 +62,8 @@ OPENROUTER_CONFIG = {
     "headers": {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
         "Content-Type": "application/json",
-        "HTTP-Referer": "https://github.com/your-repo",
-        "X-Title": "CUDA Project"
+        "HTTP-Referer": "<YOUR_SITE_URL>",
+        "X-Title": "<YOUR_SITE_NAME>"
     }
 }
 

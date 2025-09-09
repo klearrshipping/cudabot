@@ -249,7 +249,9 @@
         "box_field": "33",
         "field_name": "Commodity code",
         "description": "Tariff code which classifies the goods according to Jamaica Common External Tariff",
-        "extraction_prompt": "Look for HS codes, tariff codes, or commodity classification numbers. These may not be in shipping documents and may need to be determined based on commodity description."
+        "extraction_prompt": "AUTOMATED: This field is automatically populated by the esad_product script using HSCode API classification. No LLM processing required.",
+        "processing_method": "automated_hscode_classification",
+        "script": "esad_product"
       },
       {
         "box_field": "34",

@@ -118,6 +118,37 @@ class IntentParser:
             ]
         }
     
+    def _extract_core_product_name(self, product_text: str) -> str:
+        """Extract the core product name by removing import context, years, and descriptive phrases."""
+        # Remove common import context phrases
+        context_phrases = [
+            r'\bimported by an individual\b',
+            r'\bimported by\b',
+            r'\bfor import\b',
+            r'\bto import\b',
+            r'\bfor personal use\b',
+            r'\bfor commercial use\b',
+            r'\bfor business use\b',
+            r'\bfor resale\b',
+            r'\bfor retail\b',
+            r'\bfor wholesale\b',
+            r'\bnew\b',
+            r'\bused\b',
+            r'\bsecond hand\b',
+            r'\b\b\d{4}\b',  # Remove years like 2024
+            r'\b\b\d{3}\b',  # Remove years like 2023
+        ]
+        
+        cleaned = product_text
+        for phrase in context_phrases:
+            cleaned = re.sub(phrase, '', cleaned, flags=re.IGNORECASE)
+        
+        # Clean up extra spaces and punctuation
+        cleaned = re.sub(r'\s+', ' ', cleaned).strip()
+        cleaned = re.sub(r'[,\-]+$', '', cleaned).strip()
+        
+        return cleaned if cleaned else product_text
+    
     def parse_with_patterns(self, query: str) -> Optional[ParsedIntent]:
         """Try to parse using regex patterns first (faster)"""
         query_lower = query.lower().strip()
@@ -127,6 +158,8 @@ class IntentParser:
             match = re.search(pattern, query_lower, re.IGNORECASE)
             if match:
                 product = match.group(1).strip()
+                # Clean up the product name to extract core product
+                product = self._extract_core_product_name(product)
                 return ParsedIntent(
                     product_name=product,
                     intent=IntentType.CLASSIFY,
@@ -141,6 +174,7 @@ class IntentParser:
             match = re.search(pattern, query_lower, re.IGNORECASE)
             if match:
                 product = match.group(1).strip()
+                product = self._extract_core_product_name(product)
                 return ParsedIntent(
                     product_name=product,
                     intent=IntentType.DUTIES,
@@ -155,6 +189,7 @@ class IntentParser:
             match = re.search(pattern, query_lower, re.IGNORECASE)
             if match:
                 product = match.group(1).strip()
+                product = self._extract_core_product_name(product)
                 return ParsedIntent(
                     product_name=product,
                     intent=IntentType.PERMITS,
@@ -169,6 +204,7 @@ class IntentParser:
             match = re.search(pattern, query_lower, re.IGNORECASE)
             if match:
                 product = match.group(1).strip()
+                product = self._extract_core_product_name(product)
                 return ParsedIntent(
                     product_name=product,
                     intent=IntentType.RESTRICTIONS,
@@ -183,6 +219,7 @@ class IntentParser:
             match = re.search(pattern, query_lower, re.IGNORECASE)
             if match:
                 product = match.group(1).strip()
+                product = self._extract_core_product_name(product)
                 return ParsedIntent(
                     product_name=product,
                     intent=IntentType.GENERAL,
@@ -209,9 +246,11 @@ class IntentParser:
         - restrictions: User wants trade restriction information
         - general: General trade information request
         
+        IMPORTANT: Extract ONLY the core product name, not descriptive phrases about import context, usage, or other details.
+        
         Return ONLY valid JSON with:
         {{
-            "product_name": "the actual product being asked about",
+            "product_name": "the core product being asked about (e.g., 'tesla model y' not '2024 tesla model y imported by an individual')",
             "intent": "classify|duties|permits|restrictions|general",
             "confidence": "high|medium|low",
             "keywords": ["relevant", "keywords", "found"]
@@ -219,6 +258,7 @@ class IntentParser:
         
         Examples:
         "What is the HS code for fresh apples?" → {{"product_name": "fresh apples", "intent": "classify", "confidence": "high", "keywords": ["hs code"]}}
+        "Classify 2024 tesla model y imported by an individual" → {{"product_name": "tesla model y", "intent": "classify", "confidence": "high", "keywords": ["classify"]}}
         "How much duty do I pay on importing cars?" → {{"product_name": "cars", "intent": "duties", "confidence": "high", "keywords": ["duty", "importing"]}}
         "Do I need a permit for exporting wheat?" → {{"product_name": "wheat", "intent": "permits", "confidence": "high", "keywords": ["permit", "exporting"]}}
         """
@@ -238,8 +278,12 @@ class IntentParser:
             
             parsed = json.loads(response)
             
+            # Clean up the product name extracted by LLM
+            extracted_product = parsed.get("product_name", query)
+            cleaned_product = self._extract_core_product_name(extracted_product)
+            
             return ParsedIntent(
-                product_name=parsed.get("product_name", query),
+                product_name=cleaned_product,
                 intent=IntentType(parsed.get("intent", "unknown")),
                 confidence=parsed.get("confidence", "medium"),
                 original_query=query,

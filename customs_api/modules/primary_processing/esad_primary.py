@@ -201,6 +201,17 @@ class ESADPrimaryProcessor:
                 }
                 continue
             
+            # Skip Commodity code - will be handled by esad_product script with HSCode API
+            if field_name == "Commodity code":
+                print(f"  ⏭️ {field_name}: Skipping LLM - will be handled by esad_product script with HSCode API")
+                esad_fields[field_name] = {
+                    "value": None,  # Will be populated later
+                    "box_field": box_field,
+                    "extraction_prompt": extraction_prompt,
+                    "source": "pending_hscode_classification"
+                }
+                continue
+            
             # Use LLM to process the extraction prompt
             field_value = self._extract_field_with_llm(
                 field_name, 
@@ -570,16 +581,16 @@ RESPONSE FORMAT: Return only the clean value as specified above."""
         # Update null fields with manifest data
         fields_updated = 0
         
-        if office_code_null and manifest_data.office:
-            esad_fields["Office code"]["value"] = manifest_data.office
+        if office_code_null and manifest_data['office']:
+            esad_fields["Office code"]["value"] = manifest_data['office']
             esad_fields["Office code"]["source"] = "manifest_lookup"
-            print(f"  ✨ Updated Office code: {manifest_data.office}")
+            print(f"  ✨ Updated Office code: {manifest_data['office']}")
             fields_updated += 1
         
-        if manifest_null and manifest_data.reference_id:
-            esad_fields["Manifest"]["value"] = manifest_data.reference_id
+        if manifest_null and manifest_data['reference_id']:
+            esad_fields["Manifest"]["value"] = manifest_data['reference_id']
             esad_fields["Manifest"]["source"] = "manifest_lookup"
-            print(f"  ✨ Updated Manifest: {manifest_data.reference_id}")
+            print(f"  ✨ Updated Manifest: {manifest_data['reference_id']}")
             fields_updated += 1
         
         if fields_updated > 0:

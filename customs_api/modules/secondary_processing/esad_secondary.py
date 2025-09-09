@@ -62,7 +62,7 @@ class ESADSecondaryProcessor:
         
         # Initialize all secondary processing modules
         self.processors = {
-            'regime_type': RegimeTypeProcessor(config),
+            'regime_type': RegimeTypeProcessor(),
             'transaction_type': TransactionTypeProcessor(config),
             'incoterms': IncotermsProcessor(config),
             'currency': CurrencyProcessor(config),
@@ -170,7 +170,7 @@ class ESADSecondaryProcessor:
             # Process commercial description for Box Field 31 (Commercial description)
             try:
                 logger.info(f"🔄 Processing commercial description for Box Field 31...")
-                product_result = self._process_commercial_description(primary_data)
+                product_result = self._process_commercial_description(primary_data, order_id)
                 processed_results['fields']['product'] = product_result
                 logger.info(f"✅ Product processing completed")
             except Exception as e:
@@ -276,12 +276,13 @@ class ESADSecondaryProcessor:
                 'box_30_value': None
             }
     
-    def _process_commercial_description(self, primary_data: Dict[str, Any]) -> Dict[str, Any]:
+    def _process_commercial_description(self, primary_data: Dict[str, Any], order_id: str = None) -> Dict[str, Any]:
         """
         Process commercial description for Box Field 31 (Commercial description).
         
         Args:
             primary_data: Data from primary processing
+            order_id: Order ID for context-aware processing
             
         Returns:
             Dictionary containing commercial description processing results
@@ -297,8 +298,14 @@ class ESADSecondaryProcessor:
                     'commercial_description_processed': None
                 }
             
-            # Process commercial description using the esad_product script (non-verbose)
-            result = process_commercial_description(commercial_description, verbose=False)
+            # Process commercial description using the esad_product script with rich context
+            result = process_commercial_description(
+                commercial_description, 
+                verbose=False, 
+                get_hs_code=True, 
+                order_id=order_id,
+                primary_data=primary_data  # Pass primary data for contextual enhancement
+            )
             
             return {
                 'success': bool(result['product_name']),
@@ -306,6 +313,9 @@ class ESADSecondaryProcessor:
                 'cleaned_description': result['cleaned_description'],
                 'commercial_description_processed': result['product_name'],
                 'product_name': result['product_name'],
+                'hs_code': result.get('hs_code'),
+                'commodity_code': result.get('commodity_code'),
+                'hs_description': result.get('hs_description'),
                 'error': None if result['product_name'] else 'Failed to extract product name'
             }
             

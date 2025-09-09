@@ -509,8 +509,12 @@ class DocumentProcessor:
             # Process the order using the new API
             esad_result = processor.process_order(order['id'], bol_data, invoice_data, order_number)
             
-            # The process_order method already handles secondary processing internally
-            # and generates the esad_fields.json file
+            # Run secondary processing to enhance the results with HSCode API, etc.
+            print(f"🔄 Running secondary processing...")
+            enhanced_result = self._run_secondary_processing(esad_result, bol_data, invoice_data, order_number)
+            
+            # Update the esad_result with enhanced data
+            esad_result.update(enhanced_result)
             
             print(f"✅ eSAD field population completed")
             print(f"📊 Fields populated: {esad_result.get('fields_populated', 0)}")
@@ -587,6 +591,12 @@ class DocumentProcessor:
         Returns:
             dict: Enhanced ESAD result with secondary processing
         """
+        print(f"\n🔍 DEBUG: _run_secondary_processing called")
+        print(f"   Order number: {order_number}")
+        print(f"   ESAD result keys: {list(esad_result.keys()) if esad_result else 'None'}")
+        print(f"   BOL data keys: {list(bol_data.keys()) if bol_data else 'None'}")
+        print(f"   Invoice data keys: {list(invoice_data.keys()) if invoice_data else 'None'}")
+        
         try:
             print(f"🔄 Starting comprehensive secondary processing...")
             enhanced_result = esad_result.copy()
@@ -835,10 +845,14 @@ class DocumentProcessor:
             # 8. Commodity code classification
             try:
                 print(f"🏷️ Processing commodity code classification...")
+                print(f"🔍 DEBUG: About to call _classify_commodity_code")
                 
                 # Use LLM to classify commodity code based on description
                 commodity_code = self._classify_commodity_code(bol_data, invoice_data)
+                print(f"🔍 DEBUG: _classify_commodity_code returned: {commodity_code}")
+                
                 if commodity_code:
+                    print(f"🔍 DEBUG: Setting commodity_code_classified to: {commodity_code}")
                     enhanced_result['commodity_code_classified'] = commodity_code
                     # Update the ESAD mandatory fields
                     if 'esad_mandatory_fields' in enhanced_result:
@@ -962,34 +976,52 @@ class DocumentProcessor:
             return "CIF"  # Default fallback
     
     def _classify_commodity_code(self, bol_data: Dict[str, Any], invoice_data: Dict[str, Any]) -> str:
-        """Classify commodity code using LLM based on description"""
+        """Classify commodity code using the proper esad_product flow"""
+        print(f"\n🔍 DEBUG: _classify_commodity_code called in document_processor")
+        print(f"   BOL data keys: {list(bol_data.keys()) if bol_data else 'None'}")
+        print(f"   Invoice data keys: {list(invoice_data.keys()) if invoice_data else 'None'}")
+        
         try:
             # Get commodity description
             commodity_desc = ""
             if bol_data.get('commodity'):
                 commodity_desc = bol_data['commodity']
+                print(f"🔍 DEBUG: Using BOL commodity: {commodity_desc}")
             elif invoice_data.get('items'):
                 commodity_desc = " ".join([item.get('description', '') for item in invoice_data['items']])
+                print(f"🔍 DEBUG: Using invoice items: {commodity_desc}")
             
             if not commodity_desc:
+                print(f"❌ DEBUG: No commodity description found")
                 return None
             
-            # Use LLM to classify (simplified approach for now)
-            # In a full implementation, this would call the LLM API
-            commodity_lower = commodity_desc.lower()
+            # Use esad_product for proper refinement and HSCode API call
+            from modules.secondary_processing.esad_product import process_commercial_description
             
-            # Simple rule-based classification for common items
-            if 'solar' in commodity_lower or 'generator' in commodity_lower:
-                return "8504.40.00"  # Solar generators
-            elif 'battery' in commodity_lower or 'power station' in commodity_lower:
-                return "8507.60.00"  # Lithium batteries
-            elif 'panel' in commodity_lower and 'solar' in commodity_lower:
-                return "8541.40.00"  # Solar panels
+            print(f"🔍 Processing commercial description through esad_product: {commodity_desc}")
             
-            # Default to a general electrical equipment code
-            return "8504.40.00"
+            # Process commercial description with esad_product (which handles refinement + HSCode API)
+            result = process_commercial_description(
+                description=commodity_desc, 
+                verbose=True, 
+                get_hs_code=True
+            )
+            
+            print(f"🔍 DEBUG: process_commercial_description returned: {result}")
+            
+            if result and result.get('hs_code'):
+                print(f"✅ esad_product returned HS Code: {result['hs_code']}")
+                print(f"   Refined product name: {result.get('product_name', 'N/A')}")
+                print(f"   Commodity code: {result.get('commodity_code', 'N/A')}")
+                return result['hs_code']
+            else:
+                print(f"⚠️ esad_product did not return a valid HS code")
+                return None
+                
         except Exception as e:
-            print(f"⚠️ Error classifying commodity code: {e}")
+            print(f"⚠️ Error processing commodity through esad_product: {e}")
+            import traceback
+            traceback.print_exc()
             return None
     
     def _determine_procedure_code(self, bol_data: Dict[str, Any], invoice_data: Dict[str, Any]) -> str:

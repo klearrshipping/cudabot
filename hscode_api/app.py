@@ -57,13 +57,18 @@ class HSCodeOrchestrator:
         self.supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
         self.reconciler = HSCodeReconciler(self.supabase, reason_with_llm_fn, verbose=verbose)
     
-    def classify_complete_pipeline(self, product_name: str, additional_context: Dict[str, Any] = None) -> Dict[str, Any]:
+    def classify_complete_pipeline(self, product_name: str, additional_context: Dict[str, Any] = None, 
+                                 order_id: str = None, original_query: str = None, 
+                                 contextual_data: Dict[str, Any] = None) -> Dict[str, Any]:
         """
-        Run the complete HS code classification pipeline
+        Run the complete HS code classification pipeline with flexible context handling
         
         Args:
             product_name: The product to classify
             additional_context: Additional context from clarification answers
+            order_id: Order ID for database context lookup
+            original_query: Original user query for context extraction
+            contextual_data: Direct contextual data from request
             
         Returns:
             Complete results from all three stages
@@ -142,18 +147,29 @@ class HSCodeOrchestrator:
             print(f"\n📋 STAGE 3: Commodity Code Lookup")
             print(f"──────────────────────────────────")
             
+            # Resolve context flexibly for commodity code lookup
+            from module.commodity_code import resolve_context
+            resolved_context = resolve_context(
+                product_name=product_name,
+                contextual_data=contextual_data,
+                order_id=order_id,
+                original_query=original_query
+            )
+            
             # Use answers if provided, otherwise do initial lookup
             try:
                 if additional_context:
                     print(f"🔍 DEBUG: Calling lookup_commodity_code_with_answers with {len(final_hs_codes)} HS codes")
                     commodity_results = lookup_commodity_code_with_answers(
                         final_hs_codes, product_name, product_info, 
-                        f"Classify {product_name}", additional_context
+                        f"Classify {product_name}", additional_context, order_id
                     )
                 else:
                     print(f"🔍 DEBUG: Calling lookup_commodity_code with {len(final_hs_codes)} HS codes: {final_hs_codes}")
+                    # Use original query if available, otherwise fall back to generic query
+                    query_for_lookup = original_query if original_query else f"Classify {product_name}"
                     commodity_results = lookup_commodity_code(
-                        final_hs_codes, product_name, product_info
+                        final_hs_codes, product_name, product_info, query_for_lookup, order_id, resolved_context
                     )
                 
                 print(f"🔍 DEBUG: Commodity lookup returned: {type(commodity_results)} with keys: {list(commodity_results.keys()) if isinstance(commodity_results, dict) else 'Not a dict'}")
@@ -282,9 +298,19 @@ class ClarificationQuestion(BaseModel):
     unit: Optional[str] = None
     validation: Optional[Dict[str, Any]] = None
 
+class ContextualData(BaseModel):
+    """Rich contextual data for enhanced classification"""
+    buyer_info: Optional[Dict[str, Any]] = None
+    supplier_info: Optional[Dict[str, Any]] = None
+    product_details: Optional[Dict[str, Any]] = None
+    shipping_info: Optional[Dict[str, Any]] = None
+    document_metadata: Optional[Dict[str, Any]] = None
+
 class ClassificationRequest(BaseModel):
     product_name: str
     verbose: Optional[bool] = False
+    order_id: Optional[str] = None
+    contextual_data: Optional[ContextualData] = None
 
 class ClarificationRequest(BaseModel):
     session_id: str
@@ -719,11 +745,18 @@ async def classify_product_endpoint(request: ClassificationRequest):
         
         # Use the extracted product name for classification
         product_name = parsed_intent.product_name
+        original_query = parsed_intent.original_query
         
         # Handle different intents
         if parsed_intent.intent == IntentType.CLASSIFY:
-            # For classification queries, run the full pipeline
-            results = orchestrator.classify_complete_pipeline(product_name)
+            # For classification queries, run the full pipeline with flexible context
+            contextual_data = request.contextual_data.dict() if request.contextual_data else None
+            results = orchestrator.classify_complete_pipeline(
+                product_name, 
+                order_id=request.order_id, 
+                original_query=original_query,
+                contextual_data=contextual_data
+            )
             
             # Add debug block to see commodity extraction
             print(f"\n🔍 DEBUGGING COMMODITY EXTRACTION:")
@@ -769,6 +802,16 @@ async def classify_product_endpoint(request: ClassificationRequest):
                     selected_commodity = codes[0]
                     break
             
+            # Debug: Print selected commodity details
+            print(f"\n🔍 API RESPONSE BUILDING DEBUG:")
+            print(f"   confirmed_code: {confirmed_code}")
+            print(f"   selected_commodity: {selected_commodity}")
+            if selected_commodity:
+                print(f"   selected_commodity type: {type(selected_commodity)}")
+                print(f"   selected_commodity keys: {list(selected_commodity.keys()) if isinstance(selected_commodity, dict) else 'Not a dict'}")
+                print(f"   tariff_code: {selected_commodity.get('tariff_code')}")
+                print(f"   description: {selected_commodity.get('description')}")
+            
             return {
                 "product_name": product_name,
                 "hs_code": confirmed_code,
@@ -778,7 +821,12 @@ async def classify_product_endpoint(request: ClassificationRequest):
             
         elif parsed_intent.intent == IntentType.DUTIES:
             # For duties queries, we need to classify first, then provide duty information
-            results = orchestrator.classify_complete_pipeline(product_name)
+            contextual_data = request.contextual_data.dict() if request.contextual_data else None
+            results = orchestrator.classify_complete_pipeline(
+                product_name, 
+                order_id=request.order_id,
+                contextual_data=contextual_data
+            )
             
             # Extract HS code for duty lookup
             final_results = results.get("final_results", {})
@@ -797,7 +845,12 @@ async def classify_product_endpoint(request: ClassificationRequest):
             
         elif parsed_intent.intent == IntentType.PERMITS:
             # For permit queries, classify first then provide permit information
-            results = orchestrator.classify_complete_pipeline(product_name)
+            contextual_data = request.contextual_data.dict() if request.contextual_data else None
+            results = orchestrator.classify_complete_pipeline(
+                product_name, 
+                order_id=request.order_id,
+                contextual_data=contextual_data
+            )
             
             final_results = results.get("final_results", {})
             confirmed_code = final_results.get("confirmed_hs_code")
@@ -815,7 +868,12 @@ async def classify_product_endpoint(request: ClassificationRequest):
             
         elif parsed_intent.intent == IntentType.RESTRICTIONS:
             # For restriction queries
-            results = orchestrator.classify_complete_pipeline(product_name)
+            contextual_data = request.contextual_data.dict() if request.contextual_data else None
+            results = orchestrator.classify_complete_pipeline(
+                product_name, 
+                order_id=request.order_id,
+                contextual_data=contextual_data
+            )
             
             final_results = results.get("final_results", {})
             confirmed_code = final_results.get("confirmed_hs_code")
@@ -833,7 +891,12 @@ async def classify_product_endpoint(request: ClassificationRequest):
             
         else:
             # For general or unknown intents, default to classification
-            results = orchestrator.classify_complete_pipeline(product_name)
+            contextual_data = request.contextual_data.dict() if request.contextual_data else None
+            results = orchestrator.classify_complete_pipeline(
+                product_name, 
+                order_id=request.order_id,
+                contextual_data=contextual_data
+            )
             
             # Add debug block to see commodity extraction
             print(f"\n🔍 DEBUGGING COMMODITY EXTRACTION (ELSE BRANCH):")
@@ -1054,7 +1117,7 @@ async def classify_product_stream(request: ClassificationRequest):
             await asyncio.sleep(1)
             
             # Run the actual classification
-            results = orchestrator.classify_complete_pipeline(request.product_name)
+            results = orchestrator.classify_complete_pipeline(request.product_name, order_id=request.order_id)
             
             # Show Stage 1 results
             stage1_results = results.get("stage1_classification", {})

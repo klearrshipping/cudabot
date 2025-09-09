@@ -1,20 +1,25 @@
+#!/usr/bin/env python3
+"""
+Test script to verify that the original query is properly passed through the system
+"""
+
 import requests
 import json
 
-def test_product_classification():
-    """Test the HS Code API with a Tesla Model Y product."""
+def test_original_query_preservation():
+    """Test that the original query is preserved through the classification pipeline."""
     
     # API endpoint
     url = "http://localhost:5000/classify"
     
-    # Product data to test (following API documentation)
+    # Test with a simple query that should work without clarification
     product_data = {
-        "product_name": "What is the HS code for 2024 tesla model y imported by an individual?",
+        "product_name": "What is the HS code for fresh apples?",
         "verbose": False
     }
     
-    print("Testing HS Code API...")
-    print(f"Product: {product_data['product_name']}")
+    print("Testing Original Query Preservation...")
+    print(f"Query: {product_data['product_name']}")
     print(f"API URL: {url}")
     print("-" * 50)
     
@@ -24,7 +29,7 @@ def test_product_classification():
             url, 
             json=product_data,
             headers={"Content-Type": "application/json"},
-            timeout=120  # Increased timeout to 2 minutes
+            timeout=120
         )
         
         # Check if request was successful
@@ -34,14 +39,12 @@ def test_product_classification():
             print(f"Status Code: {response.status_code}")
             print(f"Response: {json.dumps(result, indent=2)}")
             
-            # Extract key information
-            if 'hs_code' in result:
-                print(f"\n🎯 Classified HS Code: {result['hs_code']}")
-            if 'confidence' in result:
-                print(f"📊 Confidence: {result['confidence']}")
-            if 'explanation' in result:
-                print(f"💡 Explanation: {result['explanation']}")
-                
+            # The key test: check if the original query appears in the context
+            print("\n🎯 ORIGINAL QUERY TEST:")
+            print("The original query should appear in the server logs as:")
+            print("   📝 ORIGINAL USER QUERY: What is the HS code for fresh apples?")
+            print("   📦 PRODUCT INFORMATION: Product Name: fresh apples")
+            
         else:
             print(f"❌ API Error!")
             print(f"Status Code: {response.status_code}")
@@ -58,4 +61,4 @@ def test_product_classification():
         print(f"❌ Unexpected Error: {e}")
 
 if __name__ == "__main__":
-    test_product_classification()
+    test_original_query_preservation()

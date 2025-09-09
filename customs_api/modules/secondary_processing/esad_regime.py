@@ -30,6 +30,8 @@ class RegimeTypeResult:
     import_export_direction: str
     commercial_determination: str
     contextual_factors: Dict[str, Any]
+    processing_time: float = 0.0
+    model: str = ""
 
 class RegimeTypeProcessor:
     """Processor for determining eSAD regime type using contextual analysis"""
@@ -116,6 +118,54 @@ class RegimeTypeProcessor:
                 "description": "Re-Exportation", "entry_type": "Export"
             }
         ]
+    
+    def process(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Process method for integration with secondary processor.
+        
+        Args:
+            input_data: Input data from primary processing
+            
+        Returns:
+            Dictionary containing regime type processing results
+        """
+        try:
+            # Use the primary backup method for processing
+            result_data = self.process_with_primary_backup(input_data)
+            
+            if 'error' in result_data:
+                return {
+                    'success': False,
+                    'error': result_data['error'],
+                    'regime_type': None,
+                    'procedure_code': None,
+                    'description': None
+                }
+            
+            # Extract the result from the processed data
+            result = result_data.get('result', {})
+            
+            return {
+                'success': True,
+                'regime_type': result.get('regime_type'),
+                'procedure_code': result.get('procedure_code'),
+                'description': result.get('description'),
+                'confidence': result.get('confidence'),
+                'reasoning': result.get('reasoning'),
+                'import_export_direction': result.get('import_export_direction'),
+                'commercial_determination': result.get('commercial_determination'),
+                'processing_time': result.get('processing_time'),
+                'model_used': result.get('model_used')
+            }
+            
+        except Exception as e:
+            return {
+                'success': False,
+                'error': str(e),
+                'regime_type': None,
+                'procedure_code': None,
+                'description': None
+            }
     
     def determine_regime_type(self, extracted_data: Dict[str, Any]) -> RegimeTypeResult:
         """
@@ -245,7 +295,12 @@ class RegimeTypeProcessor:
             # Detailed breakdown
             'products_analyzed': product_classification['products'],
             'commercial_count': product_classification['commercial_count'],
-            'household_count': product_classification['household_count']
+            'household_count': product_classification['household_count'],
+            
+            # Additional fields for compatibility
+            'weight': form_fields.get('weight', ''),
+            'package_info': self._extract_package_info(data.get('tables', [])),
+            'commercial_description': form_fields.get('commodity', '')
         }
         
         print(f"🏢 Enhanced Commercial Analysis:")

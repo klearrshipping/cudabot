@@ -1,0 +1,52 @@
+{
+  "supplier": {
+    "name": "Tesla Inc.",
+    "address": "3500 Deer Creek Road, Palo Alto, CA 94304, USA",
+    "contact": {}
+  },
+  "buyer": {
+    "name": "Rafer Johnson",
+    "address": "4 Duke Street, Kingston, Jamaica",
+    "contact": {
+      "phone": "+1 876-355-3021",
+      "email": "raferbop@gmail.com"
+    }
+  },
+  "invoice_details": {
+    "invoice_number": "INV-2023-TESLA-001",
+    "date": "September 4, 2025"
+  },
+  "items": [
+    {
+      "description": "Tesla Model Y 2023 (Electric SUV)",
+      "quantity": 1.0,
+      "unit_price": 52000.0,
+      "total_price": 52000.0
+    },
+    {
+      "description": "Shipping Cost",
+      "quantity": 1.0,
+      "unit_price": 3000.0,
+      "total_price": 3000.0
+    }
+  ],
+  "totals": {
+    "subtotal": 52000.0,
+    "shipping_handling": 3000.0,
+    "total_amount": 55000.0
+  },
+  "shipping": {
+    "delivery_terms": "CIF Kingston (Incoterms 2020)"
+  },
+  "payment_terms": {},
+  "currency": "USD",
+  "document_type": "invoice",
+  "extraction_confidence": "high",
+  "_metadata": {
+    "extraction_timestamp": "2025-09-07T20:46:17.440102",
+    "source_file": "uploads\\orders\\ORD-20250907-006\\invoices\\invoice_20250907_204551.pdf",
+    "processor": "claude_sonnet_4_via_openrouter",
+    "model": "openai/gpt-5-mini",
+    "processing_method": "pdf_to_image_conversion"
+  }
+}
