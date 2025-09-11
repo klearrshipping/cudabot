@@ -1068,11 +1068,72 @@ async def continue_classification(request: ClarificationRequest):
         
         session_data = classification_sessions[request.session_id]
         product_name = session_data["product_name"]
+        original_query = session_data.get("original_query", product_name)
+        intent = session_data.get("intent", "classify")
         
-        # Continue classification with additional context
-        results = orchestrator.classify_complete_pipeline(
-            product_name, 
-            request.additional_context
+        # Continue classification with user answers - don't restart the pipeline
+        # Extract user answers from additional_context
+        user_answers = request.additional_context
+        
+        # Get the previous results to continue from where we left off
+        previous_results = session_data["results"]
+        
+        # Continue the 10-stage workflow from Stage 8+ with user answers
+        from module.commodity_code import run_10_stage_workflow
+        
+        # Get the HS codes and other data from previous results
+        stage1_results = previous_results.get("stage1_classification", {})
+        stage2_results = previous_results.get("stage2_reconciliation", {})
+        final_determination = stage2_results.get("final_determination", {})
+        confirmed_hs_code = final_determination.get("confirmed_hs_code")
+        
+        if not confirmed_hs_code or confirmed_hs_code == "NO_MATCH":
+            # Fall back to original HS codes if reconciliation failed
+            hs_codes = stage1_results.get("consensus_codes", [])
+        else:
+            hs_codes = [confirmed_hs_code]
+        
+        # Continue the workflow from where it paused
+        commodity_results = run_10_stage_workflow(
+            hs_codes=hs_codes,
+            product_name=product_name,
+            product_info_text=stage1_results.get("product_information", ""),
+            original_question=original_query,
+            order_id=session_data.get("order_id"),
+            contextual_data=session_data.get("contextual_data"),
+            stage1_results=stage1_results,
+            user_answers=user_answers
+        )
+        
+        # Build the results structure to match the original pipeline
+        results = {
+            "metadata": previous_results.get("metadata", {}),
+            "stage1_classification": stage1_results,
+            "stage2_reconciliation": stage2_results,
+            "stage3_commodity_lookup": commodity_results,
+            "final_results": None,
+            "errors": []
+        }
+        
+        # Count total commodity codes found
+        total_codes = 0
+        needs_clarification = False
+        clarification_questions = []
+        
+        for hs_code, result in commodity_results.items():
+            if isinstance(result, dict) and result.get('requires_clarification'):
+                needs_clarification = True
+                clarification_questions.extend(result.get('questions', []))
+            elif isinstance(result, list):
+                total_codes += len(result)
+        
+        # Add clarification info to results
+        results["needs_clarification"] = needs_clarification
+        results["clarification_questions"] = clarification_questions
+        
+        # Generate final results summary
+        results["final_results"] = orchestrator._generate_final_summary(
+            stage1_results, final_determination, commodity_results, product_name
         )
         
         # Check if more clarification is needed

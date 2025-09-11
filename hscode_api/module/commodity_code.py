@@ -669,6 +669,11 @@ def stage8_show_context(stage7_results: dict, original_query: str, order_id: str
                         'status': 'partial_answers',
                         'unanswered_questions': remaining_unanswered,
                         'answered_questions': all_answers,
+                        'all_questions': stage7_data.get('all_questions', []),
+                        'commodity_codes': stage7_data.get('commodity_codes', []),
+                        'resolved_context': stage7_data.get('resolved_context', {}),
+                        'original_query': original_query,
+                        'order_id': order_id,
                         'message': f'{len(remaining_unanswered)} questions still need user input'
                     }
                 else:
@@ -677,6 +682,12 @@ def stage8_show_context(stage7_results: dict, original_query: str, order_id: str
                         'stage': 8,
                         'status': 'all_answers_provided',
                         'answered_questions': all_answers,
+                        'unanswered_questions': unanswered_questions,
+                        'all_questions': stage7_data.get('all_questions', []),
+                        'commodity_codes': stage7_data.get('commodity_codes', []),
+                        'resolved_context': stage7_data.get('resolved_context', {}),
+                        'original_query': original_query,
+                        'order_id': order_id,
                         'message': 'All questions answered - ready for final classification'
                     }
             else:
@@ -697,6 +708,11 @@ def stage8_show_context(stage7_results: dict, original_query: str, order_id: str
                     'status': 'user_input_required',
                     'unanswered_questions': unanswered_questions,
                     'answered_questions': answered_questions,
+                    'all_questions': stage7_data.get('all_questions', []),
+                    'commodity_codes': stage7_data.get('commodity_codes', []),
+                    'resolved_context': stage7_data.get('resolved_context', {}),
+                    'original_query': original_query,
+                    'order_id': order_id,
                     'message': f'{len(unanswered_questions)} questions require user input'
                 }
             
@@ -708,6 +724,11 @@ def stage8_show_context(stage7_results: dict, original_query: str, order_id: str
                 'stage': 8,
                 'status': 'no_input_needed',
                 'answered_questions': stage7_data.get('answered_questions', {}),
+                'all_questions': stage7_data.get('all_questions', []),
+                'commodity_codes': stage7_data.get('commodity_codes', []),
+                'resolved_context': stage7_data.get('resolved_context', {}),
+                'original_query': original_query,
+                'order_id': order_id,
                 'message': 'All questions answered - no user input required'
             }
         else:
@@ -721,7 +742,7 @@ def stage8_show_context(stage7_results: dict, original_query: str, order_id: str
     
     return results
 
-def stage9_complete_loop(stage8_results: dict, user_answers: dict = None) -> dict:
+def stage9_complete_loop(stage8_results: dict, stage5_results: dict = None, user_answers: dict = None) -> dict:
     """
     Stage 9: Complete the Loop
     Takes user answers and combines with existing context to provide LLM with 
@@ -735,7 +756,8 @@ def stage9_complete_loop(stage8_results: dict, user_answers: dict = None) -> dic
     for hs_code, stage8_data in stage8_results.items():
         print(f"\n├── {hs_code}: Completing the loop with user answers")
         
-        if stage8_data.get('status') == 'context_displayed':
+        # Handle both 'context_displayed' and 'all_answers_provided' statuses
+        if stage8_data.get('status') in ['context_displayed', 'all_answers_provided']:
             answered_questions = stage8_data.get('answered_questions', {})
             unanswered_questions = stage8_data.get('unanswered_questions', [])
             resolved_context = stage8_data.get('resolved_context', {})
@@ -748,6 +770,47 @@ def stage9_complete_loop(stage8_results: dict, user_answers: dict = None) -> dic
                 complete_answers.update(user_answers)
             else:
                 print(f"│   └── [NO USER ANSWERS] Using only context-derived answers")
+            
+            # Display the complete context (Stage 5 + Stage 8 combined)
+            print(f"│   └── [COMPLETE CONTEXT] Displaying full context:")
+            
+            # Stage 5 context (initial context)
+            if stage5_results:
+                print(f"│       ├── 📋 INITIAL CONTEXT (Stage 5):")
+                stage5_context = stage5_results.get('contextual_data', {})
+                stage1_results = stage5_results.get('stage1_results', {})
+                
+                if stage5_context:
+                    if stage5_context.get('user_query'):
+                        print(f"│       │   ├── User query: {stage5_context['user_query']}")
+                    if stage5_context.get('invoice_data'):
+                        invoice = stage5_context['invoice_data']
+                        print(f"│       │   ├── Invoice: {invoice.get('invoice_number', 'N/A')} - {invoice.get('supplier', 'N/A')}")
+                    if stage5_context.get('bill_of_lading'):
+                        bol = stage5_context['bill_of_lading']
+                        print(f"│       │   ├── Bill of Lading: {bol.get('bol_number', 'N/A')} - {bol.get('vessel', 'N/A')}")
+                
+                if stage1_results:
+                    product_info = stage1_results.get('product_information', 'N/A')
+                    print(f"│       │   └── Generated product data: {product_info}")
+            else:
+                print(f"│       ├── 📋 INITIAL CONTEXT (Stage 5): No initial context available")
+            
+            # Stage 8 context (user answers)
+            print(f"│       └── 💬 USER ENHANCED CONTEXT (Stage 8):")
+            if complete_answers:
+                for q_id, answer in complete_answers.items():
+                    # Find the question text
+                    question_text = "Unknown question"
+                    all_questions = stage8_data.get('all_questions', [])
+                    for q in all_questions:
+                        if q.get('id') == q_id:
+                            question_text = q.get('question', 'Unknown question')
+                            break
+                    print(f"│           ├── Q: {question_text}")
+                    print(f"│           └── A: {answer}")
+            else:
+                print(f"│           └── No user answers provided")
             
             # Check if we have answers for all questions
             all_questions = stage8_data.get('all_questions', [])
@@ -776,8 +839,10 @@ def stage9_complete_loop(stage8_results: dict, user_answers: dict = None) -> dic
             else:
                 print(f"│   └── [COMPLETE] All questions answered - ready for final selection")
                 
-                # Build complete context for final analysis
+                # Build complete context for final analysis (combining Stage 5 + Stage 8)
                 complete_context = {
+                    'stage5_context': stage5_results,
+                    'stage8_context': stage8_data,
                     'resolved_context': resolved_context,
                     'answered_questions': complete_answers,
                     'original_query': stage8_data.get('original_query', ''),
@@ -791,6 +856,7 @@ def stage9_complete_loop(stage8_results: dict, user_answers: dict = None) -> dic
                     'complete_context': complete_context,
                     'resolved_context': resolved_context,
                     'commodity_codes': stage8_data.get('commodity_codes', []),
+                    'stage5_context': stage5_results,
                     'message': 'All questions answered - ready for final selection'
                 }
         else:
@@ -825,7 +891,10 @@ def stage10_final_selection(stage9_results: dict, product_name: str, product_inf
             complete_answers = stage9_data.get('complete_answers', {})
             
             print(f"│   └── [SELECTION] Selecting from {len(commodity_codes)} commodity codes")
-            print(f"│       └── Using complete context with {len(complete_answers)} answered questions")
+            print(f"│       └── Using Stage 9 complete context:")
+            print(f"│           ├── Stage 3: {len(commodity_codes)} commodity codes")
+            print(f"│           ├── Stage 4: Classification questions and context")
+            print(f"│           └── Stage 9: Complete context with {len(complete_answers)} answered questions")
             
             # Filter codes based on answers if needed
             filtered_codes = commodity_codes.copy()
@@ -873,7 +942,7 @@ def stage10_final_selection(stage9_results: dict, product_name: str, product_inf
                 final_code = filtered_codes[0]
                 selection_method = 'direct_selection'
             else:
-                print(f"│       └── [LLM] Using LLM to select best match from {len(filtered_codes)} codes")
+                print(f"│       └── [LLM] Using enhanced LLM prompt with comprehensive context from {len(filtered_codes)} codes")
                 
                 # Use LLM to select best match
                 final_code = lookup.select_best_commodity_code(
@@ -990,7 +1059,7 @@ def run_10_stage_workflow(hs_codes: list[str], product_name: str, product_info_t
     stage8_results = stage8_show_context(stage7_results, original_question, order_id, user_answers)
     
     # Stage 9: Complete the loop
-    stage9_results = stage9_complete_loop(stage8_results, user_answers)
+    stage9_results = stage9_complete_loop(stage8_results, stage5_results, user_answers)
     
     # Stage 10: Final code selection
     stage10_results = stage10_final_selection(stage9_results, product_name, product_info_text)
@@ -1992,45 +2061,96 @@ class CommodityCodeLookup:
             return commodity_codes[0] if commodity_codes else None
         
         try:
-            # Build context information
+            # Build context information using Stage 9 complete context
             context_info = ""
-            if context:
-                resolved_context = context.get('resolved_context', {})
-                answered_questions = context.get('answered_questions', {})
-                
-                if resolved_context:
-                    context_info += f"\n\nContext Information:\n"
-                    for key, value in resolved_context.items():
-                        context_info += f"- {key}: {value}\n"
-                
-                if answered_questions:
-                    context_info += f"\n\nAnswered Questions:\n"
-                    for q_id, answer in answered_questions.items():
-                        context_info += f"- {q_id}: {answer}\n"
             
-            # Create the prompt
+            if context:
+                # Resolved Context (Processed Business Data from Stage 9 Complete Context)
+                resolved_context = context.get('resolved_context', {})
+                if resolved_context:
+                    context_info += f"\n\n🔍 BUSINESS CONTEXT (Stage 9 Complete Context):\n"
+                    for key, value in resolved_context.items():
+                        context_info += f"- {key.replace('_', ' ').title()}: {value}\n"
+                
+                # Complete Answers (User + LLM Responses from Stage 9)
+                answered_questions = context.get('answered_questions', {})
+                if answered_questions:
+                    context_info += f"\n\n✅ CLASSIFICATION ANSWERS (Stage 9 Complete Context):\n"
+                    for q_id, answer in answered_questions.items():
+                        # Find the question text for better context
+                        question_text = "Unknown question"
+                        stage8_context = context.get('stage8_context', {})
+                        if stage8_context:
+                            all_questions = stage8_context.get('all_questions', [])
+                            for q in all_questions:
+                                if q.get('id') == q_id:
+                                    question_text = q.get('question', 'Unknown question')
+                                    break
+                        context_info += f"- Q: {question_text}\n"
+                        context_info += f"  A: {answer}\n"
+                
+                # Additional Context
+                if context.get('original_query'):
+                    context_info += f"\n\n📝 Original Query: {context['original_query']}\n"
+                if context.get('order_id'):
+                    context_info += f"📋 Order ID: {context['order_id']}\n"
+            
+            # Create the enhanced prompt with complete structured data
             prompt = f"""
-You are an expert in HS Code classification for Jamaican customs. I need you to select the most appropriate commodity code from the following options.
+You are an expert HS Code classification specialist for Jamaican customs. You have access to comprehensive business context and user responses to make the most accurate classification decision.
 
+🎯 CLASSIFICATION TASK:
 HS Code: {hs_code}
 Product: {product_name}
 Product Information: {product_info_text}
 {context_info}
 
-Available Commodity Codes:
+📋 AVAILABLE COMMODITY CODES (Stage 3 Database Lookup Results):
 """
             
             for i, code in enumerate(commodity_codes, 1):
                 prompt += f"{i}. {code['tariff_code']} - {code['description']}\n"
             
-            prompt += f"""
-Please analyze the product information and context to select the most appropriate commodity code. Consider:
-1. The specific characteristics of the product
-2. The importer type and usage purpose
-3. Any distinguishing features mentioned in the context
-4. The most precise classification available
+            # Add the classification questions from Stage 9 complete context
+            stage8_context = context.get('stage8_context', {})
+            all_questions = stage8_context.get('all_questions', [])
+            if all_questions:
+                prompt += f"""
 
-Respond with ONLY the number (1, 2, 3, etc.) of the most appropriate commodity code, or "REJECT" if none of the codes are appropriate for this product.
+❓ CLASSIFICATION QUESTIONS (From Stage 9 Complete Context):
+The following questions were generated to distinguish between the commodity codes above:
+"""
+                for i, question in enumerate(all_questions, 1):
+                    question_text = question.get('question', 'N/A')
+                    options = question.get('options', [])
+                    attribute = question.get('attribute', 'unknown')
+                    option_text = ', '.join([opt.get('value', 'N/A') for opt in options])
+                    prompt += f"{i}. {question_text}\n"
+                    prompt += f"   Attribute: {attribute}\n"
+                    prompt += f"   Options: {option_text}\n\n"
+            
+            prompt += f"""
+
+🎯 ANALYSIS REQUIREMENTS:
+Analyze the complete business context and user responses to select the most appropriate commodity code. Consider:
+
+1. **Business Context**: Invoice details, shipping information, supplier data
+2. **Product Characteristics**: Specific features, specifications, and usage  
+3. **User Classification Answers**: Importer type, usage purpose, age restrictions
+4. **Classification Questions**: The specific questions generated to distinguish between codes
+5. **Regulatory Compliance**: Most precise and accurate classification
+6. **Customs Requirements**: Jamaican customs regulations and requirements
+
+🔍 DECISION CRITERIA:
+- Match the product description with the most specific commodity code
+- Apply user-provided classification answers (importer type, age, etc.)
+- Consider the business context (supplier, shipping, invoice details)
+- Use the classification questions to understand the distinguishing factors
+- Ensure regulatory compliance and accuracy
+- Select the most precise classification available
+
+📤 RESPONSE FORMAT:
+Respond with ONLY the number (1, 2, 3, etc.) of the most appropriate commodity code, or "REJECT" if none of the codes are appropriate for this product based on the comprehensive context provided.
 """
             
             # Call LLM

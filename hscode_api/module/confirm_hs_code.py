@@ -19,7 +19,7 @@ from datetime import datetime
 
 # Import LLM function with error handling
 try:
-    from .commodity_code import reason_with_llm_for_commodity
+    from .commodity_code import reason_with_llm_fn as reason_with_llm_for_commodity
     COMMODITY_LLM_AVAILABLE = True
 except ImportError as e:
     print(f"Warning: Could not import reason_with_llm_for_commodity: {e}")
