@@ -28,6 +28,10 @@ OPENROUTER_HEADERS = {
     "X-Title": "<YOUR_SITE_NAME>",  # Optional. Site title for rankings on openrouter.ai.
 }
 
+# Customs API Configuration
+CUSTOMS_API_BASE_URL = "http://localhost:8000"  # customs_api runs on port 8000
+CUSTOMS_API_TIMEOUT = 30  # seconds
+
 # OpenRouter Models - General Purpose (Used for general AI tasks)
 OPENROUTER_GENERAL_MODELS = {
     "mistral_small": {

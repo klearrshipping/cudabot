@@ -1489,76 +1489,65 @@ def extract_context_from_query(original_question: str, product_name: str, produc
 
 def get_order_context_by_id(order_id: int) -> Dict[str, Any]:
     """
-    Retrieve order context (BOL and invoice data) by order ID and extract structured context.
+    Fetch order context from customs_api via HTTP request.
+    
+    Args:
+        order_id: The order ID to fetch context for
+        
+    Returns:
+        Dictionary with contextual_data for Stage 5, or empty dict if error
     """
     try:
-        # Import here to avoid circular imports
-        import sys
-        import os
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        # Go up from hscode_api/module to hscode_api, then to root, then to customs_api
-        root_dir = os.path.dirname(os.path.dirname(current_dir))
-        customs_api_dir = os.path.join(root_dir, "customs_api")
-        sys.path.insert(0, customs_api_dir)
+        import requests
+        import json
         
-        from modules.core.supabase_client import get_order_extractions
+        # Configuration
+        from config import CUSTOMS_API_BASE_URL, CUSTOMS_API_TIMEOUT
+        timeout = CUSTOMS_API_TIMEOUT
         
-        # Get order extractions from database
-        order_data = get_order_extractions(order_id)
-        if not order_data:
-            print(f"❌ No order data found for order ID: {order_id}")
-            return {}
+        # Make HTTP request
+        url = f"{CUSTOMS_API_BASE_URL}/api/orders/{order_id}/context"
         
-        # Also try to get processed data from files
-        order_number = order_data['order']['order_number']
-        processed_data_dir = Path(customs_api_dir) / "processed_data" / "orders" / order_number / "primary_process"
+        print(f"🌐 Fetching order context from: {url}")
         
-        context = {
-            'order_id': order_id,
-            'order_number': order_number,
-            'database_data': order_data,
-            'file_data': {},
-            'extracted_context': {}
-        }
+        response = requests.get(
+            url,
+            timeout=timeout,
+            headers={
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+            }
+        )
         
-        # Try to load processed files
-        bol_file = processed_data_dir / f"bill_of_lading_{order_number}_primary_extract.json"
-        invoice_file = processed_data_dir / f"invoice_{order_number}_primary_extract.json"
-        
-        bol_data = None
-        invoice_data = None
-        
-        if bol_file.exists():
-            with open(bol_file, 'r', encoding='utf-8') as f:
-                bol_data = json.load(f)
-                context['file_data']['bill_of_lading'] = bol_data
-        
-        if invoice_file.exists():
-            with open(invoice_file, 'r', encoding='utf-8') as f:
-                invoice_data = json.load(f)
-                context['file_data']['invoice'] = invoice_data
-        
-        # Use existing DocumentContextExtractor to extract structured context
-        if bol_data and invoice_data:
-            print(f"📋 Extracting structured context using DocumentContextExtractor...")
-            extractor = DocumentContextExtractor()
-            extracted_context = extractor.extract_context_from_documents(bol_data, invoice_data)
-            context['extracted_context'] = extracted_context
+        # Handle response
+        if response.status_code == 200:
+            data = response.json()
+            print(f"✅ Successfully fetched context for order {order_id}")
+            return data
             
-            print(f"✅ Extracted context attributes:")
-            for key, value in extracted_context.items():
-                print(f"   - {key}: {value}")
+        elif response.status_code == 404:
+            print(f"❌ Order {order_id} not found in customs_api")
+            return {}
+            
         else:
-            print(f"⚠️  Missing document data - cannot extract structured context")
-            if not bol_data:
-                print(f"   - Bill of lading file not found: {bol_file}")
-            if not invoice_data:
-                print(f"   - Invoice file not found: {invoice_file}")
+            print(f"❌ Error fetching order context: HTTP {response.status_code}")
+            print(f"   Response: {response.text}")
+            return {}
+            
+    except requests.exceptions.Timeout:
+        print(f"❌ Timeout fetching order context for {order_id}")
+        return {}
         
-        return context
+    except requests.exceptions.ConnectionError:
+        print(f"❌ Cannot connect to customs_api at {CUSTOMS_API_BASE_URL}")
+        return {}
+        
+    except requests.exceptions.RequestException as e:
+        print(f"❌ Request error fetching order context: {e}")
+        return {}
         
     except Exception as e:
-        print(f"❌ Error getting order context for {order_id}: {e}")
+        print(f"❌ Unexpected error fetching order context: {e}")
         return {}
 
 def reason_with_llm_fn(prompt: str, hs_code: str = None) -> str:

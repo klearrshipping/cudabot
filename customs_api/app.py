@@ -14,6 +14,7 @@ import sys
 from typing import Optional
 import json
 from datetime import datetime
+from pathlib import Path
 
 # Add the modules directory to the path
 sys.path.append(os.path.join(os.path.dirname(__file__), 'modules'))
@@ -246,6 +247,73 @@ async def validate_order(order_id: int):
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error validating order: {str(e)}")
+
+@app.get("/api/orders/{order_id}/context")
+async def get_order_context(order_id: int):
+    """
+    Get complete order context including BOL and invoice data for hscode_api.
+    
+    Returns:
+        {
+            "contextual_data": {
+                "invoice_data": {...},
+                "bill_of_lading": {...},
+                "user_query": "Order ORD-123"
+            },
+            "order_id": 123,
+            "order_number": "ORD-123"
+        }
+    """
+    try:
+        # Step 1: Get order data from database
+        from modules.core.supabase_client import get_order_extractions
+        
+        order_data = get_order_extractions(order_id)
+        if not order_data:
+            raise HTTPException(status_code=404, detail=f"Order {order_id} not found")
+        
+        order_number = order_data['order']['order_number']
+        
+        # Step 2: Get file paths
+        from pathlib import Path
+        processed_data_dir = Path("processed_data") / "orders" / order_number / "primary_process"
+        
+        # Step 3: Load BOL and invoice JSON files
+        bol_file = processed_data_dir / f"bill_of_lading_{order_number}_primary_extract.json"
+        invoice_file = processed_data_dir / f"invoice_{order_number}_primary_extract.json"
+        
+        bol_data = {}
+        invoice_data = {}
+        
+        if bol_file.exists():
+            with open(bol_file, 'r', encoding='utf-8') as f:
+                bol_data = json.load(f)
+        else:
+            print(f"⚠️ BOL file not found: {bol_file}")
+        
+        if invoice_file.exists():
+            with open(invoice_file, 'r', encoding='utf-8') as f:
+                invoice_data = json.load(f)
+        else:
+            print(f"⚠️ Invoice file not found: {invoice_file}")
+        
+        # Step 4: Return structured response
+        return {
+            "contextual_data": {
+                "invoice_data": invoice_data,
+                "bill_of_lading": bol_data,
+                "user_query": f"Order {order_number}"
+            },
+            "order_id": order_id,
+            "order_number": order_number,
+            "status": "success"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error in get_order_context: {e}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 @app.get("/api/health")
 async def health_check():
