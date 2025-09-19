@@ -130,7 +130,7 @@ async def upload_documents(
         # Start automatic document processing
         processing_started = False
         try:
-            from modules.primary_processing.document_processor import DocumentProcessor
+            from modules.extraction_process.document_processor import DocumentProcessor
             processor = DocumentProcessor()
             
             # Process documents in background (non-blocking)

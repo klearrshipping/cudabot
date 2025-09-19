@@ -213,14 +213,34 @@ def stage5_resolve_context(stage1_results: dict, original_query: str, order_id: 
     display_product_name = product_name if product_name else (stage1_results.get('product_name', 'N/A') if stage1_results else 'N/A')
     print(f"├── Product name (intent parser): {display_product_name}")
     
-    # 2. Initial query or customs api data (invoice and BOL)
+    # 2. Contextual data display (streamlined structure)
     if contextual_data:
+        # Display streamlined structure fields first
+        if contextual_data.get('consignee_name'):
+            print(f"├── Consignee: {contextual_data['consignee_name']}")
+        if contextual_data.get('shipper'):
+            print(f"├── Shipper: {contextual_data['shipper']}")
+        if contextual_data.get('port_of_origin'):
+            print(f"├── Origin: {contextual_data['port_of_origin']}")
+        if contextual_data.get('port_of_destination'):
+            print(f"├── Destination: {contextual_data['port_of_destination']}")
+        if contextual_data.get('commodity'):
+            commodity_preview = contextual_data['commodity'][:60] + "..." if len(contextual_data['commodity']) > 60 else contextual_data['commodity']
+            print(f"├── Commodity: {commodity_preview}")
+        if contextual_data.get('weight'):
+            print(f"├── Weight: {contextual_data['weight']}")
+        if contextual_data.get('vessel'):
+            print(f"├── Vessel: {contextual_data['vessel']}")
+        if contextual_data.get('bill_of_lading'):
+            print(f"├── BOL: {contextual_data['bill_of_lading']}")
+        
+        # Legacy support for nested structure
         if contextual_data.get('user_query'):
             print(f"├── User query: {contextual_data['user_query']}")
         if contextual_data.get('invoice_data'):
             invoice = contextual_data['invoice_data']
             print(f"├── Invoice: {invoice.get('invoice_number', 'N/A')} - {invoice.get('supplier', 'N/A')}")
-        if contextual_data.get('bill_of_lading'):
+        if contextual_data.get('bill_of_lading') and isinstance(contextual_data.get('bill_of_lading'), dict):
             bol = contextual_data['bill_of_lading']
             print(f"├── Bill of Lading: {bol.get('bol_number', 'N/A')} - {bol.get('vessel', 'N/A')}")
     else:
@@ -248,13 +268,12 @@ def stage5_resolve_context(stage1_results: dict, original_query: str, order_id: 
 def stage6_llm_answer_questions(stage4_results: dict, stage5_results: dict, product_name: str, product_info_text: str) -> dict:
     """
     Stage 6: Answer Questions with LLM
-    Takes questions from Stage 4 and context info from Stage 5, then does actual 
-    context resolution and LLM answering.
+    Streamlined flow: questions + context + LLM prompts
     """
     results = {}
     
-    print(f"\n🤖 STAGE 6: CONTEXT PROCESSING & QUESTION ANSWERING")
-    print("-" * 50)
+    print(f"\n🤖 STAGE 6: QUESTION ANSWERING")
+    print("=" * 60)
     
     # Get context info from Stage 5
     contextual_data = stage5_results.get('contextual_data')
@@ -262,94 +281,59 @@ def stage6_llm_answer_questions(stage4_results: dict, stage5_results: dict, prod
     original_query = stage5_results.get('original_query')
     
     for hs_code, stage4_data in stage4_results.items():
-        print(f"\n├── {hs_code}: Processing questions with context")
+        print(f"\n📋 HS CODE: {hs_code}")
+        print("-" * 40)
         
         if stage4_data.get('status') == 'questions_generated':
             questions = stage4_data.get('questions', [])
             commodity_codes = stage4_data.get('commodity_codes', [])
             
-            # Step 1: Show questions from Stage 4
-            print(f"│   ├── Step 1: Questions from Stage 4")
+            # Display questions clearly
+            print(f"\n❓ CLASSIFICATION QUESTIONS ({len(questions)} questions):")
             for i, question in enumerate(questions, 1):
                 question_text = question.get('question', 'N/A')
                 options = question.get('options', [])
-                option_values = [opt.get('value', 'N/A') for opt in options]
-                print(f"│   │   └── Q{i}: {question_text}")
-                print(f"│   │       └── Options: {' / '.join(option_values)}")
+                print(f"\n   {i}. {question_text}")
+                for j, option in enumerate(options, 1):
+                    if isinstance(option, dict):
+                        label = option.get('label', option.get('value', 'N/A'))
+                        print(f"      {j}) {label}")
+                    else:
+                        print(f"      {j}) {option}")
             
-            # Step 2: Show context from Stage 5
-            print(f"│   ├── Step 2: Context from Stage 5")
-            print(f"│   │   └── Product: {product_name}")
-            if contextual_data:
-                if contextual_data.get('user_query'):
-                    print(f"│   │   └── User query: {contextual_data['user_query']}")
-                if contextual_data.get('invoice_data'):
-                    invoice = contextual_data['invoice_data']
-                    print(f"│   │   └── Invoice: {invoice.get('invoice_number', 'N/A')} - {invoice.get('supplier', 'N/A')}")
-                if contextual_data.get('bill_of_lading'):
-                    bol = contextual_data['bill_of_lading']
-                    print(f"│   │   └── Bill of Lading: {bol.get('bol_number', 'N/A')} - {bol.get('vessel', 'N/A')}")
-            else:
-                print(f"│   │   └── No contextual data provided")
-            print(f"│   │   └── Product data: {product_info_text[:100]}...")
+            # Display context summary
+            print(f"\n📊 AVAILABLE CONTEXT:")
+            context_summary = _build_context_summary(contextual_data, product_name, product_info_text, original_query)
+            print(f"   {context_summary.replace(chr(10), chr(10) + '   ')}")
             
-            # Step 3: Process context and answer questions
-            print(f"│   ├── Step 3: LLM Processing")
-            print(f"│   │   └── ✅ Analyzing context to answer questions")
+            # Process with LLM
+            print(f"\n🤖 PROCESSING WITH LLM...")
+            prompt = _create_classification_prompt(questions, context_summary, product_name, product_info_text)
+            llm_answers = _process_llm_classification(prompt, questions)
             
-            # Now do the actual context resolution
-            resolved_context = resolve_context(
-                product_name=product_name,
-                contextual_data=contextual_data,
-                order_id=order_id,
-                original_query=original_query
-            )
-            
-            # Try to map context to answers
-            auto_answers = map_context_to_answers(questions, resolved_context)
-            
-            # Find unanswered questions
-            unanswered_questions = []
+            # Display results clearly
+            print(f"\n✅ LLM ANSWERS:")
             for i, question in enumerate(questions, 1):
                 question_id = question.get('id', f'question_{i}')
-                if question_id not in auto_answers:
-                    unanswered_questions.append(question)
+                question_text = question.get('question', 'N/A')
+                answer = llm_answers.get(question_id, 'Not answered')
+                print(f"   {i}. {question_text}")
+                print(f"      → {answer}")
             
-            if unanswered_questions:
-                print(f"│   │   └── ✅ Using LLM to answer {len(unanswered_questions)} remaining questions")
-                
-                # Use LLM to answer remaining questions
-                llm_answers = _generate_llm_answers_for_stage6(unanswered_questions, resolved_context, product_name, product_info_text)
-                
-                # Validate LLM answers - only accept answers with sufficient contextual evidence
-                validated_llm_answers = _validate_llm_answers(llm_answers, unanswered_questions, resolved_context)
-                
-                # Combine auto-answers with validated LLM answers
-                combined_answers = {**auto_answers, **validated_llm_answers}
-                
-                print(f"│   │   └── ✅ Generated {len(llm_answers)} LLM answers")
-            else:
-                combined_answers = auto_answers
-                print(f"│   │   └── ✅ All questions answered automatically")
-            
-            # Step 4: Show final results
-            print(f"│   └── Step 4: Results")
-            print(f"│       └── ✅ All {len(questions)} questions answered")
-            print(f"│       └── ✅ Ready for final classification")
+            answered_count = len([q for q in questions if q.get('id', f'question_{questions.index(q)+1}') in llm_answers])
+            print(f"\n📈 SUMMARY: {answered_count}/{len(questions)} questions answered")
             
             results[hs_code] = {
                 'stage': 6,
                 'status': 'questions_answered',
                 'questions': questions,
-                'auto_answers': auto_answers,
-                'llm_answers': llm_answers if unanswered_questions else {},
-                'combined_answers': combined_answers,
-                'resolved_context': resolved_context,
+                'llm_answers': llm_answers,
                 'commodity_codes': commodity_codes,
-                'message': f'Answered {len(combined_answers)}/{len(questions)} questions (auto + LLM)'
+                'context_summary': context_summary,
+                'message': f'Answered {answered_count}/{len(questions)} questions via LLM'
             }
         else:
-            print(f"│   └── [SKIP] No questions to answer (status: {stage4_data.get('status')})")
+            print(f"   [SKIP] No questions to answer (status: {stage4_data.get('status')})")
             results[hs_code] = {
                 'stage': 6,
                 'status': 'no_questions',
@@ -374,7 +358,8 @@ def stage7_list_unanswered(stage6_results: dict) -> dict:
         
         if stage6_data.get('status') in ['questions_answered', 'all_answered']:
             questions = stage6_data.get('questions', [])
-            combined_answers = stage6_data.get('combined_answers', stage6_data.get('auto_answers', {}))
+            # Get answers from Stage 6 - check both old and new formats
+            combined_answers = stage6_data.get('combined_answers', stage6_data.get('auto_answers', stage6_data.get('llm_answers', {})))
             
             # Find unanswered questions
             unanswered_questions = []
@@ -422,121 +407,112 @@ def stage7_list_unanswered(stage6_results: dict) -> dict:
 # SUPPORTING FUNCTIONS FOR 10-STAGE WORKFLOW
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def resolve_context(product_name: str, contextual_data: Dict[str, Any] = None, 
-                   order_id: str = None, original_query: str = None) -> Dict[str, Any]:
+
+def _build_context_summary(contextual_data: Dict[str, Any], product_name: str, 
+                          product_info_text: str, original_query: str) -> str:
     """
-    Flexible context resolution supporting multiple scenarios:
-    1. Basic request (no context) - extract from query
-    2. Order-based context (order_id lookup) - fetch from database
-    3. Direct context (contextual_data provided) - use provided data
-    
-    Args:
-        product_name: Name of the product
-        contextual_data: Direct contextual data from request
-        order_id: Order ID for database lookup
-        original_query: Original user query for context extraction
-        
-    Returns:
-        Resolved context dictionary for classification
+    Build a comprehensive context summary for LLM processing.
     """
-    print(f"\n🔍 FLEXIBLE CONTEXT RESOLUTION")
-    print("-" * 50)
-    print(f"Product: {product_name}")
-    print(f"Has contextual_data: {bool(contextual_data)}")
-    print(f"Has order_id: {bool(order_id)}")
-    print(f"Has original_query: {bool(original_query)}")
+    context_parts = []
     
-    context = {}
+    # Product information
+    context_parts.append(f"Product: {product_name}")
+    context_parts.append(f"Details: {product_info_text}")
+    if original_query:
+        context_parts.append(f"Query: {original_query}")
     
-    # Scenario 1: Direct context provided (most rich)
+    # Contextual data from Stage 5
     if contextual_data:
-        print("✅ Using direct contextual data")
-        context = _process_direct_context(contextual_data)
+        if contextual_data.get('consignee_name'):
+            context_parts.append(f"Consignee: {contextual_data['consignee_name']}")
+        if contextual_data.get('shipper'):
+            context_parts.append(f"Shipper: {contextual_data['shipper']}")
+        if contextual_data.get('port_of_origin'):
+            context_parts.append(f"Origin: {contextual_data['port_of_origin']}")
+        if contextual_data.get('port_of_destination'):
+            context_parts.append(f"Destination: {contextual_data['port_of_destination']}")
+        if contextual_data.get('commodity'):
+            commodity = contextual_data['commodity']
+            if len(commodity) > 60:
+                commodity = commodity[:60] + "..."
+            context_parts.append(f"Commodity: {commodity}")
+        if contextual_data.get('weight'):
+            context_parts.append(f"Weight: {contextual_data['weight']}")
+        if contextual_data.get('vessel'):
+            context_parts.append(f"Vessel: {contextual_data['vessel']}")
+        if contextual_data.get('bill_of_lading'):
+            context_parts.append(f"BOL: {contextual_data['bill_of_lading']}")
         
-    # Scenario 2: Order-based context lookup (rich)
-    elif order_id:
-        print(f"✅ Using order-based context for {order_id}")
-        order_context = get_order_context_by_id(order_id)
-        if order_context:
-            context = order_context.get('extracted_context', {})
-            # Also include raw document data
-            context.update({
-                'file_data': order_context.get('file_data', {}),
-                'order_number': order_context.get('order_number', ''),
-                'order_id': order_id
-            })
-        else:
-            print(f"❌ No order context found, falling back to query-based")
-            context = extract_context_from_query(original_query or product_name, product_name, "")
-    
-    # Scenario 3: Basic request (minimal context)
+        # Legacy support
+        if contextual_data.get('user_query'):
+            context_parts.append(f"User Query: {contextual_data['user_query']}")
+        if contextual_data.get('invoice_data'):
+            invoice = contextual_data['invoice_data']
+            context_parts.append(f"Invoice: {invoice.get('invoice_number', 'N/A')} - {invoice.get('supplier', 'N/A')}")
+        if contextual_data.get('bill_of_lading') and isinstance(contextual_data.get('bill_of_lading'), dict):
+            bol = contextual_data['bill_of_lading']
+            context_parts.append(f"Bill of Lading: {bol.get('bol_number', 'N/A')} - {bol.get('vessel', 'N/A')}")
     else:
-        print("✅ Using basic query-based context")
-        context = extract_context_from_query(original_query or product_name, product_name, "")
+        context_parts.append("Contextual Data: None provided")
     
-    print(f"📊 Resolved context keys: {list(context.keys())}")
-    return context
+    return " | ".join(context_parts)
 
-def _generate_llm_answers_for_stage6(questions: List[Dict], resolved_context: Dict[str, Any], 
-                                    product_name: str, product_info_text: str) -> Dict[str, str]:
+def _create_classification_prompt(questions: List[Dict], context_summary: str, 
+                                 product_name: str, product_info_text: str) -> str:
     """
-    Generate LLM answers for remaining questions in Stage 6.
+    Create a focused LLM prompt for classification questions.
     """
-    try:
-        # Build context summary for LLM
-        context_summary = "AVAILABLE CONTEXT:\n\n"
+    # Build questions section
+    questions_text = "CLASSIFICATION QUESTIONS:\n"
+    for i, question in enumerate(questions, 1):
+        question_id = question.get('id', f'question_{i}')
+        question_text = question.get('question', 'N/A')
+        options = question.get('options', [])
         
-        # Add resolved context
-        for key, value in resolved_context.items():
-            context_summary += f"- {key}: {value}\n"
-        context_summary += "\n"
-        
-        # Add product information
-        context_summary += f"PRODUCT INFORMATION:\n"
-        context_summary += f"- Product Name: {product_name}\n"
-        context_summary += f"- Product Details: {product_info_text}\n\n"
-        
-        # Build questions for LLM
-        questions_text = "REMAINING QUESTIONS TO ANSWER:\n"
-        for i, q in enumerate(questions, 1):
-            questions_text += f"{i}. {q.get('question', 'N/A')}\n"
-            questions_text += f"   Options: {q.get('options', [])}\n\n"
-        
-        # Create LLM prompt
-        prompt = f"""You are a customs classification expert. Based on the available context and product information, answer the remaining clarification questions.
-
-IMPORTANT: Only answer questions where you have CLEAR CONTEXTUAL EVIDENCE. If the context does not provide sufficient information to determine an answer, DO NOT guess or make assumptions.
+        questions_text += f"\n{i}. {question_text}\n"
+        questions_text += f"   Question ID: {question_id}\n"
+        questions_text += f"   Options:\n"
+        for j, option in enumerate(options, 1):
+            if isinstance(option, dict):
+                value = option.get('value', 'N/A')
+                label = option.get('label', value)
+                questions_text += f"      {j}. {label} (value: {value})\n"
+            else:
+                questions_text += f"      {j}. {option}\n"
+    
+    # Create the prompt
+    prompt = f"""You are a customs classification expert. Based on the available context and product information, answer the classification questions.
 
 {context_summary}
 
 {questions_text}
 
 INSTRUCTIONS:
-1. Only answer questions where the available context provides clear evidence
-2. If context is insufficient, DO NOT include that question in your response
-3. Do not make assumptions or guesses beyond what the context explicitly indicates
-4. If you cannot determine an answer from the context, omit that question entirely
+1. Answer each question based on the available context and product information
+2. Use the product name and details to make intelligent inferences (e.g., "Tesla Model Y" = electric vehicle)
+3. If context is insufficient, make reasonable inferences based on product knowledge
+4. Return ONLY a JSON object with question IDs as keys and selected option values as values
 
-Return ONLY a JSON object with question IDs as keys and selected option values as values.
-Only include questions you can answer with confidence based on the available context.
-
-Example format (only include questions you can answer):
+Return format:
 {{
-  "question_1": "Selected Option"
+  "question_1": "Selected Option Value",
+  "question_2": "Selected Option Value"
 }}
-Note: If question_2 cannot be answered from context, do not include it in the response."""
-        
-        print(f"│       └── [LLM] Analyzing remaining questions with LLM...")
-        
-        # Show the exact prompt being sent to LLM
-        print(f"│       └── [LLM PROMPT]")
-        print(f"│           └── {prompt}")
-        
+
+Example:
+{{
+  "question_1": "Only electric motor",
+  "question_2": "Three years or less since manufacture"
+}}"""
+    
+    return prompt
+
+def _process_llm_classification(prompt: str, questions: List[Dict]) -> Dict[str, str]:
+    """
+    Process LLM classification and return answers.
+    """
+    try:
         response = reason_with_llm_fn(prompt)
-        
-        # Show the exact response from LLM
-        print(f"│       └── [LLM RESPONSE]")
-        print(f"│           └── {response}")
         
         # Parse JSON response
         import json
@@ -549,78 +525,17 @@ Note: If question_2 cannot be answered from context, do not include it in the re
             cleaned_response = cleaned_response.strip()
             
             llm_answers = json.loads(cleaned_response)
-            print(f"│       └── [LLM] Generated {len(llm_answers)} additional answers")
             return llm_answers
             
         except json.JSONDecodeError as e:
-            print(f"│       └── [ERROR] Failed to parse LLM response: {e}")
-            return {}
-            
-        except Exception as e:
-            print(f"│       └── [ERROR] LLM answering failed: {e}")
+            print(f"   ❌ Failed to parse LLM response: {e}")
             return {}
             
     except Exception as e:
-        print(f"│       └── [ERROR] LLM processing failed: {e}")
+        print(f"   ❌ LLM processing failed: {e}")
         return {}
 
-def _validate_llm_answers(llm_answers: Dict[str, str], questions: List[Dict], resolved_context: Dict[str, Any]) -> Dict[str, str]:
-    """
-    Validate LLM answers to ensure they have sufficient contextual evidence.
-    Reject answers that are based on assumptions rather than clear context.
-    """
-    validated_answers = {}
-    
-    for question in questions:
-        question_id = question.get('id', f'question_{questions.index(question) + 1}')
-        question_text = question.get('question', '').lower()
-        
-        # Check if LLM provided an answer for this question
-        if question_id in llm_answers:
-            answer = llm_answers[question_id]
-            
-            # Define validation rules for different question types
-            is_valid = False
-            
-            # Importer type questions - require explicit context
-            if 'importer' in question_text or 'type' in question_text:
-                # Only accept if there's explicit importer context
-                if 'importer_type' in resolved_context:
-                    is_valid = True
-                else:
-                    print(f"│       └── ❌ Rejected LLM answer for {question_id}: No importer context available")
-            
-            # Vehicle age questions - require year/age context
-            elif 'age' in question_text or 'old' in question_text or 'year' in question_text:
-                # Only accept if there's age context
-                if 'product_age_category' in resolved_context:
-                    is_valid = True
-                else:
-                    print(f"│       └── ❌ Rejected LLM answer for {question_id}: No age context available")
-            
-            # Propulsion questions - require propulsion context
-            elif 'propulsion' in question_text or 'motor' in question_text or 'electric' in question_text:
-                # Only accept if there's propulsion context
-                if 'product_specifications' in resolved_context:
-                    is_valid = True
-                else:
-                    print(f"│       └── ❌ Rejected LLM answer for {question_id}: No propulsion context available")
-            
-            # For other questions, be more permissive but still check for basic context
-            else:
-                # Accept if there's any relevant context
-                if resolved_context:
-                    is_valid = True
-                else:
-                    print(f"│       └── ❌ Rejected LLM answer for {question_id}: No context available")
-            
-            if is_valid:
-                validated_answers[question_id] = answer
-                print(f"│       └── ✅ Accepted LLM answer for {question_id}: {answer}")
-            else:
-                print(f"│       └── ❌ Rejected LLM answer for {question_id}: {answer} (insufficient context)")
-    
-    return validated_answers
+
 
 def stage8_show_context(stage7_results: dict, original_query: str, order_id: str = None, user_answers: dict = None) -> dict:
     """
@@ -756,8 +671,8 @@ def stage9_complete_loop(stage8_results: dict, stage5_results: dict = None, user
     for hs_code, stage8_data in stage8_results.items():
         print(f"\n├── {hs_code}: Completing the loop with user answers")
         
-        # Handle both 'context_displayed' and 'all_answers_provided' statuses
-        if stage8_data.get('status') in ['context_displayed', 'all_answers_provided']:
+        # Handle 'context_displayed', 'all_answers_provided', and 'no_input_needed' statuses
+        if stage8_data.get('status') in ['context_displayed', 'all_answers_provided', 'no_input_needed']:
             answered_questions = stage8_data.get('answered_questions', {})
             unanswered_questions = stage8_data.get('unanswered_questions', [])
             resolved_context = stage8_data.get('resolved_context', {})
@@ -781,12 +696,32 @@ def stage9_complete_loop(stage8_results: dict, stage5_results: dict = None, user
                 stage1_results = stage5_results.get('stage1_results', {})
                 
                 if stage5_context:
+                    # Display streamlined structure fields first
+                    if stage5_context.get('consignee_name'):
+                        print(f"│       │   ├── Consignee: {stage5_context['consignee_name']}")
+                    if stage5_context.get('shipper'):
+                        print(f"│       │   ├── Shipper: {stage5_context['shipper']}")
+                    if stage5_context.get('port_of_origin'):
+                        print(f"│       │   ├── Origin: {stage5_context['port_of_origin']}")
+                    if stage5_context.get('port_of_destination'):
+                        print(f"│       │   ├── Destination: {stage5_context['port_of_destination']}")
+                    if stage5_context.get('commodity'):
+                        commodity_preview = stage5_context['commodity'][:50] + "..." if len(stage5_context['commodity']) > 50 else stage5_context['commodity']
+                        print(f"│       │   ├── Commodity: {commodity_preview}")
+                    if stage5_context.get('weight'):
+                        print(f"│       │   ├── Weight: {stage5_context['weight']}")
+                    if stage5_context.get('vessel'):
+                        print(f"│       │   ├── Vessel: {stage5_context['vessel']}")
+                    if stage5_context.get('bill_of_lading'):
+                        print(f"│       │   ├── BOL: {stage5_context['bill_of_lading']}")
+                    
+                    # Legacy support for nested structure
                     if stage5_context.get('user_query'):
                         print(f"│       │   ├── User query: {stage5_context['user_query']}")
                     if stage5_context.get('invoice_data'):
                         invoice = stage5_context['invoice_data']
                         print(f"│       │   ├── Invoice: {invoice.get('invoice_number', 'N/A')} - {invoice.get('supplier', 'N/A')}")
-                    if stage5_context.get('bill_of_lading'):
+                    if stage5_context.get('bill_of_lading') and isinstance(stage5_context.get('bill_of_lading'), dict):
                         bol = stage5_context['bill_of_lading']
                         print(f"│       │   ├── Bill of Lading: {bol.get('bol_number', 'N/A')} - {bol.get('vessel', 'N/A')}")
                 
@@ -885,10 +820,16 @@ def stage10_final_selection(stage9_results: dict, product_name: str, product_inf
     for hs_code, stage9_data in stage9_results.items():
         print(f"\n├── {hs_code}: Performing final code selection")
         
-        if stage9_data.get('status') == 'complete':
+        if stage9_data.get('status') in ['complete', 'no_input_needed']:
             commodity_codes = stage9_data.get('commodity_codes', [])
-            complete_context = stage9_data.get('complete_context', {})
-            complete_answers = stage9_data.get('complete_answers', {})
+            
+            # Handle different data structures for different statuses
+            if stage9_data.get('status') == 'complete':
+                complete_context = stage9_data.get('complete_context', {})
+                complete_answers = stage9_data.get('complete_answers', {})
+            else:  # 'no_input_needed' or 'all_answers_provided' status
+                complete_context = stage9_data.get('resolved_context', {})
+                complete_answers = stage9_data.get('answered_questions', {})
             
             print(f"│   └── [SELECTION] Selecting from {len(commodity_codes)} commodity codes")
             print(f"│       └── Using Stage 9 complete context:")
@@ -1102,59 +1043,129 @@ def run_10_stage_workflow(hs_codes: list[str], product_name: str, product_info_t
 def _process_direct_context(contextual_data: Dict[str, Any]) -> Dict[str, Any]:
     """
     Process direct contextual data into standardized format for classification.
+    Now handles clean, flat structure directly.
     """
-    print(f"\n🔄 PROCESSING DIRECT CONTEXTUAL DATA")
-    print("-" * 50)
-    
     processed_context = {}
     
-    # Process user query (for individual user requests)
-    user_query = contextual_data.get('user_query', '')
-    if user_query:
-        print(f"✅ Processing user query: {user_query}")
-        # Extract context from user query using the same logic as extract_context_from_query
-        query_context = extract_context_from_query(user_query, "", "")
-        processed_context.update(query_context)
-        print(f"✅ Extracted context from user query: {list(query_context.keys())}")
+    # Direct mapping from clean structure - no complex processing needed
+    if contextual_data.get('consignee_name'):
+        processed_context['importer_type'] = _determine_importer_type_from_name(contextual_data['consignee_name'])
+        processed_context['usage_purpose'] = _determine_usage_purpose_from_name(contextual_data['consignee_name'])
     
-    # Process buyer information
+    if contextual_data.get('shipper'):
+        processed_context['supplier_name'] = contextual_data['shipper']
+    
+    if contextual_data.get('shipper_address'):
+        processed_context['supplier_address'] = contextual_data['shipper_address']
+    
+    if contextual_data.get('commodity'):
+        processed_context['product_specifications'] = contextual_data['commodity']
+    
+    if contextual_data.get('port_of_origin'):
+        processed_context['origin_country'] = _extract_country_from_port(contextual_data['port_of_origin'])
+    
+    if contextual_data.get('weight'):
+        processed_context['size_weight_category'] = _determine_weight_category(contextual_data['weight'])
+    
+    if contextual_data.get('extraction_confidence'):
+        processed_context['extraction_confidence'] = contextual_data['extraction_confidence']
+    
+    # Handle nested structure for backward compatibility
     buyer_info = contextual_data.get('buyer_info', {})
     if buyer_info:
         processed_context['importer_type'] = _determine_importer_type_from_buyer(buyer_info)
         processed_context['usage_purpose'] = _determine_usage_purpose_from_buyer(buyer_info)
-        print(f"✅ Processed buyer info: {buyer_info.get('name', 'Unknown')}")
     
-    # Process supplier information
     supplier_info = contextual_data.get('supplier_info', {})
     if supplier_info:
         processed_context['supplier_name'] = supplier_info.get('name', '')
         processed_context['supplier_address'] = supplier_info.get('address', '')
-        print(f"✅ Processed supplier info: {supplier_info.get('name', 'Unknown')}")
     
-    # Process product details
     product_details = contextual_data.get('product_details', {})
     if product_details:
         processed_context['product_specifications'] = _extract_product_specs_from_details(product_details)
         processed_context['value_category'] = _determine_value_category_from_details(product_details)
         processed_context['quantity_category'] = _determine_quantity_category_from_details(product_details)
-        print(f"✅ Processed product details: {product_details.get('description', 'Unknown')}")
     
-    # Process shipping information
     shipping_info = contextual_data.get('shipping_info', {})
     if shipping_info:
         processed_context['origin_country'] = _extract_origin_country_from_shipping(shipping_info)
         processed_context['size_weight_category'] = _determine_size_weight_from_shipping(shipping_info)
-        print(f"✅ Processed shipping info: {shipping_info.get('port_of_origin', 'Unknown')}")
     
-    # Process document metadata
     doc_metadata = contextual_data.get('document_metadata', {})
     if doc_metadata:
         processed_context['product_age_category'] = _determine_age_from_metadata(doc_metadata)
         processed_context['extraction_confidence'] = doc_metadata.get('extraction_confidence', 'unknown')
-        print(f"✅ Processed document metadata: {doc_metadata.get('invoice_date', 'Unknown date')}")
     
-    print(f"📊 Processed context keys: {list(processed_context.keys())}")
     return processed_context
+
+def _determine_importer_type_from_name(name: str) -> str:
+    """Determine importer type from name string."""
+    name_upper = name.upper()
+    
+    # Check for commercial indicators
+    commercial_patterns = [
+        r'(INC|LLC|LTD|CORP|COMPANY|CO\.|ENTERPRISE)',
+        r'(IMPORT|EXPORT|TRADING|WHOLESALE|RETAIL)',
+    ]
+    
+    for pattern in commercial_patterns:
+        if re.search(pattern, name_upper):
+            return 'dealer'
+    
+    # Check for individual name patterns
+    individual_patterns = [
+        r'^[A-Z][a-z]+ [A-Z][a-z]+$',  # First Last
+        r'^[A-Z][a-z]+ [A-Z]\. [A-Z][a-z]+$',  # First M. Last
+    ]
+    
+    for pattern in individual_patterns:
+        if re.match(pattern, name.title()):
+            return 'individual'
+    
+    return 'unknown'
+
+def _determine_usage_purpose_from_name(name: str) -> str:
+    """Determine usage purpose from name string."""
+    name_upper = name.upper()
+    
+    # Check for commercial/resale indicators
+    commercial_patterns = [
+        r'(INC|LLC|LTD|CORP|COMPANY|CO\.|ENTERPRISE)',
+        r'(IMPORT|EXPORT|TRADING|WHOLESALE|RETAIL|DEALER)',
+    ]
+    
+    for pattern in commercial_patterns:
+        if re.search(pattern, name_upper):
+            return 'commercial'
+    
+    return 'personal'
+
+def _extract_country_from_port(port_string: str) -> str:
+    """Extract country from port string like 'Port of Miami, USA'."""
+    if ',' in port_string:
+        return port_string.split(',')[-1].strip()
+    return ''
+
+def _determine_weight_category(weight_string: str) -> str:
+    """Determine weight category from weight string like '2,003 KGS'."""
+    import re
+    
+    # Extract numeric value
+    weight_match = re.search(r'([\d,]+)', weight_string.replace(',', ''))
+    if weight_match:
+        try:
+            weight_kg = float(weight_match.group(1))
+            if weight_kg < 100:
+                return 'light'
+            elif weight_kg < 1000:
+                return 'medium'
+            else:
+                return 'heavy'
+        except:
+            pass
+    
+    return 'unknown'
 
 def _determine_importer_type_from_buyer(buyer_info: Dict[str, Any]) -> str:
     """Determine importer type from buyer information."""
@@ -1315,127 +1326,6 @@ def _determine_age_from_metadata(doc_metadata: Dict[str, Any]) -> str:
     except Exception:
         return 'three_years_and_less'
 
-def map_context_to_answers(questions: List[Dict], extracted_context: Dict[str, Any]) -> Dict[str, str]:
-    """
-    Map extracted context directly to question answers using predefined mappings.
-    """
-    answers = {}
-    
-    print(f"\n🎯 MAPPING EXTRACTED CONTEXT TO ANSWERS")
-    print("-" * 50)
-    
-    for i, question in enumerate(questions, 1):
-        question_id = question.get('id', f'question_{i}')
-        question_text = question.get('question', '')
-        question_options = question.get('options', [])
-        
-        print(f"\nQ{i}: {question_text}")
-        print(f"   Options: {question_options}")
-        
-        # Map context to answers based on question type
-        answer = None
-        
-        # Importer Type mapping
-        if "importer" in question_text.lower() or "type of importer" in question_text.lower():
-            importer_type = extracted_context.get('importer_type', '')
-            if importer_type == 'individual':
-                answer = 'Individual'
-            elif importer_type == 'dealer':
-                answer = 'Dealer'
-            print(f"   Context: importer_type = {importer_type}")
-        
-        # Vehicle Age mapping
-        elif "age" in question_text.lower() or "old" in question_text.lower():
-            age_category = extracted_context.get('product_age_category', '')
-            if age_category == 'three_years_and_less':
-                answer = 'Three years or less since manufacture'
-            elif age_category == 'exceeding_three_years':
-                answer = 'Exceeding three years since manufacture'
-            print(f"   Context: product_age_category = {age_category}")
-        
-        # Propulsion Type mapping
-        elif "propulsion" in question_text.lower() or "motor" in question_text.lower():
-            # Check product specifications for propulsion type
-            product_specs = extracted_context.get('product_specifications', {})
-            
-            # Look for electric motor indicators in product specs
-            if product_specs.get('battery_type'):
-                answer = 'Only electric motor'
-            elif product_specs.get('has_solar_panels'):
-                answer = 'Only electric motor'
-            print(f"   Context: product_specifications = {product_specs}")
-        
-        # Usage Purpose mapping
-        elif "usage" in question_text.lower() or "purpose" in question_text.lower():
-            usage_purpose = extracted_context.get('usage_purpose', '')
-            if usage_purpose == 'personal':
-                answer = 'Personal use'
-            elif usage_purpose == 'commercial':
-                answer = 'Commercial use'
-            print(f"   Context: usage_purpose = {usage_purpose}")
-        
-        # Value Category mapping
-        elif "value" in question_text.lower() or "price" in question_text.lower():
-            value_category = extracted_context.get('value_category', '')
-            if value_category == 'low_value':
-                answer = 'Low value (under $500)'
-            elif value_category == 'medium_value':
-                answer = 'Medium value ($500-$2000)'
-            elif value_category == 'high_value':
-                answer = 'High value ($2000-$10000)'
-            elif value_category == 'very_high_value':
-                answer = 'Very high value (over $10000)'
-            print(f"   Context: value_category = {value_category}")
-        
-        # Quantity Category mapping
-        elif "quantity" in question_text.lower() or "number" in question_text.lower():
-            quantity_category = extracted_context.get('quantity_category', '')
-            if quantity_category == 'single_unit':
-                answer = 'Single unit'
-            elif quantity_category == 'small_quantity':
-                answer = 'Small quantity (2-5 units)'
-            elif quantity_category == 'medium_quantity':
-                answer = 'Medium quantity (6-20 units)'
-            elif quantity_category == 'bulk_quantity':
-                answer = 'Bulk quantity (20+ units)'
-            print(f"   Context: quantity_category = {quantity_category}")
-        
-        # Check if answer matches available options
-        # Extract option values for comparison (handle both string and dict formats)
-        option_values = []
-        for option in question_options:
-            if isinstance(option, dict):
-                option_values.append(option.get('value', option.get('label', '')))
-            else:
-                option_values.append(option)
-        
-        if answer and answer in option_values:
-            # Find the matching option and use its value
-            for option in question_options:
-                if isinstance(option, dict):
-                    if option.get('value') == answer or option.get('label') == answer:
-                        answers[question_id] = option.get('value', answer)
-                        break
-                else:
-                    if option == answer:
-                        answers[question_id] = answer
-                        break
-            print(f"   ✅ Mapped to: {answer}")
-        elif answer:
-            # Try to find partial match
-            for option in question_options:
-                option_text = option.get('value', option.get('label', '')) if isinstance(option, dict) else option
-                if answer.lower() in option_text.lower() or option_text.lower() in answer.lower():
-                    answers[question_id] = option.get('value', option_text) if isinstance(option, dict) else option
-                    print(f"   ✅ Partial match: {option_text}")
-                    break
-            else:
-                print(f"   ❌ No match found for: {answer}")
-        else:
-            print(f"   ❌ No context mapping available")
-    
-    print(f"\n📊 MAPPING RESULTS: {len(answers)}/{len(questions)} questions answered")
-    return answers
 
 def extract_context_from_query(original_question: str, product_name: str, product_info_text: str) -> Dict[str, Any]:
     """
@@ -1559,7 +1449,7 @@ def reason_with_llm_fn(prompt: str, hs_code: str = None) -> str:
         {"role": "system", "content": "You are an expert in HS Code classification. Always respond in the exact format requested."},
         {"role": "user", "content": prompt}
     ]
-    return chat_completion(messages, model_alias="mistral_small")
+    return chat_completion(messages, model_alias="gpt_5")
 
 def chat_completion(messages, model_alias="mistral_small"):
     """
@@ -2139,7 +2029,14 @@ Analyze the complete business context and user responses to select the most appr
 - Select the most precise classification available
 
 📤 RESPONSE FORMAT:
-Respond with ONLY the number (1, 2, 3, etc.) of the most appropriate commodity code, or "REJECT" if none of the codes are appropriate for this product based on the comprehensive context provided.
+Respond with a JSON object containing your selection:
+{{"selection": "1"}} for option 1
+{{"selection": "2"}} for option 2
+{{"selection": "REJECT"}} if none are appropriate
+
+Examples:
+{{"selection": "2"}}
+{{"selection": "REJECT"}}
 """
             
             # Call LLM
@@ -2149,19 +2046,19 @@ Respond with ONLY the number (1, 2, 3, etc.) of the most appropriate commodity c
                 self.logger.error("Empty response from LLM")
                 return None
             
-            # Parse response
-            response = response.strip()
-            
-            if response.upper() == "REJECT":
-                self.logger.info("LLM rejected all commodity codes as inappropriate")
-                return None
-            
+            # Parse JSON response
             try:
-                # Try to extract number from response
-                import re
-                number_match = re.search(r'\b(\d+)\b', response)
-                if number_match:
-                    selected_index = int(number_match.group(1)) - 1
+                import json
+                response_data = json.loads(response.strip())
+                selection = response_data.get('selection', '').strip()
+                
+                if selection.upper() == "REJECT":
+                    self.logger.info("LLM rejected all commodity codes as inappropriate")
+                    return None
+                
+                # Try to parse the selection as a number
+                try:
+                    selected_index = int(selection) - 1
                     if 0 <= selected_index < len(commodity_codes):
                         selected_code = commodity_codes[selected_index]
                         self.logger.info(f"LLM selected commodity code: {selected_code['tariff_code']}")
@@ -2169,12 +2066,13 @@ Respond with ONLY the number (1, 2, 3, etc.) of the most appropriate commodity c
                     else:
                         self.logger.error(f"LLM selected invalid index: {selected_index}")
                         return None
-                else:
-                    self.logger.error(f"Could not parse number from LLM response: {response}")
+                        
+                except ValueError:
+                    self.logger.error(f"Could not parse selection as number: {selection}")
                     return None
                     
-            except (ValueError, IndexError) as e:
-                self.logger.error(f"Error parsing LLM response: {e}")
+            except json.JSONDecodeError as e:
+                self.logger.error(f"Could not parse LLM JSON response: {e}")
                 return None
                 
         except Exception as e:

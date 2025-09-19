@@ -57,6 +57,12 @@ OPENROUTER_GENERAL_MODELS = {
         "description": "OpenAI GPT-5 Mini",
         "temperature": 0.7,
         "max_tokens": 1000
+    },
+    "gpt_5": {
+        "name": "openai/gpt-5",
+        "description": "OpenAI GPT-5",
+        "temperature": 0.7,
+        "max_tokens": 1000
     }
 }
 

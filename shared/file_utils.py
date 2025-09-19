@@ -20,7 +20,7 @@ MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
 
 def create_order_directory(order_number: str) -> str:
     """
-    Create directory structure for an order
+    Create directory structure for an order using the new processed_orders structure
     
     Args:
         order_number (str): Order number
@@ -29,12 +29,12 @@ def create_order_directory(order_number: str) -> str:
         str: Path to the order directory
     """
     try:
-        # Base uploads directory
-        base_dir = Path("uploads/orders")
+        # Base processed_orders directory
+        base_dir = Path("processed_orders")
         order_dir = base_dir / order_number
         
-        # Create subdirectories
-        subdirs = ["invoices", "bills_of_lading", "arrival_notices"]
+        # Create subdirectories matching the new structure
+        subdirs = ["file_uploads", "invoices", "bills_of_lading", "esad_files"]
         
         for subdir in subdirs:
             (order_dir / subdir).mkdir(parents=True, exist_ok=True)
@@ -78,7 +78,7 @@ def validate_file_upload(file_path: str, file_size: int) -> Tuple[bool, str]:
 
 def save_document_file(temp_file_path: str, order_number: str, document_type: str, original_filename: str) -> Tuple[bool, str]:
     """
-    Save uploaded document to appropriate directory
+    Save uploaded document to appropriate directory using the new processed_orders structure
     
     Args:
         temp_file_path (str): Path to temporary uploaded file
@@ -102,11 +102,11 @@ def save_document_file(temp_file_path: str, order_number: str, document_type: st
         if not order_dir:
             return False, "Failed to create order directory"
         
-        # Map document type to directory
+        # All documents go to file_uploads first (staging area)
         type_to_dir = {
-            'invoice': 'invoices',
-            'bill_of_lading': 'bills_of_lading',
-            'arrival_notice': 'arrival_notices'
+            'invoice': 'file_uploads',
+            'bill_of_lading': 'file_uploads', 
+            'arrival_notice': 'file_uploads'
         }
         
         if document_type not in type_to_dir:
@@ -124,8 +124,8 @@ def save_document_file(temp_file_path: str, order_number: str, document_type: st
         # Copy file to destination
         shutil.copy2(temp_file_path, dest_path)
         
-        # Return relative path for database storage
-        relative_path = f"uploads/orders/{order_number}/{type_to_dir[document_type]}/{new_filename}"
+        # Return relative path for database storage (updated for new structure)
+        relative_path = f"processed_orders/{order_number}/{type_to_dir[document_type]}/{new_filename}"
         
         print(f"✅ File saved: {relative_path}")
         return True, relative_path
@@ -135,7 +135,7 @@ def save_document_file(temp_file_path: str, order_number: str, document_type: st
 
 def get_document_path(order_number: str, document_type: str, filename: str) -> str:
     """
-    Get full path to a document file
+    Get full path to a document file using the new processed_orders structure
     
     Args:
         order_number (str): Order number
@@ -145,16 +145,17 @@ def get_document_path(order_number: str, document_type: str, filename: str) -> s
     Returns:
         str: Full path to document
     """
+    # All documents start in file_uploads (staging area)
     type_to_dir = {
-        'invoice': 'invoices',
-        'bill_of_lading': 'bills_of_lading',
-        'arrival_notice': 'arrival_notices'
+        'invoice': 'file_uploads',
+        'bill_of_lading': 'file_uploads',
+        'arrival_notice': 'file_uploads'
     }
     
     if document_type not in type_to_dir:
         return ""
     
-    return f"uploads/orders/{order_number}/{type_to_dir[document_type]}/{filename}"
+    return f"processed_orders/{order_number}/{type_to_dir[document_type]}/{filename}"
 
 def delete_document_file(file_path: str) -> bool:
     """

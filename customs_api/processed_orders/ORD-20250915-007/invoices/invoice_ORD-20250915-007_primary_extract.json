@@ -1,0 +1,47 @@
+{
+  "supplier": {
+    "name": "Tesla Inc.",
+    "address": "{'street': '3500 Deer Creek Road', 'city': 'Palo Alto', 'state': 'CA', 'postal_code': '94304', 'country': 'USA'}",
+    "contact": {}
+  },
+  "invoice_details": {
+    "invoice_number": "INV-2023-TESLA-001",
+    "date": "September 4, 2025",
+    "terms_of_sale": "CIF Kingston (Incoterms 2020)",
+    "currency": "USD"
+  },
+  "items": [
+    {
+      "description": "Tesla Model Y 2023 (Electric SUV)",
+      "quantity_number": 1,
+      "quantity_unit": "unit",
+      "unit_price": 52000.0,
+      "total_price": 52000.0
+    },
+    {
+      "description": "Shipping Cost",
+      "quantity_number": 1,
+      "quantity_unit": "unit",
+      "unit_price": 3000.0,
+      "total_price": 3000.0
+    }
+  ],
+  "totals": {
+    "total_cost": 55000,
+    "total_invoice_value": 55000
+  },
+  "shipping": {
+    "delivery_terms": "CIF Kingston (Incoterms 2020)",
+    "delivery_port": "Kingston"
+  },
+  "payment_terms": {},
+  "document_type": "invoice",
+  "extraction_confidence": "high",
+  "_metadata": {
+    "extraction_timestamp": "2025-09-15T21:48:38.468601",
+    "source_file": "processed_orders\\ORD-20250915-007\\file_uploads\\invoice_20250915_214808.pdf",
+    "processor": "claude_sonnet_4_via_openrouter",
+    "model": "openai/gpt-5-mini",
+    "processing_method": "pdf_to_image_conversion"
+  }
+}

@@ -48,6 +48,7 @@ from config import SUPABASE_URL, SUPABASE_KEY
 
 # Session storage (in production, use Redis or database)
 classification_sessions = {}
+classification_tasks = {}
 
 class HSCodeOrchestrator:
     """Orchestrates the complete HS code classification pipeline"""
@@ -319,7 +320,21 @@ class ClarificationQuestion(BaseModel):
     validation: Optional[Dict[str, Any]] = None
 
 class ContextualData(BaseModel):
-    """Rich contextual data for enhanced classification"""
+    """Streamlined contextual data for enhanced classification"""
+    # Clean flat structure (preferred)
+    consignee_name: Optional[str] = None
+    consignee_address: Optional[str] = None
+    shipper: Optional[str] = None
+    shipper_address: Optional[str] = None
+    port_of_origin: Optional[str] = None
+    port_of_destination: Optional[str] = None
+    weight: Optional[str] = None
+    commodity: Optional[str] = None
+    vessel: Optional[str] = None
+    bill_of_lading: Optional[str] = None
+    extraction_confidence: Optional[str] = None
+    
+    # Legacy nested structure (for backward compatibility)
     buyer_info: Optional[Dict[str, Any]] = None
     supplier_info: Optional[Dict[str, Any]] = None
     product_details: Optional[Dict[str, Any]] = None
@@ -731,6 +746,8 @@ async def root():
             "GET / - API information",
             "GET /health - Health check endpoint",
             "POST /classify - Classify a product (send JSON body)",
+            "POST /classify/async - Start async classification (returns immediately)",
+            "GET /classify/status/{task_id} - Check async classification status",
             "POST /classify/stream - Stream classification results in real-time",
             "POST /classify/continue - Continue classification with clarification answers",
             "GET /classify/{product_name} - Classify a product via URL"
@@ -1050,6 +1067,78 @@ async def classify_product_endpoint(request: ClassificationRequest):
         print(f"❌ Classification error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/classify/async", response_model=Dict[str, Any])
+async def classify_product_async(request: ClassificationRequest):
+    """
+    Start async classification and return immediately with a task ID.
+    The actual classification runs in the background.
+    """
+    import uuid
+    task_id = str(uuid.uuid4())
+    
+    # Store task in memory (in production, use Redis or database)
+    classification_tasks[task_id] = {
+        "status": "pending",
+        "result": None,
+        "error": None,
+        "created_at": datetime.now().isoformat()
+    }
+    
+    # Start background task
+    asyncio.create_task(process_classification_async(task_id, request))
+    
+    return {
+        "task_id": task_id,
+        "status": "pending",
+        "message": "Classification started. Use /classify/status/{task_id} to check progress."
+    }
+
+async def process_classification_async(task_id: str, request: ClassificationRequest):
+    """
+    Background task to process classification asynchronously.
+    """
+    try:
+        # Update task status
+        classification_tasks[task_id]["status"] = "processing"
+        
+        # Run the classification pipeline
+        results = orchestrator.classify_complete_pipeline(
+            request.product_name,
+            order_id=request.order_id,
+            original_query=request.product_name,
+            contextual_data=request.contextual_data.dict() if request.contextual_data else None,
+            user_answers=request.user_answers
+        )
+        
+        # Extract final results
+        final_results = results.get("final_results", {})
+        commodity_results = results.get("stage3_commodity_lookup", {})
+        
+        # Get the confirmed HS code and selected commodity
+        confirmed_code = final_results.get("confirmed_hs_code")
+        selected_commodity = None
+        for hs_code, codes in commodity_results.items():
+            if codes and isinstance(codes, list) and len(codes) > 0:
+                selected_commodity = codes[0]
+                break
+        
+        # Build response
+        response = {
+            "product_name": request.product_name,
+            "hs_code": confirmed_code,
+            "commodity_code": selected_commodity.get("tariff_code") if selected_commodity else None,
+            "description": selected_commodity.get("description") if selected_commodity else None
+        }
+        
+        # Update task with results
+        classification_tasks[task_id]["status"] = "completed"
+        classification_tasks[task_id]["result"] = response
+        
+    except Exception as e:
+        # Update task with error
+        classification_tasks[task_id]["status"] = "failed"
+        classification_tasks[task_id]["error"] = str(e)
+
 @app.post("/classify/continue", response_model=SimplifiedResponse)
 async def continue_classification(request: ClarificationRequest):
     """
@@ -1192,6 +1281,35 @@ async def continue_classification(request: ClarificationRequest):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/classify/status/{task_id}", response_model=Dict[str, Any])
+async def get_classification_status(task_id: str):
+    """
+    Get the status and result of an async classification task.
+    """
+    if task_id not in classification_tasks:
+        raise HTTPException(status_code=404, detail="Task not found")
+    
+    task = classification_tasks[task_id]
+    
+    if task["status"] == "completed":
+        return {
+            "task_id": task_id,
+            "status": "completed",
+            "result": task["result"]
+        }
+    elif task["status"] == "failed":
+        return {
+            "task_id": task_id,
+            "status": "failed",
+            "error": task["error"]
+        }
+    else:
+        return {
+            "task_id": task_id,
+            "status": "pending",
+            "message": "Classification in progress..."
+        }
 
 @app.get("/classify/{product_name}", response_model=SimplifiedResponse)
 async def classify_product_get(

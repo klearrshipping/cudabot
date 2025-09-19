@@ -1,0 +1,17 @@
+{
+  "timestamp": "2025-09-17T06:17:05.523396",
+  "source_document": "extracted_data",
+  "primary_model": "mistralai/mistral-small-3.1-24b-instruct:free",
+  "backup_model": "openai/gpt-4o-mini:free",
+  "result": {
+    "regime_type": "EX1",
+    "procedure_code": 1,
+    "description": "Permanent Export",
+    "confidence": "high",
+    "reasoning": "The shipment is an export, and there are no commercial indicators present. The shipment is not containerized, and there is no entity name or commercial keywords found. Since the shipment is for export and there are no special circumstances documented, the appropriate regime type is EX1 - Permanent Export.",
+    "import_export_direction": "Export",
+    "commercial_determination": "Personal",
+    "processing_time": 2.1751949787139893,
+    "model_used": "mistralai/mistral-small-3.1-24b-instruct:free"
+  }
+}
