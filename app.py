@@ -11,13 +11,14 @@ from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 import os
 import sys
-from typing import Optional
+from typing import Optional, List
 import json
 from datetime import datetime
 
 # Add the modules directory to the path
-sys.path.append(os.path.join(os.path.dirname(__file__), 'modules'))
-sys.path.append(os.path.join(os.path.dirname(__file__), 'orders'))
+sys.path.append(os.path.join(os.path.dirname(__file__), 'customs_api'))
+sys.path.append(os.path.join(os.path.dirname(__file__), 'customs_api', 'modules'))
+sys.path.append(os.path.join(os.path.dirname(__file__), 'customs_api', 'shared'))
 sys.path.append(os.path.join(os.path.dirname(__file__), 'shared'))
 
 # Import our modules
@@ -57,7 +58,7 @@ async def read_index():
 
 @app.post("/api/upload-documents")
 async def upload_documents(
-    invoice: UploadFile = File(..., description="Invoice document"),
+    invoices: List[UploadFile] = File(..., description="Invoice documents (multiple allowed)"),
     bill_of_lading: UploadFile = File(..., description="Bill of lading document"),
     arrival_notice: Optional[UploadFile] = File(None, description="Arrival notice (optional)"),
     client_id: int = Form(1, description="Client ID"),
@@ -66,27 +67,40 @@ async def upload_documents(
     """
     Upload documents for customs declaration processing
     
-    - **invoice**: Required invoice document
+    - **invoices**: Required invoice documents (multiple allowed)
     - **bill_of_lading**: Required bill of lading document  
     - **arrival_notice**: Optional arrival notice document
     - **client_id**: Client ID for the order
     - **description**: Optional order description
     """
     try:
+        # Debug logging
+        print(f"🔍 DEBUG: Received {len(invoices) if invoices else 0} invoice files")
+        print(f"🔍 DEBUG: Received BOL: {bill_of_lading.filename if bill_of_lading else 'None'}")
+        
         # Validate required files
-        if not invoice or not bill_of_lading:
-            raise HTTPException(status_code=400, detail="Invoice and bill of lading are required")
+        if not invoices or len(invoices) == 0 or not bill_of_lading:
+            raise HTTPException(status_code=400, detail="At least one invoice and bill of lading are required")
         
         # Validate file types
         allowed_extensions = {'.pdf', '.jpg', '.jpeg', '.png', '.tiff', '.tif'}
         
-        for file, file_type in [(invoice, "invoice"), (bill_of_lading, "bill_of_lading")]:
-            file_ext = os.path.splitext(file.filename)[1].lower()
+        # Validate all invoice files
+        for i, invoice in enumerate(invoices):
+            file_ext = os.path.splitext(invoice.filename)[1].lower()
             if file_ext not in allowed_extensions:
                 raise HTTPException(
                     status_code=400, 
-                    detail=f"{file_type} file type {file_ext} not allowed. Allowed types: {', '.join(allowed_extensions)}"
+                    detail=f"Invoice {i+1} file type {file_ext} not allowed. Allowed types: {', '.join(allowed_extensions)}"
                 )
+        
+        # Validate bill of lading
+        bol_ext = os.path.splitext(bill_of_lading.filename)[1].lower()
+        if bol_ext not in allowed_extensions:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Bill of lading file type {bol_ext} not allowed. Allowed types: {', '.join(allowed_extensions)}"
+            )
         
         # Create order
         order_data = OrderCreate(client_id=client_id, description=description)
@@ -101,19 +115,34 @@ async def upload_documents(
         # Save files and create document records
         documents_created = []
         
-        # Process invoice
-        invoice_success, invoice_path = await save_uploaded_file(
-            invoice, order_number, "invoice", order_id
-        )
-        if invoice_success:
-            documents_created.append("invoice")
+        # Process multiple invoices
+        invoice_paths = []
+        print(f"🔍 DEBUG: Processing {len(invoices)} invoice files...")
+        for i, invoice in enumerate(invoices):
+            print(f"🔍 DEBUG: Processing invoice {i+1}: {invoice.filename}")
+            invoice_success, invoice_path = await save_uploaded_file(
+                invoice, order_number, f"invoice_{i+1}", order_id
+            )
+            print(f"🔍 DEBUG: Invoice {i+1} result: success={invoice_success}, path={invoice_path}")
+            if invoice_success:
+                invoice_paths.append(invoice_path)
+                documents_created.append(f"invoice_{i+1}")
+            else:
+                print(f"❌ DEBUG: Invoice {i+1} failed to save: {invoice_path}")
         
         # Process bill of lading
+        print(f"🔍 DEBUG: Processing BOL: {bill_of_lading.filename}")
+        
         bol_success, bol_path = await save_uploaded_file(
             bill_of_lading, order_number, "bill_of_lading", order_id
         )
+        print(f"🔍 DEBUG: BOL result: success={bol_success}, path={bol_path}")
         if bol_success:
             documents_created.append("bill_of_lading")
+        else:
+            print(f"❌ DEBUG: BOL failed to save: {bol_path}")
+            # Don't continue processing if BOL fails - it's required
+            raise HTTPException(status_code=500, detail=f"Failed to save BOL: {bol_path}")
         
         # Process arrival notice (optional)
         arrival_path = None
@@ -130,34 +159,37 @@ async def upload_documents(
         # Start automatic document processing
         processing_started = False
         try:
-            from modules.extraction_process.document_processor import DocumentProcessor
-            processor = DocumentProcessor()
-            
-            # Process documents in background (non-blocking)
-            import threading
-            processing_thread = threading.Thread(
-                target=processor.process_order_documents,
-                args=(order_number,)
-            )
-            processing_thread.daemon = True
-            processing_thread.start()
-            
-            print(f"🔄 Started automatic processing for order: {order_number}")
-            processing_started = True
+            # Change to customs_api directory for processing
+            original_cwd = os.getcwd()
+            try:
+                os.chdir('customs_api')
+                from modules.extraction_process.document_processor import DocumentProcessor
+                processor = DocumentProcessor()
+                
+                # Process documents synchronously to see errors
+                print(f"🔄 Starting document processing for order: {order_number}")
+                result = processor.process_order_documents(order_number)
+                print(f"✅ Document processing completed: {result}")
+                processing_started = True
+            finally:
+                os.chdir(original_cwd)
             
         except Exception as e:
             print(f"⚠️ Automatic processing failed: {e}")
+            import traceback
+            traceback.print_exc()
             # Continue with upload success even if processing fails
         
         return {
             "success": True,
-            "message": "Documents uploaded successfully and processing started",
+            "message": f"Documents uploaded successfully - {len(invoices)} invoice(s) + BOL - Processing started",
             "order": {
                 "id": order_id,
                 "order_number": order_number,
                 "status": order['status']
             },
             "documents_uploaded": documents_created,
+            "invoice_count": len(invoices),
             "validation": validation,
             "processing_started": processing_started,
             "timestamp": datetime.now().isoformat()
@@ -181,46 +213,78 @@ async def save_uploaded_file(
         tuple: (success, file_path_or_error)
     """
     try:
+        print(f"🔍 DEBUG: Starting save_uploaded_file for {document_type}: {file.filename}")
+        
         # Create temporary file
         temp_file_path = f"temp/{file.filename}"
         os.makedirs("temp", exist_ok=True)
         
         # Save uploaded file temporarily
+        print(f"🔍 DEBUG: Reading file content...")
+        content = await file.read()
+        print(f"🔍 DEBUG: Read {len(content)} bytes")
+        
         with open(temp_file_path, "wb") as buffer:
-            content = file.file.read()
             buffer.write(content)
         
-        # Save to proper location
-        success, result = save_document_file(
-            temp_file_path,
-            order_number,
-            document_type,
-            file.filename
-        )
+        print(f"🔍 DEBUG: Saved temp file: {temp_file_path}")
+        
+        # Save to proper location in customs_api/processed_orders
+        # Change to customs_api directory temporarily to use the correct path
+        original_cwd = os.getcwd()
+        try:
+            os.chdir('customs_api')
+            print(f"🔍 DEBUG: Changed to customs_api directory")
+            success, result = save_document_file(
+                f"../{temp_file_path}",
+                order_number,
+                document_type,
+                file.filename
+            )
+            print(f"🔍 DEBUG: save_document_file returned: success={success}, result={result}")
+        finally:
+            os.chdir(original_cwd)
+            print(f"🔍 DEBUG: Restored to original directory")
         
         # Clean up temp file
         if os.path.exists(temp_file_path):
             os.remove(temp_file_path)
+            print(f"🔍 DEBUG: Cleaned up temp file")
         
         if not success:
+            print(f"❌ DEBUG: save_document_file failed: {result}")
             return False, result
         
         # Create document record in database
+        # Use base document type for database (invoice_1 -> invoice, bill_of_lading -> bill_of_lading)
+        if document_type == 'bill_of_lading':
+            base_document_type = 'bill_of_lading'
+        elif document_type.startswith('invoice_') and document_type.split('_')[1].isdigit():
+            base_document_type = 'invoice'
+        else:
+            base_document_type = document_type
+        
         document_data = {
             "order_id": order_id,
-            "document_type": document_type,
+            "document_type": base_document_type,
             "file_path": result,
             "file_name": file.filename,
             "file_size": len(content)
         }
         
+        print(f"🔍 DEBUG: Creating document record: {document_data}")
         doc_record = create_document_record(document_data)
         if not doc_record:
             print(f"⚠️  Warning: Failed to create document record for {document_type}")
+        else:
+            print(f"✅ DEBUG: Created document record for {document_type}")
         
         return True, result
         
     except Exception as e:
+        print(f"❌ DEBUG: Exception in save_uploaded_file: {e}")
+        import traceback
+        traceback.print_exc()
         return False, str(e)
 
 @app.get("/api/orders/{order_id}")

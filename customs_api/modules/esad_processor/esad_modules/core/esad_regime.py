@@ -16,7 +16,7 @@ from pathlib import Path
 # Add parent directory to path to import config
 import sys
 import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', '..', '..'))
 from config import OPENROUTER_API_KEY, OPENROUTER_URL, OPENROUTER_HEADERS
 
 @dataclass
@@ -684,7 +684,8 @@ OUTPUT FORMAT:
         """Parse LLM response and create result object"""
         
         print(f"🔍 Parsing LLM response...")
-        print(f"📝 Raw LLM content: {content[:200]}...")
+        print(f"📝 Raw LLM content: {content}")
+        print(f"📏 Response length: {len(content)} characters")
         
         try:
             # Try to extract JSON from response

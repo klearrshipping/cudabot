@@ -1,0 +1,17 @@
+{
+  "timestamp": "2025-09-20T08:51:11.366280",
+  "source_document": "extracted_data",
+  "primary_model": "openai/gpt-5-nano",
+  "backup_model": "openai/gpt-5-mini",
+  "result": {
+    "regime_type": "IM4",
+    "procedure_code": 4,
+    "description": "Commercial Import",
+    "confidence": "medium",
+    "reasoning": "Commercial item (framework classification: Commercial) with low value ($0) below $5,000 threshold - Commercial Import (IM4) required for commercial items",
+    "import_export_direction": "Import",
+    "commercial_determination": "Commercial",
+    "processing_time": 9.048388481140137,
+    "model_used": "openai/gpt-5-nano"
+  }
+}

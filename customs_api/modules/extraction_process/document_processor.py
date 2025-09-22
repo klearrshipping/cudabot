@@ -43,8 +43,10 @@ class DocumentProcessor:
     """
     
     def __init__(self, base_dir: str = "processed_orders"):
-        self.base_dir = Path(base_dir)
+        # Use absolute path to avoid working directory issues
+        self.base_dir = Path(base_dir).resolve()
         self.base_dir.mkdir(exist_ok=True)
+        print(f"🔍 DEBUG: DocumentProcessor base_dir: {self.base_dir}")
     
     def process_order_documents(self, order_number: str) -> Dict[str, Any]:
         """
@@ -64,24 +66,245 @@ class DocumentProcessor:
             return {"error": f"Order directory not found: {order_dir}"}
         
         # Find invoice and BOL files in the file_uploads directory (where they are initially stored)
-        invoice_files = list((order_dir / "file_uploads").glob("*invoice*.pdf")) + list((order_dir / "file_uploads").glob("*invoice*.jpg")) + list((order_dir / "file_uploads").glob("*invoice*.png"))
-        bol_files = list((order_dir / "file_uploads").glob("*bill_of_lading*.pdf")) + list((order_dir / "file_uploads").glob("*bill_of_lading*.jpg")) + list((order_dir / "file_uploads").glob("*bill_of_lading*.png"))
+        file_uploads_dir = order_dir / "file_uploads"
+        print(f"🔍 DEBUG: Looking for files in: {file_uploads_dir}")
+        print(f"🔍 DEBUG: Directory exists: {file_uploads_dir.exists()}")
+        if file_uploads_dir.exists():
+            print(f"🔍 DEBUG: Files in directory: {list(file_uploads_dir.iterdir())}")
+        
+        invoice_files = list(file_uploads_dir.glob("*invoice*.pdf")) + list(file_uploads_dir.glob("*invoice*.jpg")) + list(file_uploads_dir.glob("*invoice*.png"))
+        bol_files = list(file_uploads_dir.glob("*bill_of_lading*.pdf")) + list(file_uploads_dir.glob("*bill_of_lading*.jpg")) + list(file_uploads_dir.glob("*bill_of_lading*.png"))
         
         if not invoice_files:
             return {"error": f"No invoice files found in {order_dir / 'file_uploads'}"}
         
         if not bol_files:
-            return {"error": f"No BOL files found in {order_dir / 'file_uploads'}"}
+            print(f"⚠️  Warning: No BOL files found in {order_dir / 'file_uploads'}")
+            print(f"🔄 Proceeding with invoice-only processing...")
+            # Process invoices only if no BOL found
+            return self._process_invoices_only_for_order(invoice_files, order_number)
         
-        # Use the first files found (you might want to implement logic to handle multiple files)
-        invoice_path = str(invoice_files[0])
+        # Use the first BOL file found (typically only one BOL per order)
         bol_path = str(bol_files[0])
         
-        print(f"   📄 Found invoice: {invoice_path}")
+        print(f"   📄 Found {len(invoice_files)} invoice file(s)")
+        for i, invoice_file in enumerate(invoice_files):
+            print(f"      {i+1}. {invoice_file.name}")
         print(f"   📋 Found BOL: {bol_path}")
         
-        # Process documents and save to the order directory
-        return self._process_documents_for_order(invoice_path, bol_path, order_number)
+        # Process multiple invoices with single BOL
+        return self._process_multiple_invoices_for_order(invoice_files, bol_path, order_number)
+    
+    def _process_multiple_invoices_for_order(self, invoice_files: list, bol_path: str, order_number: str) -> Dict[str, Any]:
+        """
+        Process multiple invoice files with a single BOL for a specific order
+        
+        Args:
+            invoice_files (list): List of invoice file paths
+            bol_path (str): Path to bill of lading document
+            order_number (str): Order number
+            
+        Returns:
+            dict: Processing results for all documents
+        """
+        print(f"🔄 Starting multiple invoice processing for order: {order_number}")
+        print(f"   Invoices: {len(invoice_files)} files")
+        print(f"   BOL: {bol_path}")
+        
+        # Get the order directory
+        order_dir = self.base_dir / order_number
+        
+        # Process BOL first (single file)
+        bol_result = self._process_bill_of_lading_for_order(bol_path, order_dir, order_number)
+        
+        # Process all invoices in parallel
+        invoice_results = self._process_multiple_invoices_parallel(invoice_files, order_dir, order_number)
+        
+        # Combine results
+        all_results = {
+            'bill_of_lading': bol_result,
+            'invoices': invoice_results
+        }
+        
+        # Calculate overall success metrics
+        successful_invoices = sum(1 for result in invoice_results.values() if result.get('status') == 'success')
+        total_invoices = len(invoice_results)
+        bol_success = bol_result.get('status') == 'success'
+        
+        print(f"✅ Processing completed:")
+        print(f"   BOL: {'Success' if bol_success else 'Failed'}")
+        print(f"   Invoices: {successful_invoices}/{total_invoices} successful")
+        
+        return all_results
+    
+    def _process_invoices_only_for_order(self, invoice_files: list, order_number: str) -> Dict[str, Any]:
+        """
+        Process invoice files only (when BOL is missing)
+        
+        Args:
+            invoice_files (list): List of invoice file paths
+            order_number (str): Order number
+            
+        Returns:
+            dict: Processing results for invoices only
+        """
+        print(f"🔄 Starting invoice-only processing for order: {order_number}")
+        print(f"   Invoices: {len(invoice_files)} files")
+        print(f"   BOL: Missing - skipping BOL processing")
+        
+        # Get the order directory
+        order_dir = self.base_dir / order_number
+        
+        # Process all invoices in parallel
+        invoice_results = self._process_multiple_invoices_parallel(invoice_files, order_dir, order_number)
+        
+        # Calculate overall success metrics
+        successful_invoices = sum(1 for result in invoice_results.values() if result.get('status') == 'success')
+        total_invoices = len(invoice_results)
+        
+        print(f"✅ Invoice-only processing completed:")
+        print(f"   BOL: Skipped (missing)")
+        print(f"   Invoices: {successful_invoices}/{total_invoices} successful")
+        
+        return {
+            'bill_of_lading': {'status': 'skipped', 'reason': 'BOL file not found'},
+            'invoices': invoice_results
+        }
+    
+    def _process_multiple_invoices_parallel(self, invoice_files: list, order_dir: Path, order_number: str) -> Dict[str, Any]:
+        """
+        Process multiple invoice files in parallel
+        
+        Args:
+            invoice_files (list): List of invoice file paths
+            order_dir (Path): Order directory path
+            order_number (str): Order number
+            
+        Returns:
+            dict: Processing results for each invoice
+        """
+        results = {}
+        
+        with ThreadPoolExecutor(max_workers=min(len(invoice_files), 4)) as executor:  # Limit to 4 concurrent extractions
+            # Submit all invoice processing tasks
+            future_to_invoice = {}
+            
+            for i, invoice_file in enumerate(invoice_files):
+                future = executor.submit(
+                    self._process_single_invoice_for_order,
+                    str(invoice_file),
+                    order_dir,
+                    order_number,
+                    i + 1  # Invoice number (1-based)
+                )
+                future_to_invoice[future] = f"invoice_{i + 1}"
+            
+            # Collect results
+            for future in as_completed(future_to_invoice):
+                invoice_key = future_to_invoice[future]
+                
+                try:
+                    result = future.result()
+                    results[invoice_key] = result
+                    
+                    if result.get('status') == 'success':
+                        print(f"✅ {invoice_key} extraction completed")
+                    else:
+                        print(f"❌ {invoice_key} extraction failed: {result.get('error', 'Unknown error')}")
+                        
+                except Exception as e:
+                    print(f"❌ {invoice_key} processing error: {e}")
+                    results[invoice_key] = {
+                        'status': 'failed',
+                        'document_type': 'invoice',
+                        'error': str(e),
+                        'timestamp': datetime.now().isoformat()
+                    }
+        
+        return results
+    
+    def _process_single_invoice_for_order(self, file_path: str, order_dir: Path, order_number: str, invoice_number: int) -> Dict[str, Any]:
+        """
+        Process a single invoice document for a specific order
+        
+        Args:
+            file_path (str): Path to invoice document
+            order_dir (Path): Order directory path
+            order_number (str): Order number
+            invoice_number (int): Invoice number (1-based)
+            
+        Returns:
+            dict: Processing results
+        """
+        try:
+            # Import the OpenRouter-based invoice extractor
+            from modules.extraction_process.invoice_extract import InvoiceExtractor
+            
+            # Initialize extractor
+            extractor = InvoiceExtractor()
+            
+            # Process invoice
+            file_path_obj = Path(file_path)
+            if not file_path_obj.exists():
+                raise FileNotFoundError(f"Invoice file not found: {file_path}")
+            
+            # Extract data (don't save to individual extractor's directory)
+            extracted_data = extractor.process_document(file_path_obj, save_to_file=False)
+            
+            # Check if extraction was successful
+            if extracted_data.get('status') == 'failed':
+                raise Exception(f"Extraction failed: {extracted_data.get('error', 'Unknown error')}")
+            
+            # Save extracted data to the invoices folder with numbered filename
+            invoice_dir = order_dir / "invoices"
+            invoice_dir.mkdir(exist_ok=True)
+            extracted_file = invoice_dir / f"invoice_{order_number}_invoice_{invoice_number}_extract.json"
+            
+            with open(extracted_file, 'w', encoding='utf-8') as f:
+                json.dump(extracted_data, f, indent=2, ensure_ascii=False)
+            
+            # Calculate metrics for OpenRouter extraction
+            items_count = len(extracted_data.get('items', []))
+            extracted_fields_count = self._count_all_fields_recursive(extracted_data)
+            quality_metrics = self._analyze_extraction_quality(extracted_data)
+            sections_extracted = self._get_section_status(extracted_data)
+            
+            return {
+                'status': 'success',
+                'document_type': 'invoice',
+                'processor_type': 'claude_sonnet_4_via_openrouter',
+                'extracted_data_file': str(extracted_file),
+                'extracted_fields_count': extracted_fields_count,
+                'line_items_count': items_count,
+                'structure_version': 'v4_claude_sonnet_openrouter',
+                'sections_extracted': sections_extracted,
+                'quality_metrics': quality_metrics,
+                'invoice_number': invoice_number,
+                'extraction_summary': {
+                    'supplier_identified': bool(extracted_data.get('supplier', {}).get('name')),
+                    'buyer_identified': bool(extracted_data.get('buyer', {}).get('name')),
+                    'invoice_number_found': bool(extracted_data.get('invoice_details', {}).get('invoice_number')),
+                    'date_found': bool(extracted_data.get('invoice_details', {}).get('date')),
+                    'total_amount_found': bool(extracted_data.get('totals', {}).get('total_amount')),
+                    'items_extracted': items_count,
+                    'currency_detected': extracted_data.get('currency', 'Unknown'),
+                    'confidence': extracted_data.get('extraction_confidence', 'unknown')
+                },
+                'timestamp': datetime.now().isoformat()
+            }
+            
+        except Exception as e:
+            print(f"❌ Invoice {invoice_number} processing error: {e}")
+            traceback.print_exc()
+            return {
+                'status': 'failed',
+                'document_type': 'invoice',
+                'processor_type': 'claude_sonnet_4_via_openrouter',
+                'error': str(e),
+                'error_details': traceback.format_exc(),
+                'invoice_number': invoice_number,
+                'timestamp': datetime.now().isoformat()
+            }
     
     def _process_documents_for_order(self, invoice_path: str, bol_path: str, order_number: str) -> Dict[str, Any]:
         """

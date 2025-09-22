@@ -20,6 +20,9 @@ import re
 import requests
 import time
 from typing import Optional, Dict, List, Any
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', '..', '..'))
 from modules.core.llm_client import LLMClient
 
 def get_commercial_description_from_json(json_path: str) -> Optional[str]:
@@ -124,22 +127,40 @@ Keep brand names, essential product types, and key model identifiers. Remove tec
 Do NOT return generic categories like "Electric Vehicle" or "Electronics".
 """
     
-    # Use Kimi as primary, Mistral as backup
+    # Smart model selection - use Mistral Small for better performance
     models = [
-        "moonshotai/kimi-k2:free",                         # Primary - Kimi
-        "openai/gpt-5-nano"   # Backup - GPT-5 Nano
+        "mistralai/mistral-small-3.2-24b-instruct"        # Primary - Mistral Small, reliable and fast
+        # "moonshotai/kimi-k2:free"                        # Disabled - Too many rate limits
     ]
     
     # Test models with early termination
-    for model in models:
+    for i, model in enumerate(models):
         model_name = model.split('/')[-1].split(':')[0]
         print(f"🔍 DEBUG: Testing model: {model_name}")
         if verbose:
             print(f"\n🧪 Testing model: {model_name}")
+        
+        # Add small delay between model attempts to prevent rate limiting
+        if i > 0:
+            print(f"⏳ DEBUG: Waiting 1s before trying next model...")
+            time.sleep(1)
+        
         try:
             print(f"🔍 DEBUG: Sending prompt to LLM...")
-            raw_response = llm.send_prompt(prompt, model=model)
+            raw_response, success, error_type = llm.send_prompt(prompt, model=model)
             print(f"🔍 DEBUG: LLM raw response: {raw_response}")
+            
+            if not success:
+                if error_type == "rate_limit":
+                    print(f"⏳ DEBUG: {model_name} hit rate limit, will try next model")
+                    if verbose:
+                        print(f"⏳ {model_name} rate limited, trying next model...")
+                else:
+                    print(f"❌ DEBUG: {model_name} failed with error type: {error_type}")
+                    if verbose:
+                        print(f"❌ {model_name} failed: {error_type}")
+                continue
+            
             product_name = parse_llm_response(raw_response)
             print(f"🔍 DEBUG: Parsed product name: {product_name}")
             
@@ -195,6 +216,9 @@ def classify_with_hs_api(product_name: str, verbose: bool = False, order_id: str
             payload["contextual_data"] = contextual_data
         
         print(f"🔍 DEBUG: Starting synchronous classification with payload: {payload}")
+        print(f"🔍 DEBUG: Payload JSON: {json.dumps(payload, indent=2)}")
+        print(f"🔍 DEBUG: Sending POST request to: {API_BASE_URL}/classify")
+        print(f"🔍 DEBUG: Request headers: {{'Content-Type': 'application/json'}}")
             
         # Use synchronous classification with longer timeout
         response = requests.post(
@@ -209,6 +233,7 @@ def classify_with_hs_api(product_name: str, verbose: bool = False, order_id: str
         if response.status_code == 200:
             result = response.json()
             print(f"🔍 DEBUG: Classification completed: {result}")
+            print(f"🔍 DEBUG: Response JSON: {json.dumps(result, indent=2)}")
             if verbose:
                 print(f"✅ HS Code API returned:")
                 print(f"   HS Code: {result.get('hs_code', 'N/A')}")
@@ -239,7 +264,7 @@ def classify_with_hs_api(product_name: str, verbose: bool = False, order_id: str
             print(f"❌ HS Code API error: {str(e)}")
         return None
 
-def _build_contextual_data_from_primary(primary_data: Dict[str, Any], product_name: str) -> Optional[Dict[str, Any]]:
+def _build_contextual_data_from_primary(primary_data: Dict[str, Any], product_name: str, bol_data: Dict[str, Any] = None) -> Optional[Dict[str, Any]]:
     """
     Build contextual data from primary processing results for enhanced HS Code API calls.
     
@@ -251,67 +276,144 @@ def _build_contextual_data_from_primary(primary_data: Dict[str, Any], product_na
         Contextual data dictionary for HS Code API
     """
     try:
-        # Extract data from primary processing results
-        extracted_fields = primary_data.get('result', {}).get('extracted_fields', {})
+        print(f"🔍 DEBUG: Building contextual data from primary data structure")
+        print(f"🔍 DEBUG: Primary data keys: {list(primary_data.keys())}")
         
         # Build contextual data structure
         contextual_data = {}
         
-        # Buyer information
-        buyer_name = extracted_fields.get('buyer_name', '')
-        buyer_address = extracted_fields.get('buyer_address', '')
-        if buyer_name or buyer_address:
-            contextual_data['buyer_info'] = {
-                'name': buyer_name,
-                'address': buyer_address
-            }
-        
-        # Supplier information
-        supplier_name = extracted_fields.get('supplier_name', '')
-        supplier_address = extracted_fields.get('supplier_address', '')
-        if supplier_name or supplier_address:
+        # Supplier information (from invoice data)
+        supplier_info = primary_data.get('supplier', {})
+        if supplier_info:
             contextual_data['supplier_info'] = {
-                'name': supplier_name,
-                'address': supplier_address
+                'name': supplier_info.get('name', ''),
+                'address': supplier_info.get('address', '')
             }
+            # Also populate flat structure for HS Code API compatibility
+            contextual_data['shipper'] = supplier_info.get('name', '')
+            contextual_data['shipper_address'] = supplier_info.get('address', '')
         
-        # Product details
-        commercial_description = extracted_fields.get('commercial_description', '')
-        if commercial_description:
+        # Product details (from invoice items)
+        items = primary_data.get('items', [])
+        if items and len(items) > 0:
+            first_item = items[0]
             contextual_data['product_details'] = {
                 'description': product_name,
-                'original_description': commercial_description
+                'original_description': first_item.get('description', ''),
+                'quantity': first_item.get('quantity', ''),
+                'unit_price': first_item.get('unit_price', ''),
+                'total_price': first_item.get('total_price', '')
             }
         
-        # Shipping information
-        port_of_loading = extracted_fields.get('port_of_loading', '')
-        port_of_destination = extracted_fields.get('port_of_destination', '')
-        weight = extracted_fields.get('weight', '')
-        package_type = extracted_fields.get('package_type', '')
+        # Invoice details
+        invoice_details = primary_data.get('invoice_details', {})
+        if invoice_details:
+            contextual_data['invoice_info'] = {
+                'invoice_number': invoice_details.get('invoice_number', ''),
+                'date': invoice_details.get('date', ''),
+                'terms_of_sale': invoice_details.get('terms_of_sale', ''),
+                'currency': invoice_details.get('currency', '')
+            }
         
-        if any([port_of_loading, port_of_destination, weight, package_type]):
+        # Totals information
+        totals = primary_data.get('totals', {})
+        if totals:
+            contextual_data['financial_info'] = {
+                'total_amount': totals.get('total_amount', ''),
+                'shipping_handling': totals.get('shipping_handling', ''),
+                'currency': primary_data.get('currency', '')
+            }
+        
+        # Shipping information (from invoice)
+        shipping = primary_data.get('shipping', {})
+        if shipping:
             contextual_data['shipping_info'] = {
-                'port_of_origin': port_of_loading,
-                'port_of_destination': port_of_destination,
-                'weight': weight,
-                'package_type': package_type
+                'delivery_terms': shipping.get('delivery_terms', '')
             }
+        
+        # BOL information (if available)
+        if bol_data:
+            # Consignee information (buyer)
+            consignee = bol_data.get('consignee', {})
+            if consignee:
+                contextual_data['buyer_info'] = {
+                    'name': consignee.get('name', ''),
+                    'address': f"{consignee.get('address_line1', '')} {consignee.get('city', '')} {consignee.get('country', '')}".strip(),
+                    'phone': consignee.get('phone', ''),
+                    'email': consignee.get('email', '')
+                }
+                # Also populate flat structure for HS Code API compatibility
+                contextual_data['consignee_name'] = consignee.get('name', '')
+                contextual_data['consignee_address'] = f"{consignee.get('address_line1', '')} {consignee.get('city', '')} {consignee.get('country', '')}".strip()
+            
+            # Shipper information (supplier - may override invoice data)
+            shipper = bol_data.get('shipper', {})
+            if shipper:
+                contextual_data['supplier_info'] = {
+                    'name': shipper.get('name', ''),
+                    'address': f"{shipper.get('address_line1', '')} {shipper.get('city', '')} {shipper.get('state_province', '')} {shipper.get('postal_code', '')} {shipper.get('country', '')}".strip()
+                }
+                # Also populate flat structure for HS Code API compatibility
+                contextual_data['shipper'] = shipper.get('name', '')
+                contextual_data['shipper_address'] = f"{shipper.get('address_line1', '')} {shipper.get('city', '')} {shipper.get('state_province', '')} {shipper.get('postal_code', '')} {shipper.get('country', '')}".strip()
+            
+            # Enhanced shipping information from BOL
+            if 'shipping_info' not in contextual_data:
+                contextual_data['shipping_info'] = {}
+            
+            contextual_data['shipping_info'].update({
+                'port_of_loading': bol_data.get('port_of_loading', ''),
+                'port_of_discharge': bol_data.get('port_of_discharge', ''),
+                'vessel_name': bol_data.get('vessel_name', ''),
+                'voyage_number': bol_data.get('voyage_number', ''),
+                'sea_waybill_no': bol_data.get('sea_waybill_no', ''),
+                'carrier': bol_data.get('carrier', '')
+            })
+            
+            # Also populate flat structure for HS Code API compatibility
+            contextual_data['port_of_origin'] = bol_data.get('port_of_loading', '')
+            contextual_data['port_of_destination'] = bol_data.get('port_of_discharge', '')
+            contextual_data['vessel'] = bol_data.get('vessel_name', '')
+            contextual_data['bill_of_lading'] = bol_data.get('sea_waybill_no', '')
+            
+            # Cargo details from BOL
+            cargo = bol_data.get('cargo', {})
+            if cargo:
+                contextual_data['cargo_info'] = {
+                    'package_count': cargo.get('package_count_and_description', ''),
+                    'type': cargo.get('type', ''),
+                    'year_of_manufacture': cargo.get('year_of_manufacture', ''),
+                    'vin': cargo.get('vin', ''),
+                    'color': cargo.get('color', ''),
+                    'gross_weight': cargo.get('gross_weight', ''),
+                    'measurement': cargo.get('measurement', ''),
+                    'commodity_description': cargo.get('commodity_description', '')
+                }
+                # Also populate flat structure for HS Code API compatibility
+                contextual_data['weight'] = cargo.get('gross_weight', '')
+                contextual_data['commodity'] = cargo.get('commodity_description', '')
         
         # Document metadata
         contextual_data['document_metadata'] = {
             'extraction_confidence': primary_data.get('extraction_confidence', 'unknown'),
-            'processing_method': primary_data.get('_metadata', {}).get('processing_method', 'unknown')
+            'processing_method': primary_data.get('_metadata', {}).get('processing_method', 'unknown'),
+            'extraction_timestamp': primary_data.get('_metadata', {}).get('extraction_timestamp', 'unknown')
         }
+        # Also populate flat structure for HS Code API compatibility
+        contextual_data['extraction_confidence'] = primary_data.get('extraction_confidence', 'unknown')
         
         print(f"🔍 DEBUG: Built contextual data with {len(contextual_data)} sections")
+        print(f"🔍 DEBUG: Contextual data keys: {list(contextual_data.keys())}")
         return contextual_data if contextual_data else None
         
     except Exception as e:
         print(f"❌ DEBUG: Error building contextual data: {e}")
+        import traceback
+        traceback.print_exc()
         return None
 
 def process_commercial_description(description: str, verbose: bool = False, get_hs_code: bool = True, 
-                                 order_id: str = None, primary_data: Dict[str, Any] = None) -> Dict[str, str]:
+                                 order_id: str = None, primary_data: Dict[str, Any] = None, bol_data: Dict[str, Any] = None) -> Dict[str, str]:
     """Process commercial description and return standardized product information with optional HS code classification."""
     print(f"\n🔍 DEBUG: process_commercial_description called")
     print(f"   Description: {description}")
@@ -347,7 +449,7 @@ def process_commercial_description(description: str, verbose: bool = False, get_
             # Build contextual data from primary processing results if available
             contextual_data = None
             if primary_data:
-                contextual_data = _build_contextual_data_from_primary(primary_data, product_name)
+                contextual_data = _build_contextual_data_from_primary(primary_data, product_name, bol_data)
                 print(f"🔍 DEBUG: Built contextual data: {list(contextual_data.keys()) if contextual_data else 'None'}")
             
             hs_result = classify_with_hs_api(
@@ -422,6 +524,89 @@ def main():
     except Exception as e:
         print(f"Unexpected error: {e}")
         sys.exit(1)
+
+class ProductProcessor:
+    """Processor class for eSAD product standardization and HS code classification."""
+    
+    def __init__(self, config: Dict[str, Any] = None):
+        """Initialize the product processor."""
+        self.config = config or {}
+    
+    def process(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Process product information from input data."""
+        try:
+            # Extract data from input
+            invoice_data = input_data.get('invoice_data', {})
+            bol_data = input_data.get('bol_data', {})
+            fields = input_data.get('fields', [])
+            existing_fields = input_data.get('existing_fields', {})
+            
+            # Find commercial description from various sources
+            commercial_description = self._extract_commercial_description(invoice_data, bol_data, existing_fields)
+            
+            if not commercial_description:
+                return {
+                    'success': False,
+                    'error': 'No commercial description found',
+                    'commercial_description': '',
+                    'commodity_code': ''
+                }
+            
+            # Process the commercial description
+            result = process_commercial_description(
+                description=commercial_description,
+                verbose=False,
+                get_hs_code=True,
+                order_id=existing_fields.get('order_number'),
+                primary_data=invoice_data,
+                bol_data=bol_data
+            )
+            
+            if result.get('product_name') or result.get('hs_code'):
+                return {
+                    'success': True,
+                    'commercial_description': result.get('product_name', commercial_description),
+                    'commodity_code': result.get('commodity_code', ''),
+                    'hs_code': result.get('hs_code', ''),
+                    'hs_description': result.get('hs_description', ''),
+                    'original_description': commercial_description,
+                    'processing_notes': f"Processed: {result.get('product_name', 'N/A')} -> HS: {result.get('hs_code', 'N/A')}"
+                }
+            else:
+                return {
+                    'success': False,
+                    'error': result.get('error', 'Unknown error'),
+                    'commercial_description': commercial_description,
+                    'commodity_code': ''
+                }
+                
+        except Exception as e:
+            return {
+                'success': False,
+                'error': str(e),
+                'commercial_description': '',
+                'commodity_code': ''
+            }
+    
+    def _extract_commercial_description(self, invoice_data: Dict, bol_data: Dict, existing_fields: Dict) -> str:
+        """Extract commercial description from various data sources."""
+        # Try invoice items first
+        if 'items' in invoice_data and invoice_data['items']:
+            first_item = invoice_data['items'][0]
+            if 'description' in first_item:
+                return first_item['description']
+        
+        # Try BOL particulars
+        if 'particulars_furnished_by_shipper_said_to_contain' in bol_data:
+            particulars = bol_data['particulars_furnished_by_shipper_said_to_contain']
+            if 'package/type' in particulars:
+                return particulars['package/type']
+        
+        # Try existing fields
+        if '31_commercial_description' in existing_fields:
+            return existing_fields['31_commercial_description']
+        
+        return ""
 
 if __name__ == "__main__":
     main() 

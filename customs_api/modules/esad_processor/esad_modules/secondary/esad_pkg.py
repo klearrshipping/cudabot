@@ -99,6 +99,111 @@ Return ONLY a valid JSON object with a single field 'code', e.g. {{"code": "BX"}
     print("🔄 Both models failed, using string similarity fallback.")
     return string_similarity_fallback(kind_of_packages, package_types)
 
+class PackageProcessor:
+    """Processor class for eSAD package types (Box 31 - Kind of packages)."""
+    
+    def __init__(self, config: Dict = None):
+        """Initialize the PackageProcessor."""
+        self.config = config or {}
+    
+    def process(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Process input data to determine package type.
+        
+        Args:
+            input_data: Dictionary containing invoice_data, bol_data, fields, and existing_fields
+            
+        Returns:
+            Dictionary with processing results
+        """
+        try:
+            # Extract kind of packages from various sources
+            kind_of_packages = self._extract_kind_of_packages(input_data)
+            
+            if not kind_of_packages:
+                return {
+                    'success': False,
+                    'error': 'No kind of packages found',
+                    'package_code': None
+                }
+            
+            # Get package types from database
+            package_types = get_package_types()
+            if not package_types:
+                return {
+                    'success': False,
+                    'error': 'No package types found in database',
+                    'package_code': None
+                }
+            
+            # Find best matching package type
+            best_code = ask_llm_for_best_package_type(kind_of_packages, package_types)
+            
+            if best_code:
+                return {
+                    'success': True,
+                    'package_code': best_code,
+                    'kind_of_packages': kind_of_packages,
+                    'package_types_available': len(package_types)
+                }
+            else:
+                return {
+                    'success': False,
+                    'error': 'No suitable package type found',
+                    'kind_of_packages': kind_of_packages,
+                    'package_code': None
+                }
+            
+        except Exception as e:
+            return {
+                'success': False,
+                'error': str(e),
+                'package_code': None
+            }
+    
+    def _extract_kind_of_packages(self, input_data: Dict[str, Any]) -> str:
+        """Extract kind of packages from input data."""
+        # Try to get from existing fields first
+        existing_fields = input_data.get('existing_fields', {})
+        
+        # Look for kind of packages in various field keys
+        package_keys = [
+            'kind_of_packages',
+            '31_kind_of_packages',
+            'package_type',
+            'package_description',
+            'packaging'
+        ]
+        
+        for key in package_keys:
+            if key in existing_fields and existing_fields[key]:
+                return str(existing_fields[key])
+        
+        # Try to extract from invoice data
+        invoice_data = input_data.get('invoice_data', {})
+        if invoice_data:
+            # Check items for packaging info
+            items = invoice_data.get('items', [])
+            if items and len(items) > 0:
+                first_item = items[0]
+                if isinstance(first_item, dict):
+                    # Look for packaging-related fields
+                    for field in ['packaging', 'package_type', 'container_type']:
+                        if field in first_item and first_item[field]:
+                            return str(first_item[field])
+        
+        # Try to extract from BOL data
+        bol_data = input_data.get('bol_data', {})
+        if bol_data:
+            # Check cargo for packaging info
+            cargo = bol_data.get('cargo', {})
+            if isinstance(cargo, dict):
+                for field in ['packaging', 'package_type', 'container_type']:
+                    if field in cargo and cargo[field]:
+                        return str(cargo[field])
+        
+        return ""
+
 def main():
     """Main function with improved error handling."""
     if len(sys.argv) < 2:

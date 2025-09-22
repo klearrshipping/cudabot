@@ -192,6 +192,105 @@ def process_warehouse_lookup(office_code: str, warehouses: List[Dict], auto_mode
             'box_30_value': None
         }
 
+class WarehouseProcessor:
+    """Processor class for eSAD warehouse lookup (Box 30)."""
+    
+    def __init__(self, config: Dict = None):
+        """Initialize the WarehouseProcessor."""
+        self.config = config or {}
+    
+    def process(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Process input data to determine warehouse code.
+        
+        Args:
+            input_data: Dictionary containing invoice_data, bol_data, fields, and existing_fields
+            
+        Returns:
+            Dictionary with processing results
+        """
+        try:
+            # Extract office code from various sources
+            office_code = self._extract_office_code(input_data)
+            
+            if not office_code:
+                return {
+                    'success': False,
+                    'error': 'No office code found',
+                    'warehouse_code': None
+                }
+            
+            # Get warehouse data
+            warehouses = get_warehouse_data()
+            if not warehouses:
+                return {
+                    'success': False,
+                    'error': 'No warehouse data found',
+                    'warehouse_code': None
+                }
+            
+            # Process warehouse lookup (use auto mode for non-interactive processing)
+            results = process_warehouse_lookup(office_code, warehouses, auto_mode=True)
+            
+            if results['success']:
+                return {
+                    'success': True,
+                    'warehouse_code': results['box_30_value'],
+                    'office_code': results['office_code'],
+                    'warehouse_name': results['selected_warehouse']['warehouse'],
+                    'warehouses_found': results['count']
+                }
+            else:
+                return {
+                    'success': False,
+                    'error': results['error'],
+                    'office_code': office_code,
+                    'warehouse_code': None
+                }
+            
+        except Exception as e:
+            return {
+                'success': False,
+                'error': str(e),
+                'warehouse_code': None
+            }
+    
+    def _extract_office_code(self, input_data: Dict[str, Any]) -> str:
+        """Extract office code from input data."""
+        # Try to get from existing fields first
+        existing_fields = input_data.get('existing_fields', {})
+        
+        # Look for office code in various field keys
+        office_keys = [
+            'office_code',
+            'office_code_processed',
+            '30_office_code',
+            'manifest_office_code',
+            'office_id'
+        ]
+        
+        for key in office_keys:
+            if key in existing_fields and existing_fields[key]:
+                return str(existing_fields[key])
+        
+        # Try to extract from invoice data
+        invoice_data = input_data.get('invoice_data', {})
+        if invoice_data:
+            # Check for office-related fields
+            for field in ['office_code', 'office_id', 'manifest_office']:
+                if field in invoice_data and invoice_data[field]:
+                    return str(invoice_data[field])
+        
+        # Try to extract from BOL data
+        bol_data = input_data.get('bol_data', {})
+        if bol_data:
+            # Check for office-related fields
+            for field in ['office_code', 'office_id', 'manifest_office']:
+                if field in bol_data and bol_data[field]:
+                    return str(bol_data[field])
+        
+        return ""
+
 def main():
     """Main function with improved error handling."""
     if len(sys.argv) < 2:

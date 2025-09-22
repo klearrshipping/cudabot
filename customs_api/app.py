@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 import os
 import sys
-from typing import Optional
+from typing import Optional, List
 import json
 from datetime import datetime
 from pathlib import Path
@@ -58,7 +58,7 @@ async def read_index():
 
 @app.post("/api/upload-documents")
 async def upload_documents(
-    invoice: UploadFile = File(..., description="Invoice document"),
+    invoices: List[UploadFile] = File(..., description="Invoice documents"),
     bill_of_lading: UploadFile = File(..., description="Bill of lading document"),
     arrival_notice: Optional[UploadFile] = File(None, description="Arrival notice (optional)"),
     client_id: int = Form(1, description="Client ID"),
@@ -67,7 +67,7 @@ async def upload_documents(
     """
     Upload documents for customs declaration processing
     
-    - **invoice**: Required invoice document
+    - **invoices**: Required invoice documents (multiple allowed)
     - **bill_of_lading**: Required bill of lading document  
     - **arrival_notice**: Optional arrival notice document
     - **client_id**: Client ID for the order
@@ -75,19 +75,28 @@ async def upload_documents(
     """
     try:
         # Validate required files
-        if not invoice or not bill_of_lading:
-            raise HTTPException(status_code=400, detail="Invoice and bill of lading are required")
+        if not invoices or len(invoices) == 0 or not bill_of_lading:
+            raise HTTPException(status_code=400, detail="At least one invoice and bill of lading are required")
         
         # Validate file types
         allowed_extensions = {'.pdf', '.jpg', '.jpeg', '.png', '.tiff', '.tif'}
         
-        for file, file_type in [(invoice, "invoice"), (bill_of_lading, "bill_of_lading")]:
-            file_ext = os.path.splitext(file.filename)[1].lower()
+        # Validate all invoice files
+        for i, invoice in enumerate(invoices):
+            file_ext = os.path.splitext(invoice.filename)[1].lower()
             if file_ext not in allowed_extensions:
                 raise HTTPException(
                     status_code=400, 
-                    detail=f"{file_type} file type {file_ext} not allowed. Allowed types: {', '.join(allowed_extensions)}"
+                    detail=f"Invoice {i+1} file type {file_ext} not allowed. Allowed types: {', '.join(allowed_extensions)}"
                 )
+        
+        # Validate bill of lading
+        bol_ext = os.path.splitext(bill_of_lading.filename)[1].lower()
+        if bol_ext not in allowed_extensions:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Bill of lading file type {bol_ext} not allowed. Allowed types: {', '.join(allowed_extensions)}"
+            )
         
         # Create order using OrderProcessor to generate folder structure
         order_processor = OrderProcessor()
@@ -115,12 +124,15 @@ async def upload_documents(
         # Save files and create document records
         documents_created = []
         
-        # Process invoice
-        invoice_success, invoice_path = await save_uploaded_file(
-            invoice, order_number, "invoice", order_id
-        )
-        if invoice_success:
-            documents_created.append("invoice")
+        # Process multiple invoices
+        invoice_paths = []
+        for i, invoice in enumerate(invoices):
+            invoice_success, invoice_path = await save_uploaded_file(
+                invoice, order_number, f"invoice_{i+1}", order_id
+            )
+            if invoice_success:
+                invoice_paths.append(invoice_path)
+                documents_created.append(f"invoice_{i+1}")
         
         # Process bill of lading
         bol_success, bol_path = await save_uploaded_file(
@@ -166,7 +178,7 @@ async def upload_documents(
         
         return {
             "success": True,
-            "message": "Documents uploaded successfully - Complete workflow (Document extraction + eSAD processing) started automatically",
+            "message": f"Documents uploaded successfully - {len(invoices)} invoice(s) + BOL - Complete workflow (Document extraction + eSAD processing) started automatically",
             "order": {
                 "id": order_id,
                 "order_number": order_number,
@@ -177,6 +189,7 @@ async def upload_documents(
                 }
             },
             "documents_uploaded": documents_created,
+            "invoice_count": len(invoices),
             "validation": validation,
             "processing_started": processing_started,
             "workflow_stages": [

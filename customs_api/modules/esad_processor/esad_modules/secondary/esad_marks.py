@@ -91,6 +91,91 @@ def process_commercial_description(commercial_description: str) -> Dict[str, str
     
     return results
 
+class MarksProcessor:
+    """Processor class for eSAD marks and numbers (Box 31)."""
+    
+    def __init__(self, config: Dict = None):
+        """Initialize the MarksProcessor."""
+        self.config = config or {}
+    
+    def process(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Process input data to create field 31 marks and numbers.
+        
+        Args:
+            input_data: Dictionary containing invoice_data, bol_data, fields, and existing_fields
+            
+        Returns:
+            Dictionary with processing results
+        """
+        try:
+            # Extract commercial description from various sources
+            commercial_description = self._extract_commercial_description(input_data)
+            
+            if not commercial_description:
+                return {
+                    'success': False,
+                    'error': 'No commercial description found',
+                    'field_31_marks': 'AS ADDRESSED: NO DESCRIPTION AVAILABLE'
+                }
+            
+            # Process the commercial description
+            results = process_commercial_description(commercial_description)
+            
+            return {
+                'success': True,
+                'field_31_marks': results['field_31_marks'],
+                'original_description': results['original_description'],
+                'cleaned_description': results['cleaned_description']
+            }
+            
+        except Exception as e:
+            return {
+                'success': False,
+                'error': str(e),
+                'field_31_marks': 'AS ADDRESSED: NO DESCRIPTION AVAILABLE'
+            }
+    
+    def _extract_commercial_description(self, input_data: Dict[str, Any]) -> str:
+        """Extract commercial description from input data."""
+        # Try to get from existing fields first
+        existing_fields = input_data.get('existing_fields', {})
+        
+        # Look for commercial description in various field keys
+        commercial_desc_keys = [
+            'commercial_description',
+            '31_commercial_description',
+            'description',
+            'product_description'
+        ]
+        
+        for key in commercial_desc_keys:
+            if key in existing_fields and existing_fields[key]:
+                return str(existing_fields[key])
+        
+        # Try to extract from invoice data
+        invoice_data = input_data.get('invoice_data', {})
+        if invoice_data:
+            # Check items for description
+            items = invoice_data.get('items', [])
+            if items and len(items) > 0:
+                first_item = items[0]
+                if isinstance(first_item, dict) and 'description' in first_item:
+                    return str(first_item['description'])
+        
+        # Try to extract from BOL data
+        bol_data = input_data.get('bol_data', {})
+        if bol_data:
+            # Check particulars
+            particulars = bol_data.get('particulars_furnished_by_shipper_said_to_contain', {})
+            if isinstance(particulars, dict):
+                if 'package' in particulars and particulars['package']:
+                    return str(particulars['package'])
+                if 'type' in particulars and particulars['type']:
+                    return str(particulars['type'])
+        
+        return ""
+
 def main():
     """Main function to process commercial description and create field 31 marks."""
     if len(sys.argv) < 2:

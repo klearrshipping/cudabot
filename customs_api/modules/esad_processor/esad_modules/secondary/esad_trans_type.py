@@ -201,6 +201,118 @@ def process_transaction_type(raw_transaction_data: str) -> Dict[str, Any]:
             "processing_notes": [f"Exception during processing: {str(e)}"]
         }
 
+class TransactionTypeProcessor:
+    """Processor class for eSAD transaction type classification (Box 24)."""
+    
+    def __init__(self, config: Dict = None):
+        """Initialize the TransactionTypeProcessor."""
+        self.config = config or {}
+    
+    def process(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Process input data to determine transaction type.
+        
+        Args:
+            input_data: Dictionary containing invoice_data, bol_data, fields, and existing_fields
+            
+        Returns:
+            Dictionary with processing results
+        """
+        try:
+            # Extract transaction details from various sources
+            transaction_details = self._extract_transaction_details(input_data)
+            
+            if not transaction_details:
+                return {
+                    'success': False,
+                    'error': 'No transaction details found',
+                    'transaction_code': None,
+                    'detail_code': None
+                }
+            
+            # Process transaction type classification
+            result = process_transaction_type(transaction_details)
+            
+            if result['success']:
+                # Parse the response to extract codes
+                transaction_code, detail_code = self._parse_transaction_codes(result['processed_result'])
+                
+                return {
+                    'success': True,
+                    'transaction_code': transaction_code,
+                    'detail_code': detail_code,
+                    'transaction_details': transaction_details,
+                    'raw_response': result['processed_result']
+                }
+            else:
+                return {
+                    'success': False,
+                    'error': result['error'],
+                    'transaction_code': None,
+                    'detail_code': None
+                }
+            
+        except Exception as e:
+            return {
+                'success': False,
+                'error': str(e),
+                'transaction_code': None,
+                'detail_code': None
+            }
+    
+    def _extract_transaction_details(self, input_data: Dict[str, Any]) -> str:
+        """Extract transaction details from input data."""
+        # Try to get from existing fields first
+        existing_fields = input_data.get('existing_fields', {})
+        
+        # Look for transaction details in various field keys
+        transaction_keys = [
+            'transaction_details',
+            '24_transaction_details',
+            'transaction_type',
+            'financial_transaction',
+            'transaction_description'
+        ]
+        
+        for key in transaction_keys:
+            if key in existing_fields and existing_fields[key]:
+                return str(existing_fields[key])
+        
+        # Try to extract from invoice data
+        invoice_data = input_data.get('invoice_data', {})
+        if invoice_data:
+            # Check for transaction-related fields
+            for field in ['transaction_details', 'transaction_type', 'description']:
+                if field in invoice_data and invoice_data[field]:
+                    return str(invoice_data[field])
+        
+        # Try to extract from BOL data
+        bol_data = input_data.get('bol_data', {})
+        if bol_data:
+            # Check for transaction-related fields
+            for field in ['transaction_details', 'transaction_type', 'description']:
+                if field in bol_data and bol_data[field]:
+                    return str(bol_data[field])
+        
+        return ""
+    
+    def _parse_transaction_codes(self, response: str) -> tuple:
+        """Parse transaction codes from LLM response."""
+        try:
+            import re
+            
+            # Look for transaction_code: X and detail_code: Y patterns
+            transaction_match = re.search(r'transaction_code:\s*(\d+)', response)
+            detail_match = re.search(r'detail_code:\s*(\d+)', response)
+            
+            transaction_code = transaction_match.group(1) if transaction_match else None
+            detail_code = detail_match.group(1) if detail_match else None
+            
+            return transaction_code, detail_code
+            
+        except Exception:
+            return None, None
+
 def main():
     """Main function to fetch data and send classification requests"""
     

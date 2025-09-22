@@ -64,7 +64,27 @@ Classifies a product and returns HS code and commodity code information.
 ```json
 {
   "product_name": "string",
-  "verbose": false
+  "verbose": false,
+  "order_id": "string (optional)",
+  "contextual_data": {
+    "consignee_name": "string (optional)",
+    "consignee_address": "string (optional)",
+    "shipper": "string (optional)",
+    "shipper_address": "string (optional)",
+    "port_of_origin": "string (optional)",
+    "port_of_destination": "string (optional)",
+    "weight": "string (optional)",
+    "commodity": "string (optional)",
+    "vessel": "string (optional)",
+    "bill_of_lading": "string (optional)",
+    "extraction_confidence": "string (optional)",
+    "buyer_info": "object (optional)",
+    "supplier_info": "object (optional)",
+    "product_details": "object (optional)",
+    "shipping_info": "object (optional)",
+    "document_metadata": "object (optional)"
+  },
+  "user_answers": "object (optional)"
 }
 ```
 
@@ -142,13 +162,19 @@ import json
 # API endpoint
 API_BASE_URL = "http://localhost:5000"
 
-def classify_product(product_name):
-    """Classify a product using the API"""
+def classify_product(product_name, order_id=None, contextual_data=None):
+    """Classify a product using the API with optional context"""
     
     try:
+        payload = {"product_name": product_name}
+        if order_id:
+            payload["order_id"] = order_id
+        if contextual_data:
+            payload["contextual_data"] = contextual_data
+            
         response = requests.post(
             f"{API_BASE_URL}/classify",
-            json={"product_name": product_name},
+            json=payload,
             headers={"Content-Type": "application/json"},
             timeout=120
         )
@@ -171,6 +197,18 @@ def classify_product(product_name):
 
 # Example usage
 result = classify_product("2022 Tesla Model Y")
+
+# Example with contextual data for better classification
+contextual_data = {
+    "consignee_name": "Tesla Inc.",
+    "consignee_address": "1 Tesla Road, Austin, TX 78725",
+    "shipper": "Tesla Shanghai Gigafactory",
+    "port_of_origin": "Shanghai, China",
+    "port_of_destination": "Miami, USA",
+    "weight": "2000 KGM",
+    "commodity": "Electric Motor Vehicle"
+}
+result = classify_product("2022 Tesla Model Y", order_id="ORD-20250916-004", contextual_data=contextual_data)
 ```
 
 #### 2. GET Request Example
@@ -281,16 +319,18 @@ check_api_health()
 #### 1. Basic Classification with Fetch
 
 ```javascript
-async function classifyProduct(productName) {
+async function classifyProduct(productName, orderId = null, contextualData = null) {
     try {
+        const payload = { product_name: productName };
+        if (orderId) payload.order_id = orderId;
+        if (contextualData) payload.contextual_data = contextualData;
+        
         const response = await fetch('http://localhost:5000/classify', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({
-                product_name: productName
-            })
+            body: JSON.stringify(payload)
         });
 
         if (response.ok) {
@@ -312,6 +352,18 @@ async function classifyProduct(productName) {
 
 // Example usage
 classifyProduct('MacBook Pro M3');
+
+// Example with contextual data
+const contextualData = {
+    consignee_name: "Apple Inc.",
+    consignee_address: "1 Apple Park Way, Cupertino, CA 95014",
+    shipper: "Apple Manufacturing",
+    port_of_origin: "Shenzhen, China",
+    port_of_destination: "Los Angeles, USA",
+    weight: "1500 KGM",
+    commodity: "Portable Computer"
+};
+classifyProduct('MacBook Pro M3', 'ORD-20250916-005', contextualData);
 ```
 
 #### 2. Streaming Classification with EventSource
@@ -361,13 +413,33 @@ curl -X POST "http://localhost:5000/classify" \
   -d '{"product_name": "iPhone 15 Pro Max"}'
 ```
 
-#### 2. GET Request
+#### 2. Classification with Contextual Data
+
+```bash
+curl -X POST "http://localhost:5000/classify" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "product_name": "iPhone 15 Pro Max",
+    "order_id": "ORD-20250916-006",
+    "contextual_data": {
+      "consignee_name": "Apple Inc.",
+      "consignee_address": "1 Apple Park Way, Cupertino, CA 95014",
+      "shipper": "Apple Manufacturing",
+      "port_of_origin": "Shenzhen, China",
+      "port_of_destination": "Los Angeles, USA",
+      "weight": "200 KGM",
+      "commodity": "Mobile Phone"
+    }
+  }'
+```
+
+#### 3. GET Request
 
 ```bash
 curl "http://localhost:5000/classify/iPhone%2015%20Pro%20Max"
 ```
 
-#### 3. Health Check
+#### 4. Health Check
 
 ```bash
 curl "http://localhost:5000/health"
@@ -392,7 +464,30 @@ $response = Invoke-RestMethod -Uri "http://localhost:5000/classify" -Method POST
 Write-Output $response
 ```
 
-#### 2. Health Check
+#### 2. Classification with Contextual Data
+
+```powershell
+$contextualData = @{
+    consignee_name = "Samsung Electronics"
+    consignee_address = "129 Samsung-ro, Yeongtong-gu, Suwon-si, Gyeonggi-do, South Korea"
+    shipper = "Samsung Manufacturing"
+    port_of_origin = "Busan, South Korea"
+    port_of_destination = "Miami, USA"
+    weight = "200 KGM"
+    commodity = "Mobile Phone"
+}
+
+$body = @{
+    product_name = "Samsung Galaxy S24 Ultra"
+    order_id = "ORD-20250916-007"
+    contextual_data = $contextualData
+} | ConvertTo-Json -Depth 3
+
+$response = Invoke-RestMethod -Uri "http://localhost:5000/classify" -Method POST -Body $body -ContentType "application/json"
+Write-Output $response
+```
+
+#### 3. Health Check
 
 ```powershell
 $response = Invoke-RestMethod -Uri "http://localhost:5000/health" -Method GET
@@ -426,14 +521,32 @@ Currently, no rate limiting is implemented. However, the API uses AI models that
 - Use appropriate timeout values in your client code
 - Streaming requests should handle connection timeouts gracefully
 
+## Contextual Data Benefits
+
+The API supports rich contextual data that can significantly improve classification accuracy:
+
+### **Supported Contextual Fields:**
+- **Consignee Information**: `consignee_name`, `consignee_address`
+- **Shipper Information**: `shipper`, `shipper_address`
+- **Shipping Details**: `port_of_origin`, `port_of_destination`, `vessel`, `bill_of_lading`
+- **Product Details**: `weight`, `commodity`, `extraction_confidence`
+- **Legacy Support**: `buyer_info`, `supplier_info`, `product_details`, `shipping_info`, `document_metadata`
+
+### **Benefits:**
+1. **Higher Accuracy**: Context helps disambiguate similar products
+2. **Better Classification**: Shipping context provides additional classification signals
+3. **Reduced Clarification**: Rich context reduces need for clarification questions
+4. **Order Tracking**: `order_id` enables better logging and tracking
+
 ## Best Practices
 
 1. **Always check API health** before making classification requests
 2. **Use appropriate timeouts** (120+ seconds for classification)
-3. **Handle clarification requests** - some products may need additional information
-4. **Use streaming** for better user experience with long-running requests
-5. **Cache results** when possible to avoid repeated API calls
-6. **Handle errors gracefully** and provide meaningful feedback to users
+3. **Provide contextual data** when available for better accuracy
+4. **Handle clarification requests** - some products may need additional information
+5. **Use streaming** for better user experience with long-running requests
+6. **Cache results** when possible to avoid repeated API calls
+7. **Handle errors gracefully** and provide meaningful feedback to users
 
 ## Testing the API
 

@@ -149,7 +149,7 @@
         "box_field": "val_note",
         "field_name": "Freight charges (BOL)",
         "description": "Transportation costs extracted from Bill of Lading charges table",
-        "extraction_prompt": "Extract freight charges specifically from the BOL charges table. Look for 'FREIGHT' in the charge_type field and extract the collect_amount. This is the primary source for freight costs.",
+        "extraction_prompt": "Extract freight charges specifically from the BOL charges table. Look for 'FREIGHT' in the charge_type field and extract the collect_amount. If no freight charges are found on the BOL but freight charges are present on the invoice, this indicates prepaid freight - return 'prepaid' as the value.",
         "processing_method": "llm_extraction_cif_processing",
         "script": "esad_cif"
       },
@@ -165,7 +165,7 @@
         "box_field": "val_note",
         "field_name": "Insurance charges",
         "description": "Insurance costs for goods during transportation",
-        "extraction_prompt": "Extract insurance charges from BOL charges table or invoice insurance costs. Look for 'INSURANCE' in BOL charges or insurance line items in invoice. Use null if not found.",
+        "extraction_prompt": "Extract insurance charges from BOL charges table or invoice insurance costs. Look for 'INSURANCE' in BOL charges or insurance line items in invoice. If no insurance is found on either document, return 'calculate' to indicate insurance should be computed based on cost and freight value.",
         "processing_method": "llm_extraction_cif_processing",
         "script": "esad_cif"
       },
@@ -173,7 +173,15 @@
         "box_field": "val_note",
         "field_name": "Other charges (BOL)",
         "description": "Additional charges from BOL excluding freight and insurance",
-        "extraction_prompt": "Extract other charges from BOL charges table excluding freight and insurance. Include charges like handling, wharfage, agency fees, etc. This helps with complete cost analysis.",
+        "extraction_prompt": "Extract other charges from BOL charges table that are specifically foreign currency charges excluding freight and insurance costs. Look for charges in foreign currency (not local currency) that are not freight or insurance. If no such charges exist, return 0.",
+        "processing_method": "llm_extraction_cif_processing",
+        "script": "esad_cif"
+      },
+      {
+        "box_field": "val_note",
+        "field_name": "Cost and Freight (CF)",
+        "description": "Sum of goods value and freight charges for CIF calculation",
+        "extraction_prompt": "Calculate Cost and Freight by adding the goods value and freight charges. This is an intermediate calculation for CIF determination.",
         "processing_method": "llm_extraction_cif_processing",
         "script": "esad_cif"
       },
@@ -189,7 +197,7 @@
         "box_field": "25",
         "field_name": "Mode of transport at the border",
         "description": "Mode of transport corresponding to the active means of transport",
-        "extraction_prompt": "Extract transport mode information from vessel details, flight information, or transport type indicators. Look for vessel names, voyage numbers, flight numbers, or transport method descriptions.",
+        "extraction_prompt": "Extract the transport mode type (SEA, AIR, ROAD, RAIL) from vessel details, flight information, or transport indicators. Look for indicators like vessel names (indicates SEA), flight numbers (indicates AIR), truck/vehicle info (indicates ROAD), or train info (indicates RAIL). Return only the transport mode type, not vessel names or flight numbers.",
         "processing_method": "llm_extraction_transport_processing",
         "script": "esad_transport_mode"
       },
@@ -197,7 +205,7 @@
         "box_field": "18",
         "field_name": "Identity and nationality of active means of transport at arrival",
         "description": "Describes the identity of the means of transport on which the goods are directly loaded at the time of the import, export or transit formalities, followed by the nationality of the means of transport (or that of the vehicle propelling the others if there are several means of transport) in the form of the relevant country code",
-        "extraction_prompt": "Extract transport identity based on mode: Sea Transport - Name of vessel; Air Transport - Number and Date of flight or Tail Number; Road Transport - Vehicle Registration Number. Also identify nationality/country code of the transport means."
+        "extraction_prompt": "Extract transport identity based on mode: Sea Transport - Name of vessel; Air Transport - Number and Date of flight or Tail Number."
       },
              {
          "box_field": "27",

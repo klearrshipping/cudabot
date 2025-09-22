@@ -167,6 +167,63 @@
             width: 0%;
             transition: width 0.3s ease;
         }
+
+        .invoice-list {
+            margin-top: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 10px;
+            background: #f8f9fa;
+            display: none;
+        }
+
+        .invoice-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            margin: 5px 0;
+            background: white;
+            border-radius: 6px;
+            border: 1px solid #e0e0e0;
+            font-size: 0.9rem;
+        }
+
+        .invoice-item:first-child {
+            margin-top: 0;
+        }
+
+        .invoice-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .invoice-name {
+            flex: 1;
+            color: #333;
+            font-weight: 500;
+        }
+
+        .invoice-size {
+            color: #666;
+            margin-left: 10px;
+        }
+
+        .remove-invoice {
+            background: #e74c3c;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 4px 8px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            margin-left: 10px;
+        }
+
+        .remove-invoice:hover {
+            background: #c0392b;
+        }
     </style>
 </head>
 <body>
@@ -178,11 +235,12 @@
 
         <form id="uploadForm">
             <div class="form-group">
-                <label for="invoice">Invoice Document <span class="required">*</span></label>
+                <label for="invoices">Invoice Documents <span class="required">*</span></label>
                 <div class="file-input-wrapper">
-                    <input type="file" id="invoice" name="invoice" class="file-input" accept=".pdf,.jpg,.jpeg,.png,.tiff,.tif" required>
+                    <input type="file" id="invoices" name="invoices" class="file-input" accept=".pdf,.jpg,.jpeg,.png,.tiff,.tif" multiple required>
                 </div>
-                <div class="file-info" id="invoiceInfo"></div>
+                <div class="file-info" id="invoicesInfo"></div>
+                <div class="invoice-list" id="invoiceList"></div>
             </div>
 
             <div class="form-group">
@@ -220,35 +278,100 @@
         const status = document.getElementById('status');
         const progressBar = document.getElementById('progressBar');
         const progressFill = document.getElementById('progressFill');
+        const invoiceList = document.getElementById('invoiceList');
+        const invoicesInput = document.getElementById('invoices');
 
-        fileInputs.forEach(input => {
-            input.addEventListener('change', function(e) {
-                const file = e.target.files[0];
-                const fileInfo = document.getElementById(e.target.id + 'Info');
+        // Handle multiple invoice files
+        invoicesInput.addEventListener('change', function(e) {
+            const files = Array.from(e.target.files);
+            const fileInfo = document.getElementById('invoicesInfo');
+            
+            if (files.length > 0) {
+                const totalSize = files.reduce((sum, file) => sum + file.size, 0);
+                const totalSizeMB = (totalSize / (1024 * 1024)).toFixed(2);
                 
-                if (file) {
-                    const fileSize = (file.size / (1024 * 1024)).toFixed(2);
-                    fileInfo.innerHTML = `
-                        <strong>Selected:</strong> ${file.name}<br>
-                        <strong>Size:</strong> ${fileSize} MB<br>
-                        <strong>Type:</strong> ${file.type || 'Unknown'}
-                    `;
-                    fileInfo.style.display = 'block';
-                } else {
-                    fileInfo.style.display = 'none';
-                }
+                fileInfo.innerHTML = `
+                    <strong>Selected:</strong> ${files.length} file(s)<br>
+                    <strong>Total Size:</strong> ${totalSizeMB} MB
+                `;
+                fileInfo.style.display = 'block';
                 
-                validateForm();
-            });
+                // Display invoice list
+                displayInvoiceList(files);
+            } else {
+                fileInfo.style.display = 'none';
+                invoiceList.style.display = 'none';
+            }
+            
+            validateForm();
         });
 
+        // Handle other file inputs (single files)
+        fileInputs.forEach(input => {
+            if (input.id !== 'invoices') {
+                input.addEventListener('change', function(e) {
+                    const file = e.target.files[0];
+                    const fileInfo = document.getElementById(e.target.id + 'Info');
+                    
+                    if (file) {
+                        const fileSize = (file.size / (1024 * 1024)).toFixed(2);
+                        fileInfo.innerHTML = `
+                            <strong>Selected:</strong> ${file.name}<br>
+                            <strong>Size:</strong> ${fileSize} MB<br>
+                            <strong>Type:</strong> ${file.type || 'Unknown'}
+                        `;
+                        fileInfo.style.display = 'block';
+                    } else {
+                        fileInfo.style.display = 'none';
+                    }
+                    
+                    validateForm();
+                });
+            }
+        });
+
+        function displayInvoiceList(files) {
+            invoiceList.innerHTML = '';
+            
+            files.forEach((file, index) => {
+                const fileSize = (file.size / (1024 * 1024)).toFixed(2);
+                const invoiceItem = document.createElement('div');
+                invoiceItem.className = 'invoice-item';
+                invoiceItem.innerHTML = `
+                    <span class="invoice-name">${file.name}</span>
+                    <span class="invoice-size">${fileSize} MB</span>
+                    <button type="button" class="remove-invoice" onclick="removeInvoice(${index})">Remove</button>
+                `;
+                invoiceList.appendChild(invoiceItem);
+            });
+            
+            invoiceList.style.display = 'block';
+        }
+
+        function removeInvoice(index) {
+            const dt = new DataTransfer();
+            const files = Array.from(invoicesInput.files);
+            
+            files.forEach((file, i) => {
+                if (i !== index) {
+                    dt.items.add(file);
+                }
+            });
+            
+            invoicesInput.files = dt.files;
+            
+            // Trigger change event to update display
+            const event = new Event('change', { bubbles: true });
+            invoicesInput.dispatchEvent(event);
+        }
+
         function validateForm() {
-            const invoice = document.getElementById('invoice').files[0];
+            const invoices = document.getElementById('invoices').files;
             const billOfLading = document.getElementById('billOfLading').files[0];
             
-            if (invoice && billOfLading) {
+            if (invoices.length > 0 && billOfLading) {
                 submitBtn.disabled = false;
-                submitBtn.textContent = '📤 Upload Documents';
+                submitBtn.textContent = `📤 Upload ${invoices.length} Invoice(s) + BOL`;
             } else {
                 submitBtn.disabled = true;
                 submitBtn.textContent = '⚠️ Please select required documents';
@@ -260,17 +383,19 @@
             e.preventDefault();
             
             const formData = new FormData();
-            const invoice = document.getElementById('invoice').files[0];
+            const invoices = document.getElementById('invoices').files;
             const billOfLading = document.getElementById('billOfLading').files[0];
             const arrivalNotice = document.getElementById('arrivalNotice').files[0];
 
-            if (!invoice || !billOfLading) {
-                showStatus('Please select both invoice and bill of lading documents.', 'error');
+            if (invoices.length === 0 || !billOfLading) {
+                showStatus('Please select at least one invoice and the bill of lading document.', 'error');
                 return;
             }
 
-            // Add files to FormData
-            formData.append('invoice', invoice);
+            // Add multiple invoice files to FormData
+            for (let i = 0; i < invoices.length; i++) {
+                formData.append('invoices', invoices[i]);
+            }
             formData.append('bill_of_lading', billOfLading);
             if (arrivalNotice) {
                 formData.append('arrival_notice', arrivalNotice);

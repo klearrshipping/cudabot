@@ -103,13 +103,28 @@ def save_document_file(temp_file_path: str, order_number: str, document_type: st
             return False, "Failed to create order directory"
         
         # All documents go to file_uploads first (staging area)
+        # Handle numbered invoice types (invoice_1, invoice_2, etc.)
+        # Special case: bill_of_lading should not be split
+        if document_type == 'bill_of_lading':
+            base_document_type = 'bill_of_lading'
+        elif document_type.startswith('invoice_') and document_type.split('_')[1].isdigit():
+            # Handle numbered invoices (invoice_1, invoice_2, etc.)
+            base_document_type = 'invoice'
+        else:
+            base_document_type = document_type
+        
+        print(f"🔍 DEBUG: document_type={document_type}, base_document_type={base_document_type}")
+        
         type_to_dir = {
             'invoice': 'file_uploads',
             'bill_of_lading': 'file_uploads', 
             'arrival_notice': 'file_uploads'
         }
         
-        if document_type not in type_to_dir:
+        print(f"🔍 DEBUG: type_to_dir keys: {list(type_to_dir.keys())}")
+        print(f"🔍 DEBUG: base_document_type in type_to_dir: {base_document_type in type_to_dir}")
+        
+        if base_document_type not in type_to_dir:
             return False, f"Invalid document type: {document_type}"
         
         # Generate unique filename
@@ -118,14 +133,14 @@ def save_document_file(temp_file_path: str, order_number: str, document_type: st
         new_filename = f"{document_type}_{timestamp}{file_ext}"
         
         # Destination path
-        dest_dir = Path(order_dir) / type_to_dir[document_type]
+        dest_dir = Path(order_dir) / type_to_dir[base_document_type]
         dest_path = dest_dir / new_filename
         
         # Copy file to destination
         shutil.copy2(temp_file_path, dest_path)
         
         # Return relative path for database storage (updated for new structure)
-        relative_path = f"processed_orders/{order_number}/{type_to_dir[document_type]}/{new_filename}"
+        relative_path = f"processed_orders/{order_number}/{type_to_dir[base_document_type]}/{new_filename}"
         
         print(f"✅ File saved: {relative_path}")
         return True, relative_path

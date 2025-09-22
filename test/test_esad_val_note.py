@@ -11,8 +11,6 @@ from pathlib import Path
 # Add the customs_api directory to the path
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'customs_api'))
 
-from modules.esad_processor.process_esad import ESADOrchestrator
-
 def test_val_note_fields():
     """Test val_note fields: Valuation method and related fields"""
     
@@ -29,96 +27,96 @@ def test_val_note_fields():
             invoice_data = json.load(f)
         print(f"✅ Loaded invoice data: {len(invoice_data)} fields")
         
+        # Display invoice fields for debugging
+        print(f"\n📋 Invoice Data Fields:")
+        print(f"   • items: {invoice_data.get('items', [])}")
+        print(f"   • totals: {invoice_data.get('totals', {})}")
+        print(f"   • shipping: {invoice_data.get('shipping', {})}")
+        print(f"   • currency: {invoice_data.get('currency', 'N/A')}")
+        
         # Load BOL data
         with open(bol_file, 'r', encoding='utf-8') as f:
             bol_data = json.load(f)
         print(f"✅ Loaded BOL data: {len(bol_data)} fields")
         
-        # Initialize eSAD orchestrator
-        orchestrator = ESADOrchestrator()
+        # Display BOL fields for debugging
+        print(f"\n📋 BOL Data Fields:")
+        print(f"   • freight_and_charges: {bol_data.get('freight_and_charges', 'N/A')}")
+        print(f"   • charges_table: {bol_data.get('charges_table', [])}")
+        print(f"   • cargo: {bol_data.get('cargo', {})}")
         
-        # Test val_note fields
-        val_note_fields = [
-            {
-                "box_field": "val_note",
-                "field_name": "Valuation method",
-                "description": "Method used for customs valuation",
-                "extraction_prompt": "AUTOMATED: This field is automatically populated by the esad_cif script using valuation method analysis. No LLM processing required.",
-                "processing_method": "automated_valuation_method",
-                "script": "esad_cif"
-            },
-            {
-                "box_field": "val_note",
-                "field_name": "Valuation currency",
-                "description": "Currency used for customs valuation",
-                "extraction_prompt": "AUTOMATED: This field is automatically populated by the esad_cif script using currency analysis. No LLM processing required.",
-                "processing_method": "automated_currency_analysis",
-                "script": "esad_cif"
-            },
-            {
-                "box_field": "val_note",
-                "field_name": "Valuation amount",
-                "description": "Amount used for customs valuation",
-                "extraction_prompt": "AUTOMATED: This field is automatically populated by the esad_cif script using valuation calculations. No LLM processing required.",
-                "processing_method": "automated_valuation_calculation",
-                "script": "esad_cif"
-            },
-            {
-                "box_field": "val_note",
-                "field_name": "Valuation exchange rate",
-                "description": "Exchange rate used for valuation",
-                "extraction_prompt": "AUTOMATED: This field is automatically populated by the esad_cif script using exchange rate analysis. No LLM processing required.",
-                "processing_method": "automated_exchange_rate",
-                "script": "esad_cif"
-            },
-            {
-                "box_field": "val_note",
-                "field_name": "Valuation date",
-                "description": "Date of valuation",
-                "extraction_prompt": "AUTOMATED: This field is automatically populated by the esad_cif script using date analysis. No LLM processing required.",
-                "processing_method": "automated_date_analysis",
-                "script": "esad_cif"
-            },
-            {
-                "box_field": "val_note",
-                "field_name": "Valuation notes",
-                "description": "Additional notes for valuation",
-                "extraction_prompt": "AUTOMATED: This field is automatically populated by the esad_cif script using notes analysis. No LLM processing required.",
-                "processing_method": "automated_notes_analysis",
-                "script": "esad_cif"
+        # Import the CIF processor directly
+        from modules.esad_processor.esad_modules.esad_cif import CIFProcessor
+        
+        # Prepare input data for CIF processor
+        input_data = {
+            'invoice_data': invoice_data,
+            'bol_data': bol_data,
+            'existing_fields': {}
+        }
+        
+        # Initialize CIF processor
+        cif_processor = CIFProcessor()
+        
+        # Test CIF processor directly
+        cif_result = cif_processor.process(input_data)
+        
+        if cif_result and cif_result.get('success'):
+            # Display the model used for extraction
+            model_used = cif_result.get('model_used', 'Unknown')
+            print(f"\n🤖 LLM Model Used for Extraction: {model_used}")
+            
+            # Display results in JSON format
+            print(f"\n📊 CIF Extraction Results (JSON Format)")
+            print("=" * 60)
+            
+            # Prepare the JSON structure
+            extraction_results = {
+                "model_used": model_used,
+                "invoice_data": {
+                    "invoice_total_including_freight": cif_result.get('val_note_invoice_total_including_freight'),
+                    "invoice_value_goods_only": cif_result.get('val_note_invoice_value_goods_only'),
+                    "freight_charges_invoice": cif_result.get('val_note_freight_charges_invoice'),
+                    "other_charges_invoice": cif_result.get('val_note_other_charges_invoice'),
+                    "currency": cif_result.get('invoice_currency')
+                },
+                "bol_data": {
+                    "freight_charges_bol_foreign": cif_result.get('val_note_freight_charges_bol'),
+                    "insurance_charges_bol_foreign": cif_result.get('val_note_insurance_charges_bol'),
+                    "other_charges_bol_foreign": cif_result.get('val_note_other_charges_bol'),
+                    "foreign_currency": cif_result.get('bol_foreign_currency')
+                },
+                "additional_data": {
+                    "incoterms": cif_result.get('incoterms')
+                },
+                "calculated_values": {
+                    "insurance_charges_invoice": cif_result.get('val_note_insurance_charges_invoice'),
+                    "cost_and_freight": cif_result.get('val_note_cost_and_freight')
+                }
             }
-        ]
-        
-        print(f"\n📋 Testing val_note Fields:")
-        print(f"   • Valuation method (esad_cif script)")
-        print(f"   • Valuation currency (esad_cif script)")
-        print(f"   • Valuation amount (esad_cif script)")
-        print(f"   • Valuation exchange rate (esad_cif script)")
-        print(f"   • Valuation date (esad_cif script)")
-        print(f"   • Valuation notes (esad_cif script)")
-        
-        # Test each val_note field
-        for field_def in val_note_fields:
-            field_name = field_def["field_name"]
-            script = field_def["script"]
             
-            print(f"\n🔍 Testing: {field_name}")
-            print(f"   Script: {script}")
+            # Display JSON with proper formatting
+            print(json.dumps(extraction_results, indent=2, ensure_ascii=False))
+            print("=" * 60)
             
-            # Test specialized script processing
-            field_value = orchestrator._run_specialized_script(
-                script, field_name, invoice_data, bol_data
-            )
+            # Display calculation details after JSON
+            extracted_data = cif_result.get('extracted_data', {})
             
-            if field_value:
-                print(f"   ✅ Result: {field_value}")
-            else:
-                print(f"   ⚠️ No data returned from {script}")
+            # Show calculation details
+            if extracted_data.get('_insurance_debug') or extracted_data.get('_cf_debug'):
+                print(f"\n🔍 CALCULATION DETAILS:")
+                if extracted_data.get('_insurance_debug'):
+                    print(f"   {extracted_data['_insurance_debug']}")
+                if extracted_data.get('_cf_debug'):
+                    print(f"   {extracted_data['_cf_debug']}")
+        else:
+            error_msg = cif_result.get('error', 'Unknown error') if cif_result else 'No result returned'
+            print(f"   ⚠️ CIF processing failed: {error_msg}")
         
         print(f"\n📊 val_note Test Summary:")
-        print(f"   • Fields tested: 6")
+        print(f"   • Fields tested: CIF Components")
         print(f"   • Script: esad_cif")
-        print(f"   • Processing: Automated valuation analysis")
+        print(f"   • Processing: Direct CIF processor execution")
         
     except Exception as e:
         print(f"❌ Test failed: {e}")
