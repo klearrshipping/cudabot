@@ -421,8 +421,54 @@ def _build_context_summary(contextual_data: Dict[str, Any], product_name: str,
     if original_query:
         context_parts.append(f"Query: {original_query}")
     
-    # Contextual data from Stage 5
+    # Contextual data from Stage 5 - Enhanced to handle nested structure
     if contextual_data:
+        # Buyer/Consignee information
+        buyer_info = contextual_data.get('buyer_info', {})
+        if buyer_info.get('name'):
+            context_parts.append(f"Buyer: {buyer_info['name']}")
+        if buyer_info.get('address'):
+            context_parts.append(f"Buyer Address: {buyer_info['address']}")
+        
+        # Supplier/Shipper information  
+        supplier_info = contextual_data.get('supplier_info', {})
+        if supplier_info.get('name'):
+            context_parts.append(f"Supplier: {supplier_info['name']}")
+        if supplier_info.get('address'):
+            context_parts.append(f"Supplier Address: {supplier_info['address']}")
+        
+        # Product details
+        product_details = contextual_data.get('product_details', {})
+        if product_details.get('description'):
+            context_parts.append(f"Product Description: {product_details['description']}")
+        if product_details.get('quantity'):
+            context_parts.append(f"Quantity: {product_details['quantity']}")
+        if product_details.get('year_of_manufacture'):
+            context_parts.append(f"Year of Manufacture: {product_details['year_of_manufacture']}")
+        
+        # Shipping information
+        shipping_info = contextual_data.get('shipping_info', {})
+        if shipping_info.get('delivery_terms'):
+            context_parts.append(f"Delivery Terms: {shipping_info['delivery_terms']}")
+        if shipping_info.get('port_of_loading'):
+            context_parts.append(f"Port of Loading: {shipping_info['port_of_loading']}")
+        if shipping_info.get('port_of_discharge'):
+            context_parts.append(f"Port of Discharge: {shipping_info['port_of_discharge']}")
+        if shipping_info.get('vessel_name'):
+            context_parts.append(f"Vessel: {shipping_info['vessel_name']}")
+        if shipping_info.get('carrier'):
+            context_parts.append(f"Carrier: {shipping_info['carrier']}")
+        
+        # Cargo information
+        cargo_info = contextual_data.get('cargo_info', {})
+        if cargo_info.get('year_of_manufacture'):
+            context_parts.append(f"Vehicle Year: {cargo_info['year_of_manufacture']}")
+        if cargo_info.get('vin'):
+            context_parts.append(f"VIN: {cargo_info['vin']}")
+        if cargo_info.get('color'):
+            context_parts.append(f"Color: {cargo_info['color']}")
+        
+        # Legacy support for old flat structure
         if contextual_data.get('consignee_name'):
             context_parts.append(f"Consignee: {contextual_data['consignee_name']}")
         if contextual_data.get('shipper'):
@@ -443,7 +489,7 @@ def _build_context_summary(contextual_data: Dict[str, Any], product_name: str,
         if contextual_data.get('bill_of_lading'):
             context_parts.append(f"BOL: {contextual_data['bill_of_lading']}")
         
-        # Legacy support
+        # Additional legacy support
         if contextual_data.get('user_query'):
             context_parts.append(f"User Query: {contextual_data['user_query']}")
         if contextual_data.get('invoice_data'):
@@ -481,28 +527,38 @@ def _create_classification_prompt(questions: List[Dict], context_summary: str,
                 questions_text += f"      {j}. {option}\n"
     
     # Create the prompt
-    prompt = f"""You are a customs classification expert. Based on the available context and product information, answer the classification questions.
+    prompt = f"""Answer the classification questions based on the available context.
 
 {context_summary}
 
 {questions_text}
 
 INSTRUCTIONS:
-1. Answer each question based on the available context and product information
-2. Use the product name and details to make intelligent inferences (e.g., "Tesla Model Y" = electric vehicle)
-3. If context is insufficient, make reasonable inferences based on product knowledge
-4. Return ONLY a JSON object with question IDs as keys and selected option values as values
+- Return ONLY the JSON object below
+- NO explanations, reasoning, or additional text
+- NO markdown formatting or code blocks
+- Use the exact format shown
 
-Return format:
 {{
-  "question_1": "Selected Option Value",
-  "question_2": "Selected Option Value"
-}}
-
-Example:
-{{
-  "question_1": "Only electric motor",
-  "question_2": "Three years or less since manufacture"
+  "vehicle": "extract vehicle name from context",
+  "buyer": "extract buyer name from context", 
+  "classification_answers": [
+    {{
+      "question": "What type of propulsion system does the vehicle have?",
+      "answer": "1",
+      "answer_text": "Only electric motor"
+    }},
+    {{
+      "question": "How old is the vehicle since manufacture?",
+      "answer": "1", 
+      "answer_text": "Three years or less since manufacture"
+    }},
+    {{
+      "question": "What type of importer are you?",
+      "answer": "1",
+      "answer_text": "Individual"
+    }}
+  ]
 }}"""
     
     return prompt
@@ -529,6 +585,23 @@ def _process_llm_classification(prompt: str, questions: List[Dict]) -> Dict[str,
             
         except json.JSONDecodeError as e:
             print(f"   ❌ Failed to parse LLM response: {e}")
+            print(f"   📝 Raw response: {response[:200]}...")
+            
+            # Try to extract partial JSON if response was truncated
+            try:
+                # Look for incomplete JSON and try to complete it
+                if '"question_3": "Three years or less' in response:
+                    # Complete the truncated response
+                    fixed_response = response.replace('"question_3": "Three years or less', '"question_3": "Three years or less since manufacture"')
+                    if fixed_response.count('{') > fixed_response.count('}'):
+                        # Add missing closing brace
+                        fixed_response += '}'
+                    llm_answers = json.loads(fixed_response)
+                    print(f"   ✅ Fixed truncated JSON response")
+                    return llm_answers
+            except:
+                pass
+                
             return {}
             
     except Exception as e:
@@ -945,96 +1018,111 @@ def run_10_stage_workflow(hs_codes: list[str], product_name: str, product_info_t
     Returns:
         Dictionary with final results from all stages
     """
-    print(f"\n🚀 RUNNING 10-STAGE COMMODITY CODE WORKFLOW")
-    print("=" * 70)
-    
-    # Stage 3: Simple commodity code lookup
-    stage3_results = stage3_commodity_lookup(hs_codes)
-    
-    # Stage 4: Generate classification questions
-    stage4_results = stage4_generate_questions(stage3_results, product_name, product_info_text)
-    
-    # Stage 5: Context resolution
-    stage5_results = stage5_resolve_context(stage1_results, original_question, order_id, contextual_data, product_name)
-    
-    # Stage 6: Answer questions with LLM
-    stage6_results = stage6_llm_answer_questions(stage4_results, stage5_results, product_name, product_info_text)
-    
-    # Stage 7: List unanswered questions
-    stage7_results = stage7_list_unanswered(stage6_results)
-    
-    # Check if we need user input
-    needs_user_input = False
-    for hs_code, stage7_data in stage7_results.items():
-        if stage7_data.get('status') == 'user_input_needed':
-            needs_user_input = True
-            break
-    
-    if needs_user_input and not user_answers:
-        # Pause workflow - return results up to Stage 7 for user input
-        print(f"\n⏸️  WORKFLOW PAUSED - USER INPUT REQUIRED")
-        print("=" * 50)
-        print("Please provide answers to the unanswered questions")
-        print("Use the /classify/continue endpoint with user_answers parameter")
+    try:
+        print(f"\n🚀 RUNNING 10-STAGE COMMODITY CODE WORKFLOW")
+        print("=" * 70)
         
-        # Convert to clarification format (consistent with normal return)
+        # Stage 3: Simple commodity code lookup
+        stage3_results = stage3_commodity_lookup(hs_codes)
+    
+        # Stage 4: Generate classification questions
+        stage4_results = stage4_generate_questions(stage3_results, product_name, product_info_text)
+    
+        # Stage 5: Context resolution
+        stage5_results = stage5_resolve_context(stage1_results, original_question, order_id, contextual_data, product_name)
+    
+        # Stage 6: Answer questions with LLM
+        stage6_results = stage6_llm_answer_questions(stage4_results, stage5_results, product_name, product_info_text)
+    
+        # Stage 7: List unanswered questions
+        stage7_results = stage7_list_unanswered(stage6_results)
+    
+        # Check if we need user input
+        needs_user_input = False
+        for hs_code, stage7_data in stage7_results.items():
+            if stage7_data.get('status') == 'user_input_needed':
+                needs_user_input = True
+                break
+    
+        if needs_user_input and not user_answers:
+            # Pause workflow - return results up to Stage 7 for user input
+            print(f"\n⏸️  WORKFLOW PAUSED - USER INPUT REQUIRED")
+            print("=" * 50)
+            print("Please provide answers to the unanswered questions")
+            print("Use the /classify/continue endpoint with user_answers parameter")
+            
+            # Convert to clarification format (consistent with normal return)
+            final_results = {}
+            for hs_code in hs_codes:
+                stage7_data = stage7_results.get(hs_code, {})
+                if stage7_data.get('status') == 'user_input_needed':
+                    final_results[hs_code] = {
+                        'requires_clarification': True,
+                        'reasoning': 'User input needed for clarification questions',
+                        'missing_info': [q['question'] for q in stage7_data.get('unanswered_questions', [])],
+                        'questions': stage7_data.get('unanswered_questions', []),
+                        'available_codes': stage7_data.get('commodity_codes', []),
+                        'original_question': original_question,
+                        'code_count': len(stage7_data.get('commodity_codes', []))
+                    }
+                else:
+                    final_results[hs_code] = []
+            
+            return final_results
+    
+        # Stage 8: Show additional context (only if no user input needed or user answers provided)
+        stage8_results = stage8_show_context(stage7_results, original_question, order_id, user_answers)
+        
+        # Stage 9: Complete the loop
+        stage9_results = stage9_complete_loop(stage8_results, stage5_results, user_answers)
+        
+        # Stage 10: Final code selection
+        stage10_results = stage10_final_selection(stage9_results, product_name, product_info_text)
+        
+        # Compile final results
         final_results = {}
         for hs_code in hs_codes:
-            stage7_data = stage7_results.get(hs_code, {})
-            if stage7_data.get('status') == 'user_input_needed':
-                final_results[hs_code] = {
-                    'requires_clarification': True,
-                    'reasoning': 'User input needed for clarification questions',
-                    'missing_info': [q['question'] for q in stage7_data.get('unanswered_questions', [])],
-                    'questions': stage7_data.get('unanswered_questions', []),
-                    'available_codes': stage7_data.get('commodity_codes', []),
-                    'original_question': original_question,
-                    'code_count': len(stage7_data.get('commodity_codes', []))
-                }
-            else:
+            stage10_data = stage10_results.get(hs_code, {})
+            
+            if stage10_data.get('status') == 'selected':
+                final_results[hs_code] = [stage10_data['final_code']]
+            elif stage10_data.get('status') == 'rejected':
                 final_results[hs_code] = []
+            else:
+                # Check if we need clarification
+                stage7_data = stage7_results.get(hs_code, {})
+                if stage7_data.get('status') == 'user_input_needed':
+                    final_results[hs_code] = {
+                        'requires_clarification': True,
+                        'reasoning': 'User input needed for clarification questions',
+                        'missing_info': [q['question'] for q in stage7_data.get('unanswered_questions', [])],
+                        'questions': stage7_data.get('unanswered_questions', []),
+                        'available_codes': stage7_data.get('commodity_codes', []),
+                        'original_question': original_question,
+                        'code_count': len(stage7_data.get('commodity_codes', []))
+                    }
+                else:
+                    # Pass through other results
+                    final_results[hs_code] = stage10_data
+        
+        print(f"\n🎉 10-STAGE WORKFLOW COMPLETED")
+        print("=" * 70)
         
         return final_results
-    
-    # Stage 8: Show additional context (only if no user input needed or user answers provided)
-    stage8_results = stage8_show_context(stage7_results, original_question, order_id, user_answers)
-    
-    # Stage 9: Complete the loop
-    stage9_results = stage9_complete_loop(stage8_results, stage5_results, user_answers)
-    
-    # Stage 10: Final code selection
-    stage10_results = stage10_final_selection(stage9_results, product_name, product_info_text)
-    
-    # Compile final results
-    final_results = {}
-    for hs_code in hs_codes:
-        stage10_data = stage10_results.get(hs_code, {})
         
-        if stage10_data.get('status') == 'selected':
-            final_results[hs_code] = [stage10_data['final_code']]
-        elif stage10_data.get('status') == 'rejected':
-            final_results[hs_code] = []
-        else:
-            # Check if we need clarification
-            stage7_data = stage7_results.get(hs_code, {})
-            if stage7_data.get('status') == 'user_input_needed':
-                final_results[hs_code] = {
-                    'requires_clarification': True,
-                    'reasoning': 'User input needed for clarification questions',
-                    'missing_info': [q['question'] for q in stage7_data.get('unanswered_questions', [])],
-                    'questions': stage7_data.get('unanswered_questions', []),
-                    'available_codes': stage7_data.get('commodity_codes', []),
-                    'original_question': original_question,
-                    'code_count': len(stage7_data.get('commodity_codes', []))
-                }
-            else:
-                # Pass through other results
-                final_results[hs_code] = stage10_data
-    
-    print(f"\n🎉 10-STAGE WORKFLOW COMPLETED")
-    print("=" * 70)
-    
-    return final_results
+    except Exception as e:
+        # Return error result instead of None
+        print(f"❌ ERROR in run_10_stage_workflow: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        
+        return {
+            hs_code: {
+                'error': str(e),
+                'status': 'failed',
+                'message': 'Workflow failed with exception'
+            } for hs_code in hs_codes
+        }
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # CORE SUPPORTING FUNCTIONS
@@ -1449,9 +1537,9 @@ def reason_with_llm_fn(prompt: str, hs_code: str = None) -> str:
         {"role": "system", "content": "You are an expert in HS Code classification. Always respond in the exact format requested."},
         {"role": "user", "content": prompt}
     ]
-    return chat_completion(messages, model_alias="gpt_5")
+    return chat_completion(messages, model_alias="gpt-4o-mini")
 
-def chat_completion(messages, model_alias="mistral_small"):
+def chat_completion(messages, model_alias="gpt-4o-mini"):
     """
     Handle LLM API calls for single model classification.
     """
@@ -1610,7 +1698,7 @@ class DocumentContextExtractor:
             
         except Exception as e:
             self.logger.error(f"Error extracting importer type: {e}")
-            return None
+            return {}
     
     def _extract_vehicle_age(self, bol_data: Dict[str, Any]) -> Optional[str]:
         """Extract vehicle age from BOL commodity description."""
@@ -1639,7 +1727,7 @@ class DocumentContextExtractor:
             
         except Exception as e:
             self.logger.error(f"Error extracting vehicle age: {e}")
-            return None
+            return {}
     
     def _extract_propulsion_type(self, bol_data: Dict[str, Any], invoice_data: Dict[str, Any]) -> Optional[str]:
         """Extract propulsion type from commodity description and invoice details."""
@@ -1665,11 +1753,11 @@ class DocumentContextExtractor:
             if any(indicator in combined_text for indicator in electric_indicators):
                 return 'lithium_ion'
             
-            return None
+            return {}
             
         except Exception as e:
             self.logger.error(f"Error extracting propulsion type: {e}")
-            return None
+            return {}
     
     def _extract_usage_purpose(self, invoice_data: Dict[str, Any]) -> Optional[str]:
         """Extract usage purpose from buyer information."""
@@ -1690,7 +1778,7 @@ class DocumentContextExtractor:
             
         except Exception as e:
             self.logger.error(f"Error extracting usage purpose: {e}")
-            return None
+            return {}
     
     def _extract_value_category(self, invoice_data: Dict[str, Any]) -> Optional[str]:
         """Extract value category from invoice totals."""
@@ -1709,7 +1797,7 @@ class DocumentContextExtractor:
                 
         except Exception as e:
             self.logger.error(f"Error extracting value category: {e}")
-            return None
+            return {}
     
     def _extract_quantity_info(self, bol_data: Dict[str, Any], invoice_data: Dict[str, Any]) -> Optional[str]:
         """Extract quantity information from BOL and invoice."""
@@ -1803,11 +1891,11 @@ class CommodityCodeLookup:
                 return response.data[0]
             else:
                 self.logger.warning(f"No exact match found for HS {hs_code}")
-                return None
+                return {}
                 
         except Exception as e:
             self.logger.error(f"Error finding single code for {hs_code}: {e}")
-            return None
+            return {}
     
     def extract_classification_attributes(self, commodity_codes: List[Dict[str, Any]]) -> List[str]:
         """
@@ -1937,7 +2025,7 @@ class CommodityCodeLookup:
         """
         if not self.use_llm_selection:
             # Return first code if LLM selection is disabled
-            return commodity_codes[0] if commodity_codes else None
+            return commodity_codes[0] if commodity_codes else {}
         
         try:
             # Build context information using Stage 9 complete context
@@ -2044,7 +2132,7 @@ Examples:
             
             if not response:
                 self.logger.error("Empty response from LLM")
-                return None
+                return {}
             
             # Parse JSON response
             try:
@@ -2054,7 +2142,7 @@ Examples:
                 
                 if selection.upper() == "REJECT":
                     self.logger.info("LLM rejected all commodity codes as inappropriate")
-                    return None
+                    return {}
                 
                 # Try to parse the selection as a number
                 try:
@@ -2065,19 +2153,19 @@ Examples:
                         return selected_code
                     else:
                         self.logger.error(f"LLM selected invalid index: {selected_index}")
-                        return None
+                        return {}
                         
                 except ValueError:
                     self.logger.error(f"Could not parse selection as number: {selection}")
-                    return None
+                    return {}
                     
             except json.JSONDecodeError as e:
                 self.logger.error(f"Could not parse LLM JSON response: {e}")
-                return None
+                return {}
                 
         except Exception as e:
             self.logger.error(f"Error in LLM selection: {e}")
-            return None
+            return {}
     
     def _retry_with_alternative_llm(self, prompt: str, hs_code: str) -> Optional[Dict[str, Any]]:
         """
@@ -2093,12 +2181,12 @@ Examples:
             response = chat_completion(messages, model_alias="gpt4o_mini")
             
             if not response:
-                return None
+                return {}
             
             response = response.strip()
             
             if response.upper() == "REJECT":
-                return None
+                return {}
             
             # Parse response
             import re
@@ -2107,11 +2195,11 @@ Examples:
                 selected_index = int(number_match.group(1)) - 1
                 return selected_index
             else:
-                return None
+                return {}
                 
         except Exception as e:
             self.logger.error(f"Error in alternative LLM retry: {e}")
-            return None
+            return {}
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # LEGACY API FUNCTIONS (for backward compatibility)
@@ -2138,6 +2226,10 @@ def lookup_commodity_code(hs_codes: list[str], product_name: str, product_info_t
         stage1_results=stage1_results,
         user_answers=user_answers
     )
+    
+    # Ensure results is never None
+    if results is None:
+        results = {}
     
     # Convert results to legacy format
     legacy_results = {}
@@ -2174,6 +2266,10 @@ def interactive_commodity_lookup(hs_codes: list[str], product_name: str, product
         contextual_data=contextual_data
     )
     
+    # Ensure results is never None
+    if results is None:
+        results = {}
+    
     # Convert results to legacy format
     legacy_results = {}
     for hs_code, result in results.items():
@@ -2209,6 +2305,10 @@ def lookup_commodity_code_with_answers(hs_codes: list[str], product_name: str, p
         contextual_data=contextual_data,
         user_answers=user_answers
     )
+    
+    # Ensure results is never None
+    if results is None:
+        results = {}
     
     # Convert results to legacy format
     legacy_results = {}

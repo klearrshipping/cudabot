@@ -81,6 +81,49 @@ Return your answers as a bullet list, one bullet per question, in the same order
 with no additional commentary, JSON, or numbering.
 """.strip()
 
+VEHICLE_DETECTION_PROMPT = """
+You are an expert product classifier. Decide if the given product name refers to a motor vehicle (cars, SUVs, pickups, vans, trucks, buses, special-purpose road vehicles). Return exactly one word:
+
+- vehicle  → if it is a motor vehicle
+- non-vehicle → otherwise
+
+Product name: {product_name}
+Answer:
+""".strip()
+
+VEHICLE_INFO_TEMPLATE = """
+For the {product_name}, provide the following information in JSON format:
+
+- vehicle: the full vehicle name
+- vehicle_type: the category (e.g., sedan, SUV, truck, coupe, etc.)
+- propulsion_type: the propulsion system (e.g., internal combustion engine, electric, hybrid, plug-in hybrid)
+- engine_options: an array of all available engine/motor configurations, each with:
+  - type: engine/motor description (e.g., "2.0L I4 Turbo")
+  - displacement_cc: engine displacement in cubic centimeters (for combustion engines)
+  - notes: additional context (e.g., "Standard", "Optional", "Performance trim")
+
+Example:
+{{
+  "vehicle": "2024 Honda Accord",
+  "vehicle_type": "Midsize sedan",
+  "propulsion_type": "Internal combustion engine",
+  "engine_options": [
+    {{
+      "type": "1.5L I4 Turbo",
+      "displacement_cc": 1500,
+      "notes": "Standard engine"
+    }},
+    {{
+      "type": "2.0L I4 Turbo",
+      "displacement_cc": 2000,
+      "notes": "Sport trim only"
+    }}
+  ]
+}}
+
+Format the response as valid JSON only, with no additional text.
+""".strip()
+
 CLASSIFICATION_TEMPLATE = """
 You are an expert customs broker. Determine the 6-digit HS code for **{product_name}**.
 
@@ -137,10 +180,95 @@ class HSCodeClassifier:
             m: LLMClient(m, api_key) for m in (class_models or list(OPENROUTER_MODELS))
         }
         self.product_information = ""  # To expose the collected information
-    def collect_information(self, product_name: str) -> str:
+    def _extract_vehicle_details_from_context(self, product_name: str, contextual_data: Dict[str, Any] = None) -> str:
+        """
+        Extract complete vehicle details from contextual_data (extracted from documents).
+        Falls back to product_name if no contextual data available.
+        """
+        if not contextual_data:
+            return product_name.strip()
+        
+        # Try to extract vehicle details from various sources in contextual_data
+        vehicle_details = None
+        
+        # Check for vehicle info in product_details
+        if 'product_details' in contextual_data and contextual_data['product_details']:
+            product_details = contextual_data['product_details']
+            if isinstance(product_details, dict):
+                # Look for year, make, model in product_details
+                year = product_details.get('year') or product_details.get('model_year')
+                make = product_details.get('make') or product_details.get('manufacturer')
+                model = product_details.get('model') or product_details.get('vehicle_model')
+                
+                if year and make and model:
+                    vehicle_details = f"{year} {make} {model}"
+        
+        # Check for vehicle info in commodity field
+        if not vehicle_details and 'commodity' in contextual_data:
+            commodity = contextual_data['commodity']
+            if commodity and isinstance(commodity, str):
+                # Look for year pattern in commodity description
+                import re
+                year_match = re.search(r'\b(19|20)\d{2}\b', commodity)
+                if year_match:
+                    vehicle_details = commodity.strip()
+        
+        # Check for vehicle info in buyer_info or supplier_info
+        if not vehicle_details:
+            for info_key in ['buyer_info', 'supplier_info']:
+                if info_key in contextual_data and contextual_data[info_key]:
+                    info = contextual_data[info_key]
+                    if isinstance(info, dict):
+                        # Look for vehicle description in various fields
+                        for field in ['description', 'product_description', 'item_description']:
+                            if field in info and info[field]:
+                                desc = info[field]
+                                if isinstance(desc, str) and any(word in desc.lower() for word in ['vehicle', 'car', 'truck', 'suv', 'sedan']):
+                                    vehicle_details = desc.strip()
+                                    break
+                        if vehicle_details:
+                            break
+        
+        # Return the best vehicle details found, or fall back to product_name
+        return vehicle_details if vehicle_details else product_name.strip()
+
+    def collect_information(self, product_name: str, contextual_data: Dict[str, Any] = None) -> str:
         """Prompt 1: Collect product information using gather model."""
-        prompt = COLLECT_INFO_TEMPLATE.format(product_name=product_name)
-        logger.info("Collecting information for: %s using %s", product_name, self.gather_client.model_name)
+        # Primary detection: ask the LLM if this is a motor vehicle (with backup model)
+        is_vehicle = False
+        detection_prompt = VEHICLE_DETECTION_PROMPT.format(product_name=product_name)
+        logger.info("🔍 VEHICLE DETECTION: Starting detection for '%s'", product_name)
+        
+        try:
+            detection_answer = self.gather_client.chat("Vehicle detection", detection_prompt).strip().lower()
+            logger.info("🔍 VEHICLE DETECTION: Primary model response: '%s'", detection_answer)
+        except Exception as e:
+            logger.error("🔍 VEHICLE DETECTION: Primary model failed: %s", str(e))
+            detection_answer = ""
+
+        if detection_answer not in ("vehicle", "non-vehicle"):
+            # Backup detection using a secondary model
+            logger.info("🔍 VEHICLE DETECTION: Primary response invalid, trying backup model")
+            try:
+                backup_client = LLMClient("gpt_5_nano")
+                detection_answer = backup_client.chat("Vehicle detection", detection_prompt).strip().lower()
+                logger.info("🔍 VEHICLE DETECTION: Backup model response: '%s'", detection_answer)
+            except Exception as e:
+                logger.error("🔍 VEHICLE DETECTION: Backup model failed: %s", str(e))
+                detection_answer = "non-vehicle"
+
+        is_vehicle = detection_answer.startswith("vehicle")
+        logger.info("🔍 VEHICLE DETECTION: Final decision - is_vehicle: %s", is_vehicle)
+
+        if is_vehicle:
+            # Extract complete vehicle details from contextual_data (extracted from documents)
+            formatted_vehicle_name = self._extract_vehicle_details_from_context(product_name, contextual_data)
+            prompt = VEHICLE_INFO_TEMPLATE.format(product_name=formatted_vehicle_name)
+            logger.info("Collecting VEHICLE-SPECIFIC information for: %s using %s", formatted_vehicle_name, self.gather_client.model_name)
+        else:
+            prompt = COLLECT_INFO_TEMPLATE.format(product_name=product_name)
+            logger.info("Collecting information for: %s using %s", product_name, self.gather_client.model_name)
+        
         try:
             answer_block = self.gather_client.chat("Information collector", prompt)
             if not answer_block:
@@ -191,10 +319,10 @@ class HSCodeClassifier:
         # Sort by frequency (most common first)
         sorted_codes = [code for code, count in code_counts.most_common()]
         return sorted_codes
-    def run(self, product_name: str) -> Dict[str, HSCodeResult]:
+    def run(self, product_name: str, contextual_data: Dict[str, Any] = None) -> Dict[str, HSCodeResult]:
         """Run the full two-stage classification pipeline."""
         # Stage 1: Collect information
-        product_information = self.collect_information(product_name)
+        product_information = self.collect_information(product_name, contextual_data)
         # Stage 2: Classify with each model
         results: Dict[str, HSCodeResult] = {}
         logger.info("\nClassifying based on collected information...")
@@ -221,26 +349,42 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output", type=str, help="Output JSON file")
     return parser.parse_args()
 
-def classify_product(product_name: str) -> dict:
+def classify_product(product_name: str, contextual_data: Dict[str, Any] = None) -> dict:
     """Main entry point for classification."""
-    classifier = HSCodeClassifier()
-    results = classifier.run(product_name)
-    hs_codes = classifier.calculate_consensus(results)
-    
-    # Build detailed output
-    model_responses = {}
-    for model_name, result in results.items():
-        model_responses[model_name] = result.hs_code
-    
-    output = {
-        "product": product_name,
-        "hs_codes": ", ".join(hs_codes) if hs_codes else "No consensus",
-        "product_information": classifier.product_information,
-        "model_responses": model_responses,
-        "consensus_codes": hs_codes
-    }
-    
-    return output
+    try:
+        classifier = HSCodeClassifier()
+        results = classifier.run(product_name, contextual_data)
+        hs_codes = classifier.calculate_consensus(results)
+        
+        # Build detailed output
+        model_responses = {}
+        for model_name, result in results.items():
+            model_responses[model_name] = result.hs_code
+        
+        output = {
+            "product": product_name,
+            "hs_codes": ", ".join(hs_codes) if hs_codes else "No consensus",
+            "product_information": classifier.product_information,
+            "model_responses": model_responses,
+            "consensus_codes": hs_codes
+        }
+        
+        return output
+        
+    except Exception as e:
+        logger.error("Error in classify_product: %s", str(e))
+        import traceback
+        traceback.print_exc()
+        
+        # Return error result instead of None
+        return {
+            "product": product_name,
+            "hs_codes": "Error",
+            "product_information": f"Error occurred during classification: {str(e)}",
+            "model_responses": {},
+            "consensus_codes": [],
+            "error": str(e)
+        }
 
 def main():
     args = parse_args()

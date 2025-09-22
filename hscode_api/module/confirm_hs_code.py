@@ -19,10 +19,10 @@ from datetime import datetime
 
 # Import LLM function with error handling
 try:
-    from .commodity_code import reason_with_llm_fn as reason_with_llm_for_commodity
+    from .commodity_code import reason_with_llm_fn
     COMMODITY_LLM_AVAILABLE = True
 except ImportError as e:
-    print(f"Warning: Could not import reason_with_llm_for_commodity: {e}")
+    print(f"Warning: Could not import reason_with_llm_fn: {e}")
     COMMODITY_LLM_AVAILABLE = False
 
 # ───────────────────────────── LLM Helper ──────────────────────────────
@@ -44,16 +44,10 @@ def call_llm(messages, model_alias, config, models):
     result = response.json()
     return result["choices"][0]["message"]["content"]
 
-def chat_completion(messages, model_alias="mistral_small"):
+def chat_completion(messages, model_alias="gpt-4o-mini"):
     return call_llm(messages, model_alias, OPENROUTER_CONFIG, OPENROUTER_MODELS)
 
 # ───────────────────────────── Reasoning Function ──────────────────────────────
-def reason_with_llm_fn(prompt: str, hs_code: str = None) -> str:
-    messages = [
-        {"role": "system", "content": "You are an expert in HS Code classification. Always respond in the exact format requested."},
-        {"role": "user", "content": prompt}
-    ]
-    return chat_completion(messages, model_alias="mistral_small")
 
 class HSCodeReconciler:
     def __init__(self, supabase_client: Client, reason_with_llm_fn, verbose=True):
@@ -109,9 +103,9 @@ class HSCodeReconciler:
             # DEBUG: Check options collection
             print(f"🔍 DEBUG: Starting options collection...")
             
-            # Add tariff options (limit to top 10 for LLM processing)
+            # Add tariff options (use ALL matches for LLM processing)
             if tariff_results['exact_matches'] or tariff_results['heading_matches']:
-                tariff_matches = (tariff_results['exact_matches'] or [])[:5] + (tariff_results['heading_matches'] or [])[:5]
+                tariff_matches = (tariff_results['exact_matches'] or []) + (tariff_results['heading_matches'] or [])
                 for match in tariff_matches:
                     all_options.append({
                         'code': match['tariff_code'],
@@ -131,7 +125,7 @@ class HSCodeReconciler:
                         'source': 'hs_codes_2022',
                         'match_type': 'exact'
                     })
-                for match in (hs_results['heading_matches'] or [])[:5]:  # Limit to 5
+                for match in (hs_results['heading_matches'] or []):
                     # Avoid duplicates
                     if not any(opt['formatted_code'] == match['hs_code'] for opt in all_options):
                         all_options.append({
@@ -777,7 +771,7 @@ Respond in this EXACT JSON format:
         
         try:
             print(f"🔍 DEBUG: Calling LLM with prompt...")
-            response = reason_with_llm_for_commodity(prompt, model_alias="mistral_small")
+            response = reason_with_llm_fn(prompt)
             print(f"🔍 DEBUG: LLM response received: {response[:100]}...")
             
             # Parse JSON response

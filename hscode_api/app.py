@@ -97,10 +97,16 @@ class HSCodeOrchestrator:
             print(f"\n📊 STAGE 1: Initial HS Code Classification")
             print(f"─────────────────────────────────────────")
             
-            stage1_results = classify_product(product_name)
+            stage1_results = classify_product(product_name, contextual_data)
             results["stage1_classification"] = stage1_results
             
-            if not stage1_results or not stage1_results.get("consensus_codes"):
+            # Check for None first, then check for consensus_codes
+            if stage1_results is None:
+                error_msg = "Stage 1 failed: classify_product returned None"
+                results["errors"].append(error_msg)
+                return results
+            
+            if not stage1_results.get("consensus_codes"):
                 error_msg = "Stage 1 failed: No HS codes generated"
                 results["errors"].append(error_msg)
                 return results
@@ -169,7 +175,15 @@ class HSCodeOrchestrator:
                         final_hs_codes, product_name, product_info, query_for_lookup, order_id, contextual_data, stage1_results, user_answers
                     )
                 
-                print(f"🔍 DEBUG: Commodity lookup returned: {type(commodity_results)} with keys: {list(commodity_results.keys()) if isinstance(commodity_results, dict) else 'Not a dict'}")
+                print(f"🔍 DEBUG: Commodity lookup returned: {type(commodity_results)}")
+                if commodity_results is None:
+                    print(f"🔍 DEBUG: commodity_results is None - this indicates an error in the commodity lookup")
+                    commodity_results = {}
+                elif isinstance(commodity_results, dict):
+                    print(f"🔍 DEBUG: commodity_results keys: {list(commodity_results.keys())}")
+                else:
+                    print(f"🔍 DEBUG: commodity_results is not a dict: {commodity_results}")
+                    commodity_results = {}
                 
                 # Debug: Print detailed structure of commodity_results
                 print(f"🔍 DEBUG: Detailed commodity_results structure:")
@@ -195,6 +209,7 @@ class HSCodeOrchestrator:
             total_codes = 0
             needs_clarification = False
             clarification_questions = []
+            
             
             for hs_code, result in commodity_results.items():
                 print(f"🔍 DEBUG: Processing HS Code {hs_code}: {type(result)}")
@@ -820,6 +835,13 @@ async def classify_product_endpoint(request: ClassificationRequest):
                 user_answers=request.user_answers
             )
             
+            # Defensive guard: ensure results is a dict before using .get()
+            if results is None:
+                raise HTTPException(status_code=500, detail="Pipeline returned no results")
+            if not isinstance(results, dict):
+                print(f"DEBUG: Unexpected results type: {type(results)}; coercing to empty dict")
+                results = {}
+            
             # Add debug block to see commodity extraction
             print(f"\n🔍 DEBUGGING COMMODITY EXTRACTION:")
             print("="*60)
@@ -827,6 +849,9 @@ async def classify_product_endpoint(request: ClassificationRequest):
             commodity_results = results.get("stage3_commodity_lookup", {})
             print(f"commodity_results type: {type(commodity_results)}")
             print(f"commodity_results keys: {list(commodity_results.keys()) if isinstance(commodity_results, dict) else 'Not a dict'}")
+
+            if commodity_results is None:
+                commodity_results = {}
 
             for hs_code, codes in commodity_results.items():
                 print(f"\nHS Code: {hs_code}")
@@ -1000,6 +1025,9 @@ async def classify_product_endpoint(request: ClassificationRequest):
             commodity_results = results.get("stage3_commodity_lookup", {})
             print(f"commodity_results type: {type(commodity_results)}")
             print(f"commodity_results keys: {list(commodity_results.keys()) if isinstance(commodity_results, dict) else 'Not a dict'}")
+
+            if commodity_results is None:
+                commodity_results = {}
 
             for hs_code, codes in commodity_results.items():
                 print(f"\nHS Code: {hs_code}")
