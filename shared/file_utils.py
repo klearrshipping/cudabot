@@ -39,7 +39,7 @@ def create_order_directory(order_number: str) -> str:
         for subdir in subdirs:
             (order_dir / subdir).mkdir(parents=True, exist_ok=True)
         
-        print(f"✅ Created order directory: {order_dir}")
+        # Created order directory
         return str(order_dir)
         
     except Exception as e:
@@ -113,16 +113,11 @@ def save_document_file(temp_file_path: str, order_number: str, document_type: st
         else:
             base_document_type = document_type
         
-        print(f"🔍 DEBUG: document_type={document_type}, base_document_type={base_document_type}")
-        
         type_to_dir = {
             'invoice': 'file_uploads',
             'bill_of_lading': 'file_uploads', 
             'arrival_notice': 'file_uploads'
         }
-        
-        print(f"🔍 DEBUG: type_to_dir keys: {list(type_to_dir.keys())}")
-        print(f"🔍 DEBUG: base_document_type in type_to_dir: {base_document_type in type_to_dir}")
         
         if base_document_type not in type_to_dir:
             return False, f"Invalid document type: {document_type}"
@@ -142,7 +137,7 @@ def save_document_file(temp_file_path: str, order_number: str, document_type: st
         # Return relative path for database storage (updated for new structure)
         relative_path = f"processed_orders/{order_number}/{type_to_dir[base_document_type]}/{new_filename}"
         
-        print(f"✅ File saved: {relative_path}")
+        # File saved
         return True, relative_path
         
     except Exception as e:

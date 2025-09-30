@@ -135,8 +135,7 @@ class IntentParser:
             r'\bnew\b',
             r'\bused\b',
             r'\bsecond hand\b',
-            r'\b\b\d{4}\b',  # Remove years like 2024
-            r'\b\b\d{3}\b',  # Remove years like 2023
+            # Note: Removed year-stripping patterns to preserve vehicle years for classification
         ]
         
         cleaned = product_text
@@ -246,11 +245,11 @@ class IntentParser:
         - restrictions: User wants trade restriction information
         - general: General trade information request
         
-        IMPORTANT: Extract ONLY the core product name, not descriptive phrases about import context, usage, or other details.
+        IMPORTANT: Extract the core product name, preserving important details like years for vehicles, but removing import context phrases.
         
         Return ONLY valid JSON with:
         {{
-            "product_name": "the core product being asked about (e.g., 'tesla model y' not '2024 tesla model y imported by an individual')",
+            "product_name": "the core product being asked about (e.g., '2024 tesla model y' not '2024 tesla model y imported by an individual')",
             "intent": "classify|duties|permits|restrictions|general",
             "confidence": "high|medium|low",
             "keywords": ["relevant", "keywords", "found"]
@@ -258,7 +257,7 @@ class IntentParser:
         
         Examples:
         "What is the HS code for fresh apples?" → {{"product_name": "fresh apples", "intent": "classify", "confidence": "high", "keywords": ["hs code"]}}
-        "Classify 2024 tesla model y imported by an individual" → {{"product_name": "tesla model y", "intent": "classify", "confidence": "high", "keywords": ["classify"]}}
+        "Classify 2024 tesla model y imported by an individual" → {{"product_name": "2024 tesla model y", "intent": "classify", "confidence": "high", "keywords": ["classify"]}}
         "How much duty do I pay on importing cars?" → {{"product_name": "cars", "intent": "duties", "confidence": "high", "keywords": ["duty", "importing"]}}
         "Do I need a permit for exporting wheat?" → {{"product_name": "wheat", "intent": "permits", "confidence": "high", "keywords": ["permit", "exporting"]}}
         """

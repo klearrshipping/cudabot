@@ -427,6 +427,11 @@ Return ONLY a JSON object with this structure:
         
         # Process importer address
         if 'importer_address' in data and data['importer_address']:
+            # Show raw importer input before formatting
+            try:
+                print(f"🔎 RAW Importer Address Input: {str(data['importer_address'])[:200]}")
+            except Exception:
+                pass
             importer_result = self.format_address(data['importer_address'])
             results['importer_address'] = {
                 'original': importer_result.original,
@@ -448,6 +453,11 @@ Return ONLY a JSON object with this structure:
         
         # Process exporter address
         if 'exporter_address' in data and data['exporter_address']:
+            # Show raw exporter input before formatting
+            try:
+                print(f"🔎 RAW Exporter Address Input: {str(data['exporter_address'])[:200]}")
+            except Exception:
+                pass
             exporter_result = self.format_address(data['exporter_address'])
             results['exporter_address'] = {
                 'original': exporter_result.original,
@@ -493,13 +503,76 @@ def main():
         input_path = sys.argv[1]
         with open(input_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
-        # Try to extract addresses from result.extracted_fields
-        extracted_fields = data.get('result', {}).get('extracted_fields', {})
-        addresses = {
-            'importer_address': extracted_fields.get('importer_address', ''),
-            'exporter_address': extracted_fields.get('exporter_address', '')
-        }
         print(f"🏠 ESAD Address Formatter: Processing addresses from {input_path}")
+
+        # If this looks like a BOL JSON (has shipper/consignee), build addresses from party data
+        shipper = data.get('shipper') if isinstance(data.get('shipper'), dict) else None
+        consignee = data.get('consignee') if isinstance(data.get('consignee'), dict) else None
+
+        def _field(d: Dict, *names: str) -> str:
+            for n in names:
+                if isinstance(d, dict) and n in d and d.get(n):
+                    return str(d.get(n)).strip()
+            return ""
+
+        def _country_full(code: str) -> str:
+            if not code:
+                return ""
+            m = {
+                'HK': 'Hong Kong',
+                'JM': 'Jamaica',
+                'US': 'United States',
+                'CN': 'China',
+                'GB': 'United Kingdom'
+            }
+            return m.get(str(code).upper(), code)
+
+        def _build_address_from_party(party: Dict) -> str:
+            if not isinstance(party, dict):
+                return ""
+            parts = []
+            parts.append(_field(party, 'address_line1', 'address_line_1'))
+            parts.append(_field(party, 'address_line2', 'address_line_2'))
+            parts.append(_field(party, 'city', 'city_region'))
+            parts.append(_field(party, 'postal_code', 'zip'))
+            parts.append(_country_full(_field(party, 'country')))
+            return " ".join([p for p in parts if p]).strip()
+
+        if shipper or consignee:
+            if consignee:
+                print("🔎 RAW Consignee Object:")
+                try:
+                    print(json.dumps(consignee, indent=2, ensure_ascii=False))
+                except Exception:
+                    print(str(consignee))
+            if shipper:
+                print("🔎 RAW Shipper Object:")
+                try:
+                    print(json.dumps(shipper, indent=2, ensure_ascii=False))
+                except Exception:
+                    print(str(shipper))
+
+            importer_address = _build_address_from_party(consignee or {})
+            exporter_address = _build_address_from_party(shipper or {})
+            print("🔧 Fields used to build Importer Address:",
+                  _field(consignee or {}, 'address_line1', 'address_line_1'),
+                  _field(consignee or {}, 'city', 'city_region'),
+                  _field(consignee or {}, 'country'))
+            print("🔧 Fields used to build Exporter Address:",
+                  _field(shipper or {}, 'address_line1', 'address_line_1'),
+                  _field(shipper or {}, 'city', 'city_region'),
+                  _field(shipper or {}, 'country'))
+            addresses = {
+                'importer_address': importer_address,
+                'exporter_address': exporter_address
+            }
+        else:
+            # Fallback to original shape: extract from result.extracted_fields
+            extracted_fields = data.get('result', {}).get('extracted_fields', {})
+            addresses = {
+                'importer_address': extracted_fields.get('importer_address', ''),
+                'exporter_address': extracted_fields.get('exporter_address', '')
+            }
     else:
         # Fallback to hardcoded test addresses
         addresses = {

@@ -52,6 +52,12 @@ OPENROUTER_GENERAL_MODELS = {
         "temperature": 0.7,
         "max_tokens": 1000
     },
+    "gemini_pro": {
+        "name": "google/gemini-2.5-pro",
+        "description": "Google Gemini 2.5 Pro",
+        "temperature": 0.2,
+        "max_tokens": 3000
+    },
     "gpt_5_mini": {
         "name": "openai/gpt-5-mini",
         "description": "OpenAI GPT-5 Mini",

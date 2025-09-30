@@ -460,26 +460,32 @@ class ESADProcessor:
         trn_processor = TRNLookupProcessor()
         
         # Process addresses
-        print("\n🏠 Processing addresses...")
+        print("\n🏠 BOX 2 & BOX 8: Processing addresses (Exporter/Consignee)...")
         try:
             # Process importer address
             if bol_data and bol_data.get('consignee'):
+                consignee_name = bol_data['consignee'].get('name', '').strip()
                 consignee_address = f"{bol_data['consignee'].get('address_line1', '')} {bol_data['consignee'].get('city', '')} {bol_data['consignee'].get('country', '')}".strip()
                 if consignee_address:
                     importer_result = address_formatter.format_address(consignee_address)
+                    if consignee_name:
+                        print(f"👤 Consignee Name: {consignee_name}")
                     print(f"✅ Importer Address: {importer_result.formatted}")
             
             # Process exporter address  
             if bol_data and bol_data.get('shipper'):
+                shipper_name = bol_data['shipper'].get('name', '').strip()
                 shipper_address = f"{bol_data['shipper'].get('address_line1', '')} {bol_data['shipper'].get('city', '')} {bol_data['shipper'].get('country', '')}".strip()
                 if shipper_address:
                     exporter_result = address_formatter.format_address(shipper_address)
+                    if shipper_name:
+                        print(f"🏢 Consignor Name: {shipper_name}")
                     print(f"✅ Exporter Address: {exporter_result.formatted}")
         except Exception as e:
             print(f"❌ Address processing failed: {e}")
         
         # Process package types
-        print("\n📦 Processing package types...")
+        print("\n📦 BOX 31: Processing package types...")
         try:
             package_input = base_input_data.copy()
             package_result = package_processor.process(package_input)
@@ -491,7 +497,7 @@ class ESADProcessor:
             print(f"❌ Package processing failed: {e}")
         
         # Process transport mode
-        print("\n🚢 Processing transport mode...")
+        print("\n🚢 BOX 25: Processing transport mode at border...")
         try:
             transport_input = base_input_data.copy()
             transport_result = transport_processor.process(transport_input)
@@ -503,7 +509,7 @@ class ESADProcessor:
             print(f"❌ Transport processing failed: {e}")
         
         # Process weights
-        print("\n⚖️ Processing weights...")
+        print("\n⚖️ BOX 35 (Gross) & BOX 38 (Net): Processing weights...")
         try:
             # Extract weight data from BOL cargo
             weight_data = {}
@@ -534,7 +540,7 @@ class ESADProcessor:
             print(f"❌ Weight processing failed: {e}")
         
         # Process marks and numbers
-        print("\n📝 Processing marks and numbers...")
+        print("\n📝 BOX 31: Processing marks and numbers...")
         try:
             marks_input = base_input_data.copy()
             marks_result = marks_processor.process(marks_input)
@@ -546,7 +552,7 @@ class ESADProcessor:
             print(f"❌ Marks processing failed: {e}")
         
         # Process warehouse information
-        print("\n🏢 Processing warehouse information...")
+        print("\n🏢 BOX 49: Processing warehouse information...")
         try:
             warehouse_input = base_input_data.copy()
             warehouse_result = warehouse_processor.process(warehouse_input)
@@ -558,7 +564,7 @@ class ESADProcessor:
             print(f"❌ Warehouse processing failed: {e}")
         
         # Process country codes
-        print("\n🌍 Processing country codes...")
+        print("\n🌍 BOX 15 (Export) & BOX 17 (Destination): Processing country codes...")
         try:
             # Load countries data
             from modules.esad_processor.esad_modules.secondary.esad_country import load_countries_data
@@ -581,7 +587,7 @@ class ESADProcessor:
             print(f"❌ Country processing failed: {e}")
         
         # Process location information
-        print("\n📍 Processing location information...")
+        print("\n📍 BOX 30 (Location of goods) & BOX 27 (Place of unloading): Processing location information...")
         try:
             location_input = base_input_data.copy()
             location_result = location_processor.process(location_input)
@@ -593,7 +599,7 @@ class ESADProcessor:
             print(f"❌ Location processing failed: {e}")
         
         # Process LOCODE information
-        print("\n🚢 Processing LOCODE information...")
+        print("\n🚢 BOX 30/27: Processing LOCODE information...")
         try:
             locode_input = base_input_data.copy()
             locode_result = locode_processor.process(locode_input)
@@ -605,7 +611,7 @@ class ESADProcessor:
             print(f"❌ LOCODE processing failed: {e}")
         
         # Process reference numbers
-        print("\n🔢 Processing reference numbers...")
+        print("\n🔢 BOX 7: Processing reference numbers...")
         try:
             ref_input = base_input_data.copy()
             ref_result = ref_number_processor.process(ref_input)
@@ -617,7 +623,7 @@ class ESADProcessor:
             print(f"❌ Reference processing failed: {e}")
         
         # Process transaction type
-        print("\n💼 Processing transaction type...")
+        print("\n💼 BOX 24: Processing transaction type...")
         try:
             trans_input = base_input_data.copy()
             trans_result = trans_type_processor.process(trans_input)
@@ -629,7 +635,7 @@ class ESADProcessor:
             print(f"❌ Transaction processing failed: {e}")
         
         # Process TRN (Tax Registration Number)
-        print("\n🏛️ Processing TRN...")
+        print("\n🏛️ IDs (Boxes 2/8): Processing TRN...")
         try:
             trn_input = base_input_data.copy()
             trn_result = trn_processor.process(trn_input)

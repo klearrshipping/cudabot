@@ -44,7 +44,7 @@ def call_llm(messages, model_alias, config, models):
     result = response.json()
     return result["choices"][0]["message"]["content"]
 
-def chat_completion(messages, model_alias="gpt-4o-mini"):
+def chat_completion(messages, model_alias="gpt_5"):
     return call_llm(messages, model_alias, OPENROUTER_CONFIG, OPENROUTER_MODELS)
 
 # ───────────────────────────── Reasoning Function ──────────────────────────────

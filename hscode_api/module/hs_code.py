@@ -58,7 +58,7 @@ def call_llm(messages, model_alias, config, models, api_key=None):
     result = response.json()
     return result["choices"][0]["message"]["content"]
 
-def chat_completion(messages, model_alias="mistral_small", api_key=None):
+def chat_completion(messages, model_alias="gpt_5", api_key=None):
     # Use OpenRouter for single model classification
     return call_llm(
         messages, model_alias,
@@ -94,29 +94,36 @@ Answer:
 VEHICLE_INFO_TEMPLATE = """
 For the {product_name}, provide the following information in JSON format:
 
-- vehicle: the full vehicle name
+- vehicle: the full vehicle name (including year if provided)
 - vehicle_type: the category (e.g., sedan, SUV, truck, coupe, etc.)
 - propulsion_type: the propulsion system (e.g., internal combustion engine, electric, hybrid, plug-in hybrid)
-- engine_options: an array of all available engine/motor configurations, each with:
+- engine_options: an array of ALL available engine/motor configurations for this year/make/model, each with:
   - type: engine/motor description (e.g., "2.0L I4 Turbo")
   - displacement_cc: engine displacement in cubic centimeters (for combustion engines)
-  - notes: additional context (e.g., "Standard", "Optional", "Performance trim")
+  - notes: additional context (e.g., "Standard", "Optional", "Performance trim", "Base model", "Premium trim")
 
-Example:
+IMPORTANT: If this vehicle comes in multiple trims, engine options, or variations for the given year, include ALL of them in the engine_options array. Do not limit to just one configuration.
+
+Example for a vehicle with multiple trims:
 {{
-  "vehicle": "2024 Honda Accord",
-  "vehicle_type": "Midsize sedan",
+  "vehicle": "2023 Chevrolet Tahoe",
+  "vehicle_type": "Full-size SUV",
   "propulsion_type": "Internal combustion engine",
   "engine_options": [
     {{
-      "type": "1.5L I4 Turbo",
-      "displacement_cc": 1500,
-      "notes": "Standard engine"
+      "type": "5.3L V8 EcoTec3",
+      "displacement_cc": 5300,
+      "notes": "Standard engine, base trim"
     }},
     {{
-      "type": "2.0L I4 Turbo",
-      "displacement_cc": 2000,
-      "notes": "Sport trim only"
+      "type": "6.2L V8 EcoTec3",
+      "displacement_cc": 6200,
+      "notes": "High Country and Premier trims"
+    }},
+    {{
+      "type": "3.0L I6 Duramax Turbo Diesel",
+      "displacement_cc": 3000,
+      "notes": "Optional diesel engine"
     }}
   ]
 }}
@@ -170,7 +177,7 @@ class HSCodeClassifier:
     """Runs Prompt 1 once (with gather-model), then Prompt 2 on each classification model."""
     def __init__(
         self,
-        gather_model: str = "gpt_5_mini",
+        gather_model: str = "gpt_5",
         class_models: Optional[List[str]] = None,
         api_key: Optional[str] = None,
     ):
@@ -250,7 +257,7 @@ class HSCodeClassifier:
             # Backup detection using a secondary model
             logger.info("🔍 VEHICLE DETECTION: Primary response invalid, trying backup model")
             try:
-                backup_client = LLMClient("gpt_5_nano")
+                backup_client = LLMClient("gpt_5")
                 detection_answer = backup_client.chat("Vehicle detection", detection_prompt).strip().lower()
                 logger.info("🔍 VEHICLE DETECTION: Backup model response: '%s'", detection_answer)
             except Exception as e:
@@ -342,8 +349,8 @@ class HSCodeClassifier:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="HS Code Classifier – multi-model two-stage pipeline")
     parser.add_argument("product", type=str, help="Product name to classify")
-    parser.add_argument("--gather-model", default="gpt_5_mini",
-                       help="Model for collecting product info (default: gpt_5_mini)")
+    parser.add_argument("--gather-model", default="gpt_5",
+                       help="Model for collecting product info (default: gpt_5)")
     parser.add_argument("--class-models", 
                        help="Comma-separated list of models for classification (default: all)")
     parser.add_argument("--output", type=str, help="Output JSON file")
