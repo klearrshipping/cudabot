@@ -128,11 +128,11 @@ async def upload_documents(
         invoice_paths = []
         for i, invoice in enumerate(invoices):
             invoice_success, invoice_path = await save_uploaded_file(
-                invoice, order_number, f"invoice_{i+1}", order_id
+                invoice, order_number, "invoice", order_id
             )
             if invoice_success:
                 invoice_paths.append(invoice_path)
-                documents_created.append(f"invoice_{i+1}")
+                documents_created.append("invoice")
         
         # Process bill of lading
         bol_success, bol_path = await save_uploaded_file(
@@ -157,7 +157,7 @@ async def upload_documents(
         processing_started = False
         try:
             from modules.extraction_process.document_processor import DocumentProcessor
-            from modules.esad_processor.process_esad import ESADOrchestrator
+            from modules.esad_processor.process_esad import ESADProcessor
             
             # Process documents and eSAD in background (non-blocking)
             import threading
@@ -410,58 +410,39 @@ def process_complete_workflow(order_number: str):
         print(f"[WF] Extraction finished: {order_number} result_keys={result_keys}")
         print(f"✅ Document extraction completed successfully")
 
-        # Additional DEBUG context prior to ESAD stage
-        try:
-            print(f"[WF] DEBUG: About to start Stage 2 for {order_number}")
-            print(f"[WF] DEBUG: Current working directory: {os.getcwd()}")
-            print(f"[WF] DEBUG: Python path head: {sys.path[:3]}")
-        except Exception as _dbg_e:
-            print(f"[WF] DEBUG: Failed to print env info: {_dbg_e}")
-        
         # Stage 2: eSAD Processing
         print(f"\n🔧 STAGE 2: eSAD Processing")
         print(f"─────────────────────────────")
         
-        # Robust import with explicit diagnostics
-        print(f"[WF] DEBUG: Attempting to import ESADOrchestrator...")
+        # Importing ESADProcessor
         try:
-            from modules.esad_processor.process_esad import ESADOrchestrator
-            print(f"[WF] DEBUG: ESADOrchestrator import OK")
+            from modules.esad_processor.process_esad import ESADProcessor
         except ImportError as ie:
-            print(f"[WF] ERROR: ImportError importing ESADOrchestrator: {ie}")
-            try:
-                esad_file_path = os.path.join(os.path.dirname(__file__), 'modules', 'esad_processor', 'process_esad.py')
-                print(f"[WF] DEBUG: Looking for: {esad_file_path} exists={os.path.exists(esad_file_path)}")
-            except Exception as _p:
-                print(f"[WF] DEBUG: Path check failed: {_p}")
+            print(f"[WF] ERROR: ImportError importing ESADProcessor: {ie}")
             raise
         except Exception as imp_e:
             print(f"[WF] ERROR: Unexpected import error: {imp_e}")
             raise
 
-        # Initialize orchestrator with diagnostics
-        print(f"[WF] DEBUG: Attempting ESADOrchestrator initialization...")
+        # Initialize ESADProcessor
         try:
-            esad_orchestrator = ESADOrchestrator()
-            print(f"[WF] DEBUG: ESADOrchestrator initialized")
+            esad_orchestrator = ESADProcessor()
         except Exception as init_e:
-            print(f"[WF] ERROR: ESADOrchestrator initialization failed: {init_e}")
+            print(f"[WF] ERROR: ESADProcessor initialization failed: {init_e}")
             import traceback as _tb
             _tb.print_exc()
             raise
         
         # Process eSAD
         print(f"[WF] ESAD start: {order_number}")
-        esad_results = esad_orchestrator.process_order_esad(order_number)
+        esad_success = esad_orchestrator.process_esad(order_number)
         
-        if esad_results.get('status') == 'success':
-            print(f"[WF] ESAD done: {order_number} status=success path={esad_results.get('final_esad_path')}")
+        if esad_success:
+            print(f"[WF] ESAD done: {order_number} status=success")
             print(f"✅ eSAD processing completed successfully!")
-            print(f"   📄 Final eSAD: {esad_results.get('final_esad_path')}")
-            print(f"   📊 Fields processed: {esad_results.get('processing_summary', {}).get('total_fields', 0)}")
         else:
-            print(f"[WF] ESAD done: {order_number} status=error error={esad_results.get('error')}")
-            print(f"❌ eSAD processing failed: {esad_results.get('error', 'Unknown error')}")
+            print(f"[WF] ESAD done: {order_number} status=error")
+            print(f"❌ eSAD processing failed")
             return
         
         # Stage 3: Workflow Complete

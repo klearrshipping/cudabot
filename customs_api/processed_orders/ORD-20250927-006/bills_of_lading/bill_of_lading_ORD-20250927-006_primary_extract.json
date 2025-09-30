@@ -1,0 +1,129 @@
+{
+  "document_type": "DRAFT BILL OF LADING",
+  "document_subtitle": "Bill of Lading - Multiple Vehicles",
+  "print_timestamp": "9/21/25, 8:26 AM",
+  "carrier": {
+    "name": "Mediterranean Shipping Company (MSC)"
+  },
+  "sea_waybill_no": "MEDUM2604004",
+  "vessel_and_voyage_no": "MSC Patnaree III - JX351R",
+  "port_of_loading": "Port of Miami, USA",
+  "port_of_discharge": "Kingston, Jamaica",
+  "shipper": {
+    "name": "Carvana Co.",
+    "address_line_1": "1930 W Rio Salado Pkwy",
+    "city": "Tempe",
+    "state": "AZ",
+    "postal_code": "85281",
+    "country": "USA",
+    "tel": "+1 800-333-4554"
+  },
+  "consignee": {
+    "name": "Rafer Johnson",
+    "address_line_1": "4 Duke Street",
+    "city": "Kingston",
+    "country": "Jamaica",
+    "tel": "+1 876-355-3021",
+    "email": "raferbop@gmail.com"
+  },
+  "notify_party": {
+    "name": "B.L. Williams Int'l Ltd.",
+    "address_line_1": "48-52 Second Street",
+    "locality": "Newport West",
+    "city": "Kingston 13",
+    "country": "Jamaica W.I."
+  },
+  "particulars_furnished_by_shipper_said_to_contain": {
+    "table_columns": [
+      "Package",
+      "Description",
+      "Type",
+      "YOM",
+      "VIN",
+      "Color",
+      "Gross Weight (KGS)",
+      "Measurement (CBM)"
+    ],
+    "packages": [
+      {
+        "package_label": "PACKAGE 1",
+        "description": "2023 TESLA MODEL Y",
+        "type": "Electric Motor Vehicle (SUV)",
+        "YOM": "2023",
+        "VIN": "5YJYGDEE8PF123456",
+        "color": "Pearl White Multi-Coat",
+        "gross_weight_kgs": "2,003",
+        "measurement_cbm": "15.5"
+      },
+      {
+        "package_label": "PACKAGE 2",
+        "description": "2023 TESLA MODEL 3",
+        "type": "Electric Motor Vehicle (Sedan)",
+        "YOM": "2023",
+        "VIN": "5YJ3E1EA8PF789012",
+        "color": "Midnight Silver Metallic",
+        "gross_weight_kgs": "1,847",
+        "measurement_cbm": "14.2"
+      },
+      {
+        "package_label": "PACKAGE 3",
+        "description": "2024 TESLA CYBERTRUCK",
+        "type": "Electric Motor Vehicle (Pickup)",
+        "YOM": "2024",
+        "VIN": "7G2FX8EA0Q0345678",
+        "color": "Stainless Steel",
+        "gross_weight_kgs": "3,104",
+        "measurement_cbm": "18.7"
+      },
+      {
+        "package_label": "PACKAGE 4",
+        "description": "2023 CHEVROLET TAHOE C1500 RST",
+        "type": "Gas Motor Vehicle (Full-Size SUV)",
+        "YOM": "2023",
+        "VIN": "1GNSKCKC8PR456789",
+        "color": "Shadow Gray Metallic",
+        "gross_weight_kgs": "2,812",
+        "measurement_cbm": "16.8"
+      }
+    ],
+    "total_shipment": {
+      "gross_weight_kgs": "9,766",
+      "total_measurement_cbm": "65.2"
+    }
+  },
+  "additional_notes": [
+    "All Tesla vehicles equipped with Lithium-Ion battery systems",
+    "Chevrolet Tahoe equipped with 5.3L V8 EcoTec3 engine",
+    "All vehicles secured and prepared for ocean transport",
+    "Hazardous materials declaration: Lithium-Ion batteries (UN3480) - properly packaged and declared"
+  ],
+  "freight_and_charges": {
+    "label": "Freight & Charges:",
+    "terms": "Prepaid (CIF Kingston)"
+  },
+  "place_and_date_of_issue": "Miami, FL - September 20, 2025",
+  "number_of_original_b_l": "THREE (3)",
+  "signed_for_the_carrier": null,
+  "received_by": null,
+  "footer": {
+    "file_reference": "file:///C:/Users/rafer/OneDrive/Desktop/pdf/carvana_bol.html",
+    "page": "1/2"
+  },
+  "document_notes_and_identifiers": {
+    "header_title": "DRAFT BILL OF LADING",
+    "document_note": "Bill of Lading - Multiple Vehicles"
+  },
+  "charges": [],
+  "_metadata": {
+    "extraction_timestamp": "2025-09-27T13:35:10.291217",
+    "source_file": "C:\\Users\\rafer\\OneDrive\\Desktop\\projects\\cuda\\customs_api\\processed_orders\\ORD-20250927-006\\file_uploads\\bill_of_lading_20250927_133416.pdf",
+    "processor": "claude_sonnet_4_via_openrouter",
+    "model": "openai/gpt-5-mini",
+    "document_type": "Shipping Document",
+    "processing_method": "pdf_to_image_conversion",
+    "bol_recheck": true,
+    "bol_confidence": "medium"
+  },
+  "bill_of_lading": "MEDUM2604004",
+  "master_bill_of_lading": null
+}

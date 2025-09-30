@@ -43,7 +43,7 @@ def create_order(client_id: int, description: str = None) -> Optional[Dict[str, 
         result = supabase.table("orders").insert(order_data).execute()
         
         if result.data:
-            print(f"✅ Created order: {order_number}")
+            # Created order
             return result.data[0]
         else:
             print("❌ Failed to create order")

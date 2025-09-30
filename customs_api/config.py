@@ -40,7 +40,8 @@ OPENROUTER_GENERAL_MODELS = {
     "kimi": "moonshotai/kimi-k2:free",
     "kimi_standard": "moonshotai/kimi-k2",
     "grok_mini": "x-ai/grok-3-mini",
-    "gpt_5_nano": "openai/gpt-5-nano"
+    "gpt_5_nano": "openai/gpt-5-nano",
+    "gpt_5": "openai/gpt-5"
 }
 
 # OpenRouter Models - Document Extraction (Used for eSAD extraction scripts)

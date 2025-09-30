@@ -300,6 +300,99 @@ class CommercialReferenceProcessor:
         
         print(f"💾 Reference number result saved to: {output_file}")
         return output_file
+    
+    def process(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Process input data to determine commercial reference number.
+        
+        Args:
+            input_data: Dictionary containing invoice_data, bol_data, fields, and existing_fields
+            
+        Returns:
+            Dictionary with processing results
+        """
+        try:
+            # Extract order ID from various sources
+            order_id = self._extract_order_id(input_data)
+            
+            if not order_id:
+                return {
+                    'success': False,
+                    'error': 'No order ID found',
+                    'reference_number': None
+                }
+            
+            # Process commercial reference
+            reference_number = self.process_commercial_reference(order_id)
+            
+            return {
+                'success': True,
+                'reference_number': reference_number,
+                'order_id': order_id
+            }
+            
+        except Exception as e:
+            return {
+                'success': False,
+                'error': str(e),
+                'reference_number': None
+            }
+    
+    def _extract_order_id(self, input_data: Dict[str, Any]) -> Optional[int]:
+        """Extract order ID from input data."""
+        # Try to get from existing fields first
+        existing_fields = input_data.get('existing_fields', {})
+        
+        # Look for order ID in various field keys
+        order_keys = [
+            'order_id',
+            'order_number',
+            'reference_number',
+            'commercial_reference',
+            'order_reference'
+        ]
+        
+        for key in order_keys:
+            if key in existing_fields and existing_fields[key]:
+                try:
+                    # Try to extract numeric part from order ID
+                    order_value = str(existing_fields[key])
+                    # Look for patterns like ORD-20250926-010
+                    import re
+                    match = re.search(r'(\d{8})-(\d{3})', order_value)
+                    if match:
+                        # Use the last 3 digits as order ID
+                        return int(match.group(2))
+                    # Try to extract any number
+                    numbers = re.findall(r'\d+', order_value)
+                    if numbers:
+                        return int(numbers[-1])  # Use the last number found
+                except (ValueError, TypeError):
+                    continue
+        
+        # Try to extract from invoice data
+        invoice_data = input_data.get('invoice_data', {})
+        if invoice_data:
+            # Check for order-related fields
+            for field in ['order_id', 'order_number', 'reference']:
+                if field in invoice_data and invoice_data[field]:
+                    try:
+                        return int(invoice_data[field])
+                    except (ValueError, TypeError):
+                        continue
+        
+        # Try to extract from BOL data
+        bol_data = input_data.get('bol_data', {})
+        if bol_data:
+            # Check for order-related fields
+            for field in ['order_id', 'order_number', 'reference']:
+                if field in bol_data and bol_data[field]:
+                    try:
+                        return int(bol_data[field])
+                    except (ValueError, TypeError):
+                        continue
+        
+        return None
 
 def main():
     """Interactive reference number generator"""

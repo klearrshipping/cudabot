@@ -1,7 +1,14 @@
 import sys
 import json
 import difflib
-from typing import Optional, Dict, List
+import os
+from typing import Optional, Dict, List, Any
+
+# Add the customs_api directory to the path
+current_dir = os.path.dirname(os.path.abspath(__file__))
+customs_api_dir = os.path.join(current_dir, '..', '..', '..', '..')
+sys.path.insert(0, customs_api_dir)
+
 from modules.core.csv_data_client import fetch_package_types
 from modules.core.llm_client import LLMClient
 
@@ -62,7 +69,7 @@ def ask_llm_for_best_package_type(kind_of_packages: str, package_types: List[Dic
     # Optimized model selection: Use general models for secondary processing
     from config import OPENROUTER_GENERAL_MODELS
     priority_models = [
-        OPENROUTER_GENERAL_MODELS["gpt_5_nano"],        # Primary - Best for text analysis
+        OPENROUTER_GENERAL_MODELS["gpt_5"],        # Primary - Best for text analysis
         OPENROUTER_GENERAL_MODELS["kimi_standard"]         # Backup - Reliable fallback
     ]
     
@@ -197,7 +204,13 @@ class PackageProcessor:
         if bol_data:
             # Check cargo for packaging info
             cargo = bol_data.get('cargo', {})
-            if isinstance(cargo, dict):
+            if isinstance(cargo, list) and len(cargo) > 0:
+                # If cargo is a list, use the first item
+                cargo_item = cargo[0]
+                for field in ['packaging', 'package_type', 'container_type']:
+                    if field in cargo_item and cargo_item[field]:
+                        return str(cargo_item[field])
+            elif isinstance(cargo, dict):
                 for field in ['packaging', 'package_type', 'container_type']:
                     if field in cargo and cargo[field]:
                         return str(cargo[field])

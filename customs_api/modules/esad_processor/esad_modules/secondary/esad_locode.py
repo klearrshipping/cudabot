@@ -161,6 +161,93 @@ class LocodeProcessor:
         }
         
         return country_mapping.get(country_name.lower().strip(), None)
+    
+    def process(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Process input data to determine LOCODE information.
+        
+        Args:
+            input_data: Dictionary containing invoice_data, bol_data, fields, and existing_fields
+            
+        Returns:
+            Dictionary with processing results
+        """
+        try:
+            # Extract location data from various sources
+            location_data = self._extract_location_data(input_data)
+            
+            if not location_data:
+                return {
+                    'success': False,
+                    'error': 'No location data found',
+                    'locode': None
+                }
+            
+            # Process loading location
+            result = self.process_loading_location(location_data)
+            
+            if result['processed']:
+                return {
+                    'success': True,
+                    'locode': result['locode'],
+                    'standardized_name': result['standardized_name'],
+                    'city_name': result['city_name'],
+                    'country_code': result['country_code'],
+                    'country_name': result['country_name'],
+                    'subdivision': result['subdivision']
+                }
+            else:
+                return {
+                    'success': False,
+                    'error': result['error'],
+                    'locode': None
+                }
+            
+        except Exception as e:
+            return {
+                'success': False,
+                'error': str(e),
+                'locode': None
+            }
+    
+    def _extract_location_data(self, input_data: Dict[str, Any]) -> str:
+        """Extract location data from input data."""
+        # Try to get from existing fields first
+        existing_fields = input_data.get('existing_fields', {})
+        
+        # Look for location data in various field keys
+        location_keys = [
+            'location',
+            '27_location',
+            'place_of_loading',
+            'place_of_unloading',
+            'port_of_loading',
+            'port_of_destination',
+            'loading_location',
+            'unloading_location'
+        ]
+        
+        for key in location_keys:
+            if key in existing_fields and existing_fields[key]:
+                return str(existing_fields[key])
+        
+        # Try to extract from BOL data
+        bol_data = input_data.get('bol_data', {})
+        if bol_data:
+            # Check for location-related fields
+            for field in ['port_of_loading', 'port_of_destination', 'place_of_loading', 'place_of_delivery']:
+                if field in bol_data and bol_data[field]:
+                    return str(bol_data[field])
+        
+        # Try to extract from invoice data
+        invoice_data = input_data.get('invoice_data', {})
+        if invoice_data:
+            # Check for location-related fields
+            for field in ['origin', 'destination', 'shipping_from', 'shipping_to']:
+                if field in invoice_data and invoice_data[field]:
+                    return str(invoice_data[field])
+        
+        return ""
 
 
 def process_loading_location(location_text: str) -> Dict[str, Any]:

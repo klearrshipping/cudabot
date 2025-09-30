@@ -88,20 +88,13 @@ def parse_llm_response(raw_response: str) -> Optional[str]:
 
 def ask_llm_for_product_name(description: str, verbose: bool = False) -> Optional[str]:
     """Get the specific product name using LLM."""
-    print(f"\n🔍 DEBUG: ask_llm_for_product_name called")
-    print(f"   Description: {description}")
-    print(f"   Verbose: {verbose}")
-    
     if not description or description.lower() in ['not specified', 'none', '']:
-        print(f"❌ DEBUG: Description is invalid or empty, returning None")
         return None
     
-    print(f"🔍 DEBUG: Initializing LLM client...")
     llm = LLMClient()
     
     # Clean the description first
     cleaned_description = clean_commercial_description(description)
-    print(f"🔍 DEBUG: Cleaned description: {cleaned_description}")
     
     if verbose:
         print(f"\n📦 Processing commercial description:")
@@ -113,64 +106,56 @@ You are a customs documentation expert. Given the commercial description from a 
 
 Cleaned description: '{cleaned_description}'
 
-Your task is to extract a clean, specific product name from the description. Include the brand name and primary product type, plus key model identifiers when present. Remove excessive technical specifications, marketing language, and verbose details.
+Your task is to extract a clean, specific product name from the description. Include the brand name, primary product type, and ALL key model identifiers when present. For vehicles, preserve trim levels, engine specifications, and model variants as they are essential for accurate classification.
 
 Examples:
 - "2022 Tesla Model Y imported by an individual" → "2022 Tesla Model Y"
+- "2023 Chevrolet Tahoe C1500 RST (Full-Size SUV)" → "2023 Chevrolet Tahoe C1500 RST"
 - "Apple iPhone 14 Pro smartphones" → "Apple iPhone 14 Pro smartphone"
-- "EF ECOFLOW Solar Generator DELTA 2 Max 2048Wh with 4X100W 12V Solar Panels, High Efficiency Monocrystalline PV Modules, 2400W LFP Portable Power Station, AC + Solar Fast Dual Charging For Camping RV" → "EF ECOFLOW Solar Generator"
-- "Nike Air Max 270 React Running Shoes Men's Size 10 Black/White Mesh Upper with Air Cushioning Technology" → "Nike Air Max 270 Running Shoes"
-- "Samsung 65-inch QLED 4K Smart TV Model QN65Q80A with HDR10+ and Alexa Built-in 2023 Model" → "Samsung 65-inch QLED Smart TV"
+- "EF ECOFLOW Solar Generator DELTA 2 Max 2048Wh with 4X100W 12V Solar Panels, High Efficiency Monocrystalline PV Modules, 2400W LFP Portable Power Station, AC + Solar Fast Dual Charging For Camping RV" → "EF ECOFLOW Solar Generator DELTA 2 Max"
+- "Nike Air Max 270 React Running Shoes Men's Size 10 Black/White Mesh Upper with Air Cushioning Technology" → "Nike Air Max 270 React Running Shoes"
+- "Samsung 65-inch QLED 4K Smart TV Model QN65Q80A with HDR10+ and Alexa Built-in 2023 Model" → "Samsung 65-inch QLED Smart TV QN65Q80A"
 
-Return ONLY a valid JSON object with a single field 'product_name', e.g. {{"product_name": "2022 Tesla Model Y"}}. 
-Keep brand names, essential product types, and key model identifiers. Remove technical specs, marketing language, and excessive details.
+Return ONLY a valid JSON object with a single field 'product_name', e.g. {{"product_name": "2023 Chevrolet Tahoe C1500 RST"}}. 
+Keep brand names, essential product types, and ALL key model identifiers (especially trim levels, engine codes, model variants). Remove only marketing language and excessive technical specifications that don't identify the specific product.
 Do NOT return generic categories like "Electric Vehicle" or "Electronics".
 """
     
-    # Smart model selection - use Mistral Small for better performance
+    # Smart model selection - use GPT-5 for better performance
     models = [
-        "mistralai/mistral-small-3.2-24b-instruct"        # Primary - Mistral Small, reliable and fast
+        "openai/gpt-5"        # Primary - GPT-5, best performance and accuracy
         # "moonshotai/kimi-k2:free"                        # Disabled - Too many rate limits
     ]
     
     # Test models with early termination
     for i, model in enumerate(models):
         model_name = model.split('/')[-1].split(':')[0]
-        print(f"🔍 DEBUG: Testing model: {model_name}")
         if verbose:
             print(f"\n🧪 Testing model: {model_name}")
         
         # Add small delay between model attempts to prevent rate limiting
         if i > 0:
-            print(f"⏳ DEBUG: Waiting 1s before trying next model...")
             time.sleep(1)
         
         try:
-            print(f"🔍 DEBUG: Sending prompt to LLM...")
             raw_response, success, error_type = llm.send_prompt(prompt, model=model)
-            print(f"🔍 DEBUG: LLM raw response: {raw_response}")
             
             if not success:
                 if error_type == "rate_limit":
-                    print(f"⏳ DEBUG: {model_name} hit rate limit, will try next model")
                     if verbose:
                         print(f"⏳ {model_name} rate limited, trying next model...")
                 else:
-                    print(f"❌ DEBUG: {model_name} failed with error type: {error_type}")
                     if verbose:
                         print(f"❌ {model_name} failed: {error_type}")
                 continue
             
             product_name = parse_llm_response(raw_response)
-            print(f"🔍 DEBUG: Parsed product name: {product_name}")
             
             if product_name:
-                print(f"✅ DEBUG: {model_name} successfully returned: {product_name}")
                 if verbose:
                     print(f"✅ {model_name} returned: {product_name}")
                 return product_name
             else:
-                print(f"❌ DEBUG: {model_name} did not return a valid product name")
                 if verbose:
                     print(f"❌ {model_name} did not return a valid product name.")
                 
@@ -187,18 +172,10 @@ Do NOT return generic categories like "Electric Vehicle" or "Electronics".
 def classify_with_hs_api(product_name: str, verbose: bool = False, order_id: str = None, 
                         contextual_data: Dict[str, Any] = None) -> Optional[Dict[str, str]]:
     """Classify product using HS Code API with optional rich contextual data."""
-    print(f"\n🔍 DEBUG: classify_with_hs_api called")
-    print(f"   Product name: {product_name}")
-    print(f"   Verbose: {verbose}")
-    print(f"   Order ID: {order_id}")
-    print(f"   Has contextual data: {bool(contextual_data)}")
-    
     if not product_name:
-        print(f"❌ DEBUG: No product name provided, returning None")
         return None
     
     API_BASE_URL = "http://localhost:5000"
-    print(f"🔍 DEBUG: Using API URL: {API_BASE_URL}")
     
     if verbose:
         print(f"\n🔍 Classifying with HS Code API: {product_name}")
@@ -214,11 +191,6 @@ def classify_with_hs_api(product_name: str, verbose: bool = False, order_id: str
             payload["order_id"] = order_id
         if contextual_data:
             payload["contextual_data"] = contextual_data
-        
-        print(f"🔍 DEBUG: Starting synchronous classification with payload: {payload}")
-        print(f"🔍 DEBUG: Payload JSON: {json.dumps(payload, indent=2)}")
-        print(f"🔍 DEBUG: Sending POST request to: {API_BASE_URL}/classify")
-        print(f"🔍 DEBUG: Request headers: {{'Content-Type': 'application/json'}}")
             
         # Use synchronous classification with longer timeout
         response = requests.post(
@@ -228,12 +200,8 @@ def classify_with_hs_api(product_name: str, verbose: bool = False, order_id: str
             timeout=300  # 5 minute timeout for full classification
         )
         
-        print(f"🔍 DEBUG: Classification response status: {response.status_code}")
-        
         if response.status_code == 200:
             result = response.json()
-            print(f"🔍 DEBUG: Classification completed: {result}")
-            print(f"🔍 DEBUG: Response JSON: {json.dumps(result, indent=2)}")
             if verbose:
                 print(f"✅ HS Code API returned:")
                 print(f"   HS Code: {result.get('hs_code', 'N/A')}")
@@ -241,7 +209,6 @@ def classify_with_hs_api(product_name: str, verbose: bool = False, order_id: str
                 print(f"   Description: {result.get('description', 'N/A')}")
             return result
         else:
-            print(f"❌ DEBUG: Classification failed: {response.text}")
             if verbose:
                 print(f"❌ HS Code API error: {response.text}")
             return None
@@ -276,8 +243,7 @@ def _build_contextual_data_from_primary(primary_data: Dict[str, Any], product_na
         Contextual data dictionary for HS Code API
     """
     try:
-        print(f"🔍 DEBUG: Building contextual data from primary data structure")
-        print(f"🔍 DEBUG: Primary data keys: {list(primary_data.keys())}")
+        # Build contextual data from primary data structure
         
         # Build contextual data structure
         contextual_data = {}
@@ -379,19 +345,38 @@ def _build_contextual_data_from_primary(primary_data: Dict[str, Any], product_na
             # Cargo details from BOL
             cargo = bol_data.get('cargo', {})
             if cargo:
-                contextual_data['cargo_info'] = {
-                    'package_count': cargo.get('package_count_and_description', ''),
-                    'type': cargo.get('type', ''),
-                    'year_of_manufacture': cargo.get('year_of_manufacture', ''),
-                    'vin': cargo.get('vin', ''),
-                    'color': cargo.get('color', ''),
-                    'gross_weight': cargo.get('gross_weight', ''),
-                    'measurement': cargo.get('measurement', ''),
-                    'commodity_description': cargo.get('commodity_description', '')
-                }
-                # Also populate flat structure for HS Code API compatibility
-                contextual_data['weight'] = cargo.get('gross_weight', '')
-                contextual_data['commodity'] = cargo.get('commodity_description', '')
+                # Handle both list and dict structures for cargo
+                if isinstance(cargo, list) and len(cargo) > 0:
+                    # If cargo is a list, use the first item
+                    cargo_item = cargo[0]
+                    contextual_data['cargo_info'] = {
+                        'package_count': cargo_item.get('no_of_pieces', ''),
+                        'type': cargo_item.get('nature_and_quantity_of_goods', ''),
+                        'year_of_manufacture': cargo_item.get('year_of_manufacture', ''),
+                        'vin': cargo_item.get('vin', ''),
+                        'color': cargo_item.get('color', ''),
+                        'gross_weight': cargo_item.get('gross_weight_kg', ''),
+                        'measurement': cargo_item.get('measurement', ''),
+                        'commodity_description': cargo_item.get('nature_and_quantity_of_goods', '')
+                    }
+                    # Also populate flat structure for HS Code API compatibility
+                    contextual_data['weight'] = cargo_item.get('gross_weight_kg', '')
+                    contextual_data['commodity'] = cargo_item.get('nature_and_quantity_of_goods', '')
+                elif isinstance(cargo, dict):
+                    # If cargo is a dict, use the original logic
+                    contextual_data['cargo_info'] = {
+                        'package_count': cargo.get('package_count_and_description', ''),
+                        'type': cargo.get('type', ''),
+                        'year_of_manufacture': cargo.get('year_of_manufacture', ''),
+                        'vin': cargo.get('vin', ''),
+                        'color': cargo.get('color', ''),
+                        'gross_weight': cargo.get('gross_weight', ''),
+                        'measurement': cargo.get('measurement', ''),
+                        'commodity_description': cargo.get('commodity_description', '')
+                    }
+                    # Also populate flat structure for HS Code API compatibility
+                    contextual_data['weight'] = cargo.get('gross_weight', '')
+                    contextual_data['commodity'] = cargo.get('commodity_description', '')
         
         # Document metadata
         contextual_data['document_metadata'] = {
@@ -402,8 +387,8 @@ def _build_contextual_data_from_primary(primary_data: Dict[str, Any], product_na
         # Also populate flat structure for HS Code API compatibility
         contextual_data['extraction_confidence'] = primary_data.get('extraction_confidence', 'unknown')
         
-        print(f"🔍 DEBUG: Built contextual data with {len(contextual_data)} sections")
-        print(f"🔍 DEBUG: Contextual data keys: {list(contextual_data.keys())}")
+        # Contextual data built successfully
+        # Contextual data keys available
         return contextual_data if contextual_data else None
         
     except Exception as e:
@@ -415,13 +400,6 @@ def _build_contextual_data_from_primary(primary_data: Dict[str, Any], product_na
 def process_commercial_description(description: str, verbose: bool = False, get_hs_code: bool = True, 
                                  order_id: str = None, primary_data: Dict[str, Any] = None, bol_data: Dict[str, Any] = None) -> Dict[str, str]:
     """Process commercial description and return standardized product information with optional HS code classification."""
-    print(f"\n🔍 DEBUG: process_commercial_description called")
-    print(f"   Description: {description}")
-    print(f"   Verbose: {verbose}")
-    print(f"   Get HS Code: {get_hs_code}")
-    print(f"   Order ID: {order_id}")
-    print(f"   Has primary data: {bool(primary_data)}")
-    
     results = {
         'original_description': description,
         'cleaned_description': clean_commercial_description(description),
@@ -431,26 +409,19 @@ def process_commercial_description(description: str, verbose: bool = False, get_
         'hs_description': None
     }
     
-    print(f"🔍 DEBUG: Initial results: {results}")
-    
     if description and description.lower() not in ['not specified', 'none', '']:
-        print(f"🔍 DEBUG: Description is valid, proceeding with processing")
-        
         # Get product name from LLM
-        print(f"🔍 DEBUG: Calling ask_llm_for_product_name...")
         product_name = ask_llm_for_product_name(description, verbose=verbose)
-        print(f"🔍 DEBUG: ask_llm_for_product_name returned: {product_name}")
         results['product_name'] = product_name
         
         # Optionally get HS code classification
         if get_hs_code and product_name:
-            print(f"🔍 DEBUG: get_hs_code=True and product_name exists, calling classify_with_hs_api...")
             
             # Build contextual data from primary processing results if available
             contextual_data = None
             if primary_data:
                 contextual_data = _build_contextual_data_from_primary(primary_data, product_name, bol_data)
-                print(f"🔍 DEBUG: Built contextual data: {list(contextual_data.keys()) if contextual_data else 'None'}")
+                # Contextual data built
             
             hs_result = classify_with_hs_api(
                 product_name, 
@@ -458,20 +429,11 @@ def process_commercial_description(description: str, verbose: bool = False, get_
                 order_id=order_id,
                 contextual_data=contextual_data
             )
-            print(f"🔍 DEBUG: classify_with_hs_api returned: {hs_result}")
             if hs_result:
                 results['hs_code'] = hs_result.get('hs_code')
                 results['commodity_code'] = hs_result.get('commodity_code')
                 results['hs_description'] = hs_result.get('description')
-                print(f"🔍 DEBUG: Updated results with HS code data: {results}")
-            else:
-                print(f"❌ DEBUG: classify_with_hs_api returned None or empty result")
-        else:
-            print(f"🔍 DEBUG: Skipping HS code classification - get_hs_code={get_hs_code}, product_name={product_name}")
-    else:
-        print(f"❌ DEBUG: Description is invalid or empty, skipping processing")
-        
-    print(f"🔍 DEBUG: Final results: {results}")
+                # Results updated with HS code data
     return results
 
 def main():

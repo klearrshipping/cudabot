@@ -18,8 +18,15 @@ import sys
 import json
 import csv
 import difflib
+import os
 from typing import Optional, Dict, List
 from pathlib import Path
+
+# Add the customs_api directory to the path
+current_dir = os.path.dirname(os.path.abspath(__file__))
+customs_api_dir = os.path.join(current_dir, '..', '..', '..', '..')
+sys.path.insert(0, customs_api_dir)
+
 from modules.core.llm_client import LLMClient
 
 # Cache for country data to avoid repeated file reads

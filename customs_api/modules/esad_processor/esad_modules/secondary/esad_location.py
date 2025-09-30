@@ -10,7 +10,11 @@ import re
 from typing import Dict, Any, Optional, List
 import sys
 import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+
+# Add the customs_api directory to the path
+current_dir = os.path.dirname(os.path.abspath(__file__))
+customs_api_dir = os.path.join(current_dir, '..', '..', '..', '..')
+sys.path.insert(0, customs_api_dir)
 
 try:
     from modules.core.csv_data_client import fetch_locodes
@@ -420,6 +424,54 @@ class LocationProcessor:
         if result["success"]:
             return result["box_27_value"]
         return ""
+    
+    def process(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Process input data to determine location information.
+        
+        Args:
+            input_data: Dictionary containing invoice_data, bol_data, fields, and existing_fields
+            
+        Returns:
+            Dictionary with processing results
+        """
+        try:
+            # Extract BOL data and determine ESAD type
+            bol_data = input_data.get('bol_data', {})
+            esad_type = input_data.get('esad_type', 'import')  # Default to import
+            
+            if not bol_data:
+                return {
+                    'success': False,
+                    'error': 'No BOL data found',
+                    'location_code': None
+                }
+            
+            # Process loading/unloading location
+            result = self.process_loading_unloading_location(bol_data, esad_type)
+            
+            if result['success']:
+                return {
+                    'success': True,
+                    'location_code': result['locode'],
+                    'extracted_port': result['extracted_port'],
+                    'box_27_value': result['box_27_value'],
+                    'source_field': result.get('source_field'),
+                    'processing_notes': result.get('processing_notes', [])
+                }
+            else:
+                return {
+                    'success': False,
+                    'error': result['error'],
+                    'location_code': None
+                }
+            
+        except Exception as e:
+            return {
+                'success': False,
+                'error': str(e),
+                'location_code': None
+            }
 
 
 def process_loading_unloading_location(bol_data: Dict[str, Any], esad_type: str = "import") -> Dict[str, Any]:

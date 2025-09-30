@@ -26,7 +26,9 @@ class TransportModeProcessor:
     def _load_transport_codes(self) -> List[Dict[str, str]]:
         """Load transport mode codes from CSV file"""
         try:
-            codes_path = "../../data/transport_mode.csv"
+            # Get the correct path to the data directory
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            codes_path = os.path.join(current_dir, "..", "..", "..", "..", "customs_api", "data", "transport_mode.csv")
             if not os.path.exists(codes_path):
                 print(f"⚠️ Transport mode CSV not found: {codes_path}")
                 return []
@@ -204,6 +206,91 @@ class TransportModeProcessor:
         else:
             # Return default value if processing fails
             return "1"  # Default to Ocean Transport if unable to determine
+    
+    def process(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Process input data to determine transport mode.
+        
+        Args:
+            input_data: Dictionary containing invoice_data, bol_data, fields, and existing_fields
+            
+        Returns:
+            Dictionary with processing results
+        """
+        try:
+            # Extract transport mode data from various sources
+            transport_data = self._extract_transport_data(input_data)
+            
+            if not transport_data:
+                return {
+                    'success': False,
+                    'error': 'No transport mode data found',
+                    'transport_code': None
+                }
+            
+            # Process transport mode classification
+            result = self.process_transport_mode(transport_data)
+            
+            if result['success']:
+                return {
+                    'success': True,
+                    'transport_code': result['processed_result']['official_code'],
+                    'transport_mode': result['processed_result']['transport_mode'],
+                    'transport_description': result['processed_result']['official_description'],
+                    'raw_input': transport_data
+                }
+            else:
+                return {
+                    'success': False,
+                    'error': result['error'],
+                    'transport_code': None
+                }
+            
+        except Exception as e:
+            return {
+                'success': False,
+                'error': str(e),
+                'transport_code': None
+            }
+    
+    def _extract_transport_data(self, input_data: Dict[str, Any]) -> str:
+        """Extract transport mode data from input data."""
+        # Try to get from existing fields first
+        existing_fields = input_data.get('existing_fields', {})
+        
+        # Look for transport mode data in various field keys
+        transport_keys = [
+            'transport_mode',
+            '25_transport_mode',
+            'mode_of_transport',
+            'transport_type',
+            'shipping_method'
+        ]
+        
+        for key in transport_keys:
+            if key in existing_fields and existing_fields[key]:
+                return str(existing_fields[key])
+        
+        # Try to extract from BOL data
+        bol_data = input_data.get('bol_data', {})
+        if bol_data:
+            # Check for transport-related fields
+            for field in ['transport_mode', 'shipping_method', 'vessel_info']:
+                if field in bol_data and bol_data[field]:
+                    if field == 'vessel_info' and isinstance(bol_data[field], dict):
+                        vessel = bol_data[field]
+                        return f"Vessel {vessel.get('vessel_name', '')} {vessel.get('voyage_number', '')}"
+                    return str(bol_data[field])
+        
+        # Try to extract from invoice data
+        invoice_data = input_data.get('invoice_data', {})
+        if invoice_data:
+            # Check for transport-related fields
+            for field in ['transport_mode', 'shipping_method', 'delivery_method']:
+                if field in invoice_data and invoice_data[field]:
+                    return str(invoice_data[field])
+        
+        return ""
 
 def process_transport_mode(raw_transport_data: str) -> Dict[str, Any]:
     """

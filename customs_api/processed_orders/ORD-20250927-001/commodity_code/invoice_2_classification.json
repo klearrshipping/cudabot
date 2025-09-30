@@ -1,0 +1,19 @@
+{
+  "invoice_key": "invoice_2",
+  "timestamp": "2025-09-28T11:46:20.262568",
+  "classification": {
+    "success": false,
+    "commercial_description": "Unknown Product",
+    "commodity_code": "",
+    "hs_code": "",
+    "hs_description": "",
+    "original_description": "",
+    "processing_notes": "",
+    "error": "Classification failed due to insufficient data"
+  },
+  "metadata": {
+    "order_number": "ORD-20250927-001",
+    "processing_date": "2025-09-28",
+    "processing_time": "11:46:20"
+  }
+}

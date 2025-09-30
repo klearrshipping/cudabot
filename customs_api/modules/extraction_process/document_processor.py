@@ -46,7 +46,7 @@ class DocumentProcessor:
         # Use absolute path to avoid working directory issues
         self.base_dir = Path(base_dir).resolve()
         self.base_dir.mkdir(exist_ok=True)
-        print(f"🔍 DEBUG: DocumentProcessor base_dir: {self.base_dir}")
+        # DocumentProcessor initialized
     
     def process_order_documents(self, order_number: str) -> Dict[str, Any]:
         """
@@ -67,10 +67,7 @@ class DocumentProcessor:
         
         # Find invoice and BOL files in the file_uploads directory (where they are initially stored)
         file_uploads_dir = order_dir / "file_uploads"
-        print(f"🔍 DEBUG: Looking for files in: {file_uploads_dir}")
-        print(f"🔍 DEBUG: Directory exists: {file_uploads_dir.exists()}")
-        if file_uploads_dir.exists():
-            print(f"🔍 DEBUG: Files in directory: {list(file_uploads_dir.iterdir())}")
+        # Looking for files in uploads directory
         
         invoice_files = list(file_uploads_dir.glob("*invoice*.pdf")) + list(file_uploads_dir.glob("*invoice*.jpg")) + list(file_uploads_dir.glob("*invoice*.png"))
         bol_files = list(file_uploads_dir.glob("*bill_of_lading*.pdf")) + list(file_uploads_dir.glob("*bill_of_lading*.jpg")) + list(file_uploads_dir.glob("*bill_of_lading*.png"))
@@ -87,10 +84,7 @@ class DocumentProcessor:
         # Use the first BOL file found (typically only one BOL per order)
         bol_path = str(bol_files[0])
         
-        print(f"   📄 Found {len(invoice_files)} invoice file(s)")
-        for i, invoice_file in enumerate(invoice_files):
-            print(f"      {i+1}. {invoice_file.name}")
-        print(f"   📋 Found BOL: {bol_path}")
+        # Found invoice and BOL files
         
         # Process multiple invoices with single BOL
         return self._process_multiple_invoices_for_order(invoice_files, bol_path, order_number)
@@ -107,9 +101,7 @@ class DocumentProcessor:
         Returns:
             dict: Processing results for all documents
         """
-        print(f"🔄 Starting multiple invoice processing for order: {order_number}")
-        print(f"   Invoices: {len(invoice_files)} files")
-        print(f"   BOL: {bol_path}")
+        # Starting multiple invoice processing
         
         # Get the order directory
         order_dir = self.base_dir / order_number
@@ -208,7 +200,8 @@ class DocumentProcessor:
                     results[invoice_key] = result
                     
                     if result.get('status') == 'success':
-                        print(f"✅ {invoice_key} extraction completed")
+                        # Invoice extraction completed
+                        pass
                     else:
                         print(f"❌ {invoice_key} extraction failed: {result.get('error', 'Unknown error')}")
                         

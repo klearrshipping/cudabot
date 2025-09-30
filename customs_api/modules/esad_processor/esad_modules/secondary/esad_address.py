@@ -33,7 +33,7 @@ class AddressFormatter:
         self.api_key = OPENROUTER_API_KEY
         # Use general models for secondary processing tasks
         from config import OPENROUTER_GENERAL_MODELS
-        self.primary_model = OPENROUTER_GENERAL_MODELS["gpt_5_nano"]
+        self.primary_model = OPENROUTER_GENERAL_MODELS["gpt_5"]
         self.backup_model = OPENROUTER_GENERAL_MODELS["kimi_standard"]
         
         # Common Jamaican parishes

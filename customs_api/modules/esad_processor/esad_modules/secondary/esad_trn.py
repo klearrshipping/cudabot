@@ -305,6 +305,65 @@ class TRNLookupProcessor:
                 return str(importer).strip()
         
         return None
+    
+    def process(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Process input data to determine TRN information.
+        
+        Args:
+            input_data: Dictionary containing invoice_data, bol_data, fields, and existing_fields
+            
+        Returns:
+            Dictionary with processing results
+        """
+        try:
+            # Extract BOL and invoice data
+            bol_data = input_data.get('bol_data', {})
+            invoice_data = input_data.get('invoice_data', {})
+            
+            if not bol_data and not invoice_data:
+                return {
+                    'success': False,
+                    'error': 'No BOL or invoice data found',
+                    'trn': None
+                }
+            
+            # Lookup TRN from documents
+            results = self.lookup_trn_from_documents(bol_data, invoice_data)
+            
+            # Return the first successful result (exporter or importer)
+            for entity_type, result in results.items():
+                if result.success:
+                    return {
+                        'success': True,
+                        'trn': result.trn_number,
+                        'company_name': result.company_name,
+                        'entity_type': entity_type,
+                        'match_type': result.match_type,
+                        'confidence_score': result.confidence_score
+                    }
+            
+            # If no successful results, return the first error
+            for entity_type, result in results.items():
+                if not result.success:
+                    return {
+                        'success': False,
+                        'error': result.error_message,
+                        'trn': None
+                    }
+            
+            return {
+                'success': False,
+                'error': 'No TRN lookup results available',
+                'trn': None
+            }
+            
+        except Exception as e:
+            return {
+                'success': False,
+                'error': str(e),
+                'trn': None
+            }
 
 
 def main():

@@ -13,6 +13,12 @@ from typing import List, Dict, Any
 def get_csv_financial_transactions():
     """Fetch financial transaction data from CSV file"""
     try:
+        import sys
+        import os
+        # Add the customs_api directory to the path
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        customs_api_dir = os.path.join(current_dir, '..', '..', '..', '..')
+        sys.path.insert(0, customs_api_dir)
         from modules.core.csv_data_client import fetch_financial_transactions
         
         transactions = fetch_financial_transactions()
@@ -78,7 +84,7 @@ def send_to_kimi_free(prompt: str, transaction_details: str, invoice_info: Dict 
         }
     
     # Use Mistral Small model from OpenRouter general models for best performance
-    model = OPENROUTER_GENERAL_MODELS.get("gpt_5_nano", "openai/gpt-5-nano")
+    model = OPENROUTER_GENERAL_MODELS.get("gpt_5", "openai/gpt-5")
     
     # Add invoice context if available
     invoice_context = ""

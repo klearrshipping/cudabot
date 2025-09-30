@@ -304,7 +304,7 @@ def check_database_schema():
         for table in required_tables:
             try:
                 result = supabase.table(table).select("id").limit(1).execute()
-                print(f"✅ Table {table} exists")
+                # Table exists
             except Exception:
                 print(f"❌ Table {table} missing")
                 missing_tables.append(table)
@@ -314,7 +314,7 @@ def check_database_schema():
             print("💡 Please run the database_schema.sql script in your Supabase SQL editor")
             return False
         
-        print("\n✅ All required database tables are available")
+        # All required database tables are available
         return True
         
     except Exception as e:

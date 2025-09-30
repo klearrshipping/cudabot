@@ -55,8 +55,7 @@ class OrderProcessor:
         # Create base directories if they don't exist
         self.base_dir.mkdir(parents=True, exist_ok=True)
         
-        print(f"📁 Order Processor initialized:")
-        print(f"   📂 Base directory: {self.base_dir}")
+        # Order Processor initialized
     
     def generate_order_number(self) -> str:
         """
@@ -113,11 +112,11 @@ class OrderProcessor:
         Returns:
             dict: Order creation results
         """
-        print(f"🔄 Creating new order...")
+        # Creating new order
         
         # Generate unique order number
         order_number = self.generate_order_number()
-        print(f"📋 Generated order number: {order_number}")
+        # Generated order number
         
         # Create order directory structure
         order_dir = self.base_dir / order_number
@@ -128,12 +127,13 @@ class OrderProcessor:
             'file_uploads': order_dir / "file_uploads",
             'invoices': order_dir / "invoices",
             'bills_of_lading': order_dir / "bills_of_lading",
-            'esad_files': order_dir / "esad_files"
+            'esad_files': order_dir / "esad_files",
+            'commodity_code': order_dir / "commodity_code"
         }
         
         for name, path in directories.items():
             path.mkdir(parents=True, exist_ok=True)
-            print(f"   📁 Created: {name} -> {path}")
+            # Created directory
         
         # Create order metadata file
         order_metadata = {
@@ -147,7 +147,8 @@ class OrderProcessor:
                 'file_uploads': [],
                 'invoices': [],
                 'bills_of_lading': [],
-                'esad_files': []
+                'esad_files': [],
+                'commodity_code': []
             },
             'processing_status': {
                 'files_uploaded': False,
@@ -163,7 +164,7 @@ class OrderProcessor:
         with open(metadata_file, 'w', encoding='utf-8') as f:
             json.dump(order_metadata, f, indent=2, ensure_ascii=False)
         
-        print(f"   📄 Created: order_metadata.json")
+        # Created order_metadata.json
         
         # Create database record if available
         if create_order:
@@ -179,7 +180,6 @@ class OrderProcessor:
                 print(f"   ⚠️ Database save failed: {e}")
         
         print(f"✅ Order {order_number} created successfully!")
-        print(f"   📂 Order directory: {order_dir}")
         
         return {
             'status': 'success',
@@ -363,6 +363,20 @@ class OrderProcessor:
             'file_type': file_type,
             'associated_at': datetime.now().isoformat()
         }
+    
+    def add_file_to_order_metadata(self, order_number: str, file_path: str, document_type: str) -> Dict[str, Any]:
+        """
+        Add file to order metadata (alias for associate_file_with_order)
+        
+        Args:
+            order_number (str): Order number
+            file_path (str): Path to the file
+            document_type (str): Type of document
+            
+        Returns:
+            dict: Association results
+        """
+        return self.associate_file_with_order(order_number, file_path, document_type)
 
 
 def main():

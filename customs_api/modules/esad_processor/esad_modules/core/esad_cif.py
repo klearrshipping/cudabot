@@ -15,7 +15,7 @@ def ask_llm_for_cif_components(invoice_data: Dict, bol_data: Dict) -> Dict[str, 
     # Optimized model selection: Use general models for financial analysis
     from config import OPENROUTER_GENERAL_MODELS
     priority_models = [
-        OPENROUTER_GENERAL_MODELS["gpt_5_nano"],        # Primary - Best for financial analysis
+        OPENROUTER_GENERAL_MODELS["gpt_5"],        # Primary - Best for financial analysis
         OPENROUTER_GENERAL_MODELS["kimi_standard"]       # Backup - Reliable fallback
     ]
     
@@ -118,9 +118,17 @@ IMPORTANT:
         'val_note_other_charges_bol': None
     }
 
-def parse_llm_cif_response(response: str) -> Optional[Dict[str, Any]]:
+def parse_llm_cif_response(response) -> Optional[Dict[str, Any]]:
     """Parse LLM response to extract CIF components."""
     try:
+        # Handle different response types (string, tuple, etc.)
+        if isinstance(response, tuple):
+            # If it's a tuple, take the first element (usually the content)
+            response = response[0] if response else ""
+        elif not isinstance(response, str):
+            # Convert to string if it's not already
+            response = str(response)
+        
         # Clean the response
         response = response.strip()
         
@@ -143,8 +151,9 @@ def parse_llm_cif_response(response: str) -> Optional[Dict[str, Any]]:
                 
         return cif_data
         
-    except (json.JSONDecodeError, KeyError) as e:
+    except (json.JSONDecodeError, KeyError, AttributeError) as e:
         print(f"❌ Failed to parse LLM response: {e}")
+        print(f"Raw response type: {type(response)}")
         print(f"Raw response: {response}")
         return None
 
@@ -226,6 +235,42 @@ def compute_cost_and_freight(extracted_data: Dict[str, Any]) -> Dict[str, Any]:
     
     return extracted_data
 
+def compute_cif(extracted_data: Dict[str, Any]) -> Dict[str, Any]:
+    """Compute CIF value (Cost + Insurance + Freight)."""
+    goods_value = extracted_data.get('val_note_invoice_value_goods_only', 0) or 0
+    freight_invoice = extracted_data.get('val_note_freight_charges_invoice', 0) or 0
+    freight_bol = extracted_data.get('val_note_freight_charges_bol', 0) or 0
+    insurance_invoice = extracted_data.get('val_note_insurance_charges_invoice', 0) or 0
+    insurance_bol = extracted_data.get('val_note_insurance_charges_bol', 0) or 0
+    other_charges_invoice = extracted_data.get('val_note_other_charges_invoice', 0) or 0
+    other_charges_bol = extracted_data.get('val_note_other_charges_bol', 0) or 0
+    
+    # Use the higher freight amount or sum if both exist
+    total_freight = max(freight_invoice, freight_bol) if freight_invoice and freight_bol else (freight_invoice or freight_bol)
+    
+    # Use the higher insurance amount or sum if both exist
+    total_insurance = max(insurance_invoice, insurance_bol) if insurance_invoice and insurance_bol else (insurance_invoice or insurance_bol)
+    
+    # Sum other charges from both invoice and BOL
+    total_other_charges = (other_charges_invoice or 0) + (other_charges_bol or 0)
+    
+    # CIF = Cost (goods) + Insurance + Freight + Other charges
+    cif_value = goods_value + total_insurance + total_freight + total_other_charges
+    extracted_data['val_note_cif'] = round(cif_value, 2)
+    
+    # Build detailed debug message
+    debug_parts = [f"Goods: ${goods_value:,.2f}"]
+    if total_insurance > 0:
+        debug_parts.append(f"Insurance: ${total_insurance:,.2f}")
+    if total_freight > 0:
+        debug_parts.append(f"Freight: ${total_freight:,.2f}")
+    if total_other_charges > 0:
+        debug_parts.append(f"Other: ${total_other_charges:,.2f}")
+    
+    extracted_data['_cif_debug'] = f"🌍 CIF calculation: {' + '.join(debug_parts)} = ${cif_value:,.2f}"
+    
+    return extracted_data
+
 class CIFProcessor:
     """CIF processor that uses LLM to analyze documents and extract CIF components."""
     
@@ -275,6 +320,7 @@ class CIFProcessor:
                 extracted_data = cif_result.copy()
                 extracted_data = compute_insurance_if_none(extracted_data, transport_mode)
                 extracted_data = compute_cost_and_freight(extracted_data)
+                extracted_data = compute_cif(extracted_data)
                 
                 return {
                     'success': True,
@@ -287,6 +333,7 @@ class CIFProcessor:
                     'val_note_insurance_charges_bol': extracted_data.get('val_note_insurance_charges_bol'),
                     'val_note_other_charges_bol': extracted_data.get('val_note_other_charges_bol'),
                     'val_note_cost_and_freight': extracted_data.get('val_note_cost_and_freight'),
+                    'val_note_cif': extracted_data.get('val_note_cif'),
                     'invoice_currency': extracted_data.get('invoice_currency'),
                     'bol_foreign_currency': extracted_data.get('bol_foreign_currency'),
                     'incoterms': extracted_data.get('incoterms'),
@@ -304,7 +351,8 @@ class CIFProcessor:
                     'val_note_other_charges_invoice': None,
                     'val_note_freight_charges_bol': None,
                     'val_note_insurance_charges_bol': None,
-                    'val_note_other_charges_bol': None
+                    'val_note_other_charges_bol': None,
+                    'val_note_cif': None
                 }
                 
         except Exception as e:
@@ -318,7 +366,8 @@ class CIFProcessor:
                 'val_note_other_charges_invoice': None,
                 'val_note_freight_charges_bol': None,
                 'val_note_insurance_charges_bol': None,
-                'val_note_other_charges_bol': None
+                'val_note_other_charges_bol': None,
+                'val_note_cif': None
             }
     
     def _extract_transport_mode(self, input_data: Dict[str, Any]) -> str:

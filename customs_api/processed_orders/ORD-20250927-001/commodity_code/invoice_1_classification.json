@@ -1,0 +1,19 @@
+{
+  "invoice_key": "invoice_1",
+  "timestamp": "2025-09-28T11:46:20.236145",
+  "classification": {
+    "success": true,
+    "commercial_description": "10kW Inverter",
+    "commodity_code": "8504400000",
+    "hs_code": "8504.40",
+    "hs_description": "Static converters:",
+    "original_description": "10kw inverter",
+    "processing_notes": "Processed: 10kW Inverter -> HS: 8504.40",
+    "error": null
+  },
+  "metadata": {
+    "order_number": "ORD-20250927-001",
+    "processing_date": "2025-09-28",
+    "processing_time": "11:46:20"
+  }
+}

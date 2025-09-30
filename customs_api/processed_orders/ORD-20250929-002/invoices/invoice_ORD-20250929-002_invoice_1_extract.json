@@ -1,0 +1,51 @@
+{
+  "supplier": {
+    "name": "Shenzhen Jinsdon Lighting Technology CO.,LTD",
+    "address": "NO.68, BaiGongAo Industrial Zone, Xikeng Community, Guanlan Town, Longhua District, Shenzhen, 518110, China",
+    "contact": {
+      "telephone": "0086-755-89918655",
+      "fax": "0086-755-89918656"
+    }
+  },
+  "buyer": {
+    "name": "Rafer Johnson",
+    "address": "34 RoehamptonCloseKingston 19Jamaica West indies",
+    "contact": {
+      "contacter": "Rafer Johnson",
+      "telephone": "+1 (876) 817-0065"
+    }
+  },
+  "invoice_details": {
+    "invoice_number": "JSDXS2025091202",
+    "date": "9/10/2025"
+  },
+  "items": [
+    {
+      "item_number": "1",
+      "description": "10kw inverter",
+      "quantity": 1.0,
+      "unit": "pcs",
+      "unit_price": 900.0,
+      "total_price": 900.0
+    }
+  ],
+  "totals": {
+    "subtotal": 900.0,
+    "total_amount": 900.0,
+    "currency": "USD"
+  },
+  "shipping": {
+    "method": "ups",
+    "delivery_terms": "ups"
+  },
+  "payment_terms": {},
+  "document_type": "invoice",
+  "extraction_confidence": "high",
+  "_metadata": {
+    "extraction_timestamp": "2025-09-29T18:33:01.376012",
+    "source_file": "C:\\Users\\rafer\\OneDrive\\Desktop\\projects\\cuda\\customs_api\\processed_orders\\ORD-20250929-002\\file_uploads\\invoice_20250929_182952.pdf",
+    "processor": "claude_sonnet_4_via_openrouter",
+    "model": "openai/gpt-5-mini",
+    "processing_method": "pdf_to_image_conversion"
+  }
+}

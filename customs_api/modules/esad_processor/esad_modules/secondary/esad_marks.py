@@ -18,7 +18,14 @@ This script:
 import sys
 import json
 import re
-from typing import Optional, Dict, List
+import os
+from typing import Optional, Dict, List, Any
+
+# Add the customs_api directory to the path
+current_dir = os.path.dirname(os.path.abspath(__file__))
+customs_api_dir = os.path.join(current_dir, '..', '..', '..', '..')
+sys.path.insert(0, customs_api_dir)
+
 from modules.core.llm_client import LLMClient
 
 def get_commercial_description_from_json(json_path: str) -> str:

@@ -62,7 +62,7 @@ class FlexibleFormExtractor:
     def process_document(self, file_path: Path, save_to_file: bool = True, 
                         order_number: str = None, save_to_db: bool = True) -> Dict[str, Any]:
         """Process bill of lading or arrival notice using Claude Sonnet 4 via OpenRouter"""
-        print(f"🔄 Processing: {file_path.name}")
+        # Processing document
 
         try:
             # Convert PDF to image for OpenRouter compatibility
@@ -228,7 +228,7 @@ Be comprehensive in extracting ALL charges from any charges/fees table found in 
             # Encode as base64
             img_base64 = base64.b64encode(img_data).decode('utf-8')
             
-            print(f"📏 Final image size: {len(img_data)/1024/1024:.1f}MB")
+            # Image size calculated
             
             # Return as data URL with JPEG format
             return f"data:image/jpeg;base64,{img_base64}"
@@ -267,7 +267,7 @@ Be comprehensive in extracting ALL charges from any charges/fees table found in 
                 # Encode as base64
                 img_base64 = base64.b64encode(img_data).decode('utf-8')
                 
-                print(f"📏 Final image size: {len(img_data)/1024/1024:.1f}MB")
+                # Image size calculated
                 
                 # Return as data URL
                 return f"data:image/jpeg;base64,{img_base64}"
@@ -301,18 +301,12 @@ Be comprehensive in extracting ALL charges from any charges/fees table found in 
             "temperature": 0.1
         }
         
-        print(f"🚀 Sending BOL request to OpenRouter with model: {self.model}")
-        print(f"🚀 Payload keys: {list(payload.keys())}")
-        print(f"🚀 Image data URL length: {len(image_data_url)}")
+        # Sending BOL request to OpenRouter
         
         try:
             response = requests.post(self.base_url, headers=self.headers, json=payload)
-            print(f"🚀 BOL Response status: {response.status_code}")
-            print(f"🚀 BOL Response headers: {dict(response.headers)}")
-            
             response.raise_for_status()
             response_data = response.json()
-            print(f"🚀 BOL Response data keys: {list(response_data.keys())}")
             
             return response_data
         except requests.exceptions.HTTPError as e:
@@ -333,13 +327,13 @@ Be comprehensive in extracting ALL charges from any charges/fees table found in 
                 message = choices[0].get('message', {})
                 text_content = message.get('content', '')
                 
-                print(f"🔍 Raw LLM Response: {text_content[:500]}...")  # Debug: Show first 500 chars
+                # LLM response received
                 
                 # First, try to extract JSON from response
                 json_match = re.search(r'\{.*\}', text_content, re.DOTALL)
                 if json_match:
                     json_str = json_match.group(0)
-                    print(f"🔍 Extracted JSON: {json_str[:500]}...")  # Debug: Show extracted JSON
+                    # JSON extracted successfully
                     
                     try:
                         extracted_data = json.loads(json_str)
@@ -347,13 +341,16 @@ Be comprehensive in extracting ALL charges from any charges/fees table found in 
                         # Clean and validate the extracted data
                         cleaned_data = self._clean_extracted_data(extracted_data)
                         
-                        print(f"🔍 Cleaned Data Keys: {list(cleaned_data.keys())}")  # Debug: Show what keys we have
+                        # Data cleaned successfully
                         if 'shipper' in cleaned_data:
-                            print(f"🔍 Shipper Data: {cleaned_data['shipper']}")
+                            # Shipper data extracted
+                            pass
                         if 'consignee_name' in cleaned_data:
-                            print(f"🔍 Consignee Data: {cleaned_data['consignee_name']}")
+                            # Consignee data extracted
+                            pass
                         if 'bill_of_lading' in cleaned_data:
-                            print(f"🔍 BOL Number: {cleaned_data['bill_of_lading']}")
+                            # BOL number extracted
+                            pass
                         
                         return cleaned_data
                     except json.JSONDecodeError as e:
@@ -566,7 +563,7 @@ Be comprehensive in extracting ALL charges from any charges/fees table found in 
         # If both fields are empty, try to re-extract with a focused prompt
         if (not bol_number or bol_number.strip() == '' or bol_number.lower() == 'null') and \
            (not master_bol or master_bol.strip() == '' or master_bol.lower() == 'null'):
-            print(f"❌ No BOL number found in either field - attempting re-extraction")
+            # No BOL number found - attempting re-extraction
             return self._recheck_bol_number(extracted_data, image_data_url)
         
         # If we have a valid BOL number, validate it
@@ -588,7 +585,7 @@ Be comprehensive in extracting ALL charges from any charges/fees table found in 
             Dict: Updated extraction data with BOL number if found
         """
         try:
-            print(f"🔍 Attempting BOL number re-extraction...")
+            # Attempting BOL number re-extraction
             
             # Create a focused prompt just for BOL number extraction
             bol_focus_prompt = """You are a document analysis specialist. Your task is to find the Bill of Lading (BOL) number in this document.
@@ -618,7 +615,7 @@ Return ONLY the JSON object, no additional text."""
             # Check if we found a BOL number
             found_bol = bol_data.get('bill_of_lading')
             if found_bol and found_bol.strip() and found_bol.lower() != 'null':
-                print(f"✅ BOL number found during recheck: {found_bol}")
+                # BOL number found during recheck
                 extracted_data['bill_of_lading'] = found_bol
                 extracted_data['master_bill_of_lading'] = bol_data.get('master_bill_of_lading')
                 

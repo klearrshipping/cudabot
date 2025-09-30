@@ -17,7 +17,7 @@ This script:
 import sys
 import json
 import csv
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 from pathlib import Path
 
 # Cache for warehouse data to avoid repeated file reads

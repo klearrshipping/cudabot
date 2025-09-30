@@ -1,0 +1,32 @@
+{
+  "order_number": "ORD-20250927-004",
+  "created_at": "2025-09-27T05:18:38.287583",
+  "status": "created",
+  "description": "Customs declaration upload",
+  "client_name": "Client 1",
+  "directories": {
+    "order_root": "processed_orders\\ORD-20250927-004",
+    "file_uploads": "processed_orders\\ORD-20250927-004\\file_uploads",
+    "invoices": "processed_orders\\ORD-20250927-004\\invoices",
+    "bills_of_lading": "processed_orders\\ORD-20250927-004\\bills_of_lading",
+    "esad_files": "processed_orders\\ORD-20250927-004\\esad_files"
+  },
+  "files": {
+    "file_uploads": [],
+    "invoices": [
+      "file_uploads\\invoice_20250927_051841.pdf"
+    ],
+    "bills_of_lading": [
+      "file_uploads\\bill_of_lading_20250927_051842.pdf"
+    ],
+    "esad_files": []
+  },
+  "processing_status": {
+    "files_uploaded": false,
+    "invoices_processed": false,
+    "bills_processed": false,
+    "esad_processed": false,
+    "completed": false
+  },
+  "updated_at": "2025-09-27T05:18:42.325682"
+}

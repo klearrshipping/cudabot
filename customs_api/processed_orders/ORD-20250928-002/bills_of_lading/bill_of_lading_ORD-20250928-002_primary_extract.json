@@ -1,0 +1,211 @@
+{
+  "document_type": "Air Waybill / Arrival Notice (NOT NEGOTIABLE)",
+  "document_id_top_right": "B870Y28X3TL",
+  "air_waybill_number_or_tracking_number": "1ZB870Y20417757098",
+  "shipper": {
+    "account_number_header": "B870Y2",
+    "name": "QI TAN",
+    "address_line_1": "RM 808 BLOCK B 13/F TEXACO ROAD",
+    "address_line_2": "INDUSTRIAL CENTRE 256-264 TEXACO RD TSUEN WAN 76900",
+    "country": "HK",
+    "contact": null,
+    "additional_identifier_in_shipper_box": "B870Y2"
+  },
+  "consignee": {
+    "name": "RAFER JOHNSON",
+    "address_line_1": "34 ROEHAMPTON CLOSE",
+    "address_line_2": "KINGSTON",
+    "contact": "(8751876) 817-0065",
+    "account_number": null
+  },
+  "notify_party_optional_accounting": null,
+  "agent_iata_code": null,
+  "agent_account_no": null,
+  "airport_of_departure": {
+    "text": "AIRPORT OF DEPARTURE",
+    "code": "MIA",
+    "name": "Miami International Airport",
+    "additional_text": "ADDRESS OF FIRST CARRIER AND REQUESTED ROUTING"
+  },
+  "routing_and_destination": {
+    "to_code": "KIN",
+    "to_text": "TO KIN",
+    "by_first_carrier": "IBC CARRIERS",
+    "routing_text_box": "TO KIN BY FIRST CARRIER IBC CARRIERS"
+  },
+  "currency": "USD",
+  "payment_indicator_boxes": {
+    "WTVAL_PPD": "X",
+    "WTVAL_COL": null,
+    "OTHER_PPD": "X",
+    "OTHER_COL": null
+  },
+  "declared_value": {
+    "declared_value_for_carriage": "NVD",
+    "declared_value_for_customs": "$900 USD",
+    "declared_value_currency": "USD"
+  },
+  "airport_of_destination": {
+    "airport_code": "NMIA",
+    "flight_number_field": "VOA0589",
+    "flight_date_raw": "17-Sep-2025",
+    "flight_date_ddmmyyyy": "17/09/2025",
+    "tail_number": "N1438"
+  },
+  "tracking_information": {
+    "tracking_number": "1ZB870Y20417757098"
+  },
+  "handling_information": {
+    "text1": "ASYCUDA REF # JMKIN2025/1997",
+    "text2": "AJAS 2/ JMAJT"
+  },
+  "cargo_summary_table_rows": [
+    {
+      "no_of_pieces": "1",
+      "gross_weight_lb_kg_label": "GROSS WEIGHT LB KG",
+      "gross_weight": "21.3",
+      "gross_weight_unit": "K",
+      "rate_class": "K",
+      "chargeable_weight": "21.3 K",
+      "commodity_item_no": null,
+      "charge_symbol": "$",
+      "freight_charges": "75.00",
+      "nature_and_quantity_of_goods": "10KW INVERTER(HK HS CODE 85013200)"
+    }
+  ],
+  "totals_line_near_cargo": {
+    "pieces_total": "1",
+    "weight_total": "21 K"
+  },
+  "charges_and_fees_table": {
+    "note": "Extracted from freight/charges area. All visible rows included.",
+    "rows": [
+      {
+        "charge_type": "FREIGHT CHARGES",
+        "currency": "USD",
+        "prepaid_amount": null,
+        "collect_amount": "75.00",
+        "local_prepaid_amount": null,
+        "local_collect_amount": null,
+        "notes": null
+      },
+      {
+        "charge_type": "CHARGE (symbol shown)",
+        "currency": "USD",
+        "prepaid_amount": null,
+        "collect_amount": "$",
+        "local_prepaid_amount": null,
+        "local_collect_amount": null,
+        "notes": "Small $ symbol appears in charge column"
+      }
+    ],
+    "declared_value_for_customs": {
+      "amount": "900",
+      "currency": "USD"
+    }
+  },
+  "commodity_details": {
+    "description": "10KW INVERTER",
+    "additional_info": "(HK HS CODE 85013200)",
+    "marks_and_numbers": null
+  },
+  "weights_and_measures": {
+    "piece_count": "1",
+    "gross_weight": {
+      "value": "21.3",
+      "unit": "K"
+    },
+    "chargeable_weight": {
+      "value": "21.3",
+      "unit": "K"
+    },
+    "rounded_total_weight_line": {
+      "value": "21",
+      "unit": "K"
+    }
+  },
+  "flight_and_vessel_info": {
+    "flight_number": "VOA0589",
+    "flight_date_raw": "17-Sep-2025",
+    "flight_date_ddmmyyyy": "17/09/2025",
+    "tail_number": "N1438",
+    "vessel_name": null,
+    "voyage_number": null,
+    "flag": null
+  },
+  "references_and_codes": {
+    "top_left_code_under_shipper": "B870Y2",
+    "top_center_small_code": "B870Y2",
+    "document_header_code_top_right": "B870Y28X3TL",
+    "awb_like_tracking": "1ZB870Y20417757098",
+    "asycuda_ref": "JMKIN2025/1997",
+    "other_reference": "AJAS 2/ JMAJT"
+  },
+  "signatures_and_execution": {
+    "signature_company": "Tata Courier Services Ltd.",
+    "signed_by": "J. Clarke",
+    "executed_on_raw": "9/18/2025",
+    "executed_on_ddmmyyyy": "18/09/2025",
+    "signature_of_issuing_carrier_or_agent": null,
+    "signature_of_shipper_or_his_agent": null
+  },
+  "other_visible_text_blocks": {
+    "top_center_title": "NOT NEGOTIABLE AIR WAYBILL (AIR CONSIGNMENT NOTE)",
+    "copies_note": "Copies 1,2, and 3 of this Air Waybill are originals and have same validity",
+    "legal_text_snippet": "It is agreed that the goods described herein are accepted in apparent good order and condition (except as noted) for carriage SUBJECT TO THE CONDITIONS OF CONTRACT ON THE REVERSE HEREOF. ALL GOODS MAY BE CARRIED BY ANY OTHER MEANS INCLUDING ROAD OR ANY OTHER CARRIER UNLESS SPECIFIC CONTRARY INSTRUCTIONS ARE GIVEN HEREON BY THE SHIPPER, AND SHIPPER AGREES THAT THE SHIPMENT MAY BE CARRIED VIA INTERMEDIATE STOPPING PLACES WHICH THE CARRIER DEEMS APPROPRIATE. THE SHIPPER'S ATTENTIONS IS DRAWN TO THE NOTICE CONCERNING CARRIER'S LIMITATION OF LIABILITY ON THE REVERSE HEREOF. Shipper may increase such limitation of liability by declaring a higher value for carriage and paying a supplemental charge if required.",
+    "awb_small_text_under_currency": "P/P"
+  },
+  "ports_and_locations": {
+    "origin_airport_code": "MIA",
+    "origin_airport_name": "Miami International Airport",
+    "destination_airport_code": "NMIA",
+    "destination_city_code": "KIN",
+    "destination_city_name": null,
+    "carrier_first": "IBC CARRIERS"
+  },
+  "form_fields_blank_or_not_present": {
+    "shipper_s_r_f_c": null,
+    "del_zone": null,
+    "pickup_zone": null,
+    "child_tracking_number": null,
+    "delivery_charges_fields": null,
+    "tax_fields": null,
+    "total_other_charges_due_agent": null,
+    "total_other_charges_due_carrier": null,
+    "total_prepaid": null,
+    "total_collect": null,
+    "currency_conversion_rates": null,
+    "charges_at_destination": null,
+    "total_collect_chgs": null
+  },
+  "visual_or_handwritten_annotations": {
+    "handwritten_signature": "J. Clarke",
+    "company_stamp_or_print": "Tata Courier Services Ltd."
+  },
+  "image_footer_barcode": "visible (not transcribed)",
+  "raw_extracted_text_snippets": {
+    "top_left_airport_of_departure_label": "AIRPORT OF DEPARTURE MIA",
+    "shipper_name_and_address_block_firstline": "B870Y2",
+    "consignee_phone_exact": "(8751876) 817-0065",
+    "routing_box_text": "ROUTING AND DESTINATION TO KIN BY FIRST CARRIER IBC CARRIERS",
+    "flight_tail_and_tracking_line": "VOA0589 17-Sep-2025 N1438 1ZB870Y20417757098",
+    "handling_information_line": "ASYCUDA REF # JMKIN2025/1997 AJAS 2/ JMAJT",
+    "commodity_line": "10KW INVERTER(HK HS CODE 85013200)",
+    "freight_charge_value_text": "$ 75.00",
+    "declared_value_for_customs_text": "$900 USD",
+    "execution_date_text": "9/18/2025"
+  },
+  "charges": [],
+  "_metadata": {
+    "extraction_timestamp": "2025-09-28T11:55:05.550567",
+    "source_file": "C:\\Users\\rafer\\OneDrive\\Desktop\\projects\\cuda\\customs_api\\processed_orders\\ORD-20250928-002\\file_uploads\\bill_of_lading_20250928_115405.pdf",
+    "processor": "claude_sonnet_4_via_openrouter",
+    "model": "openai/gpt-5-mini",
+    "document_type": "Shipping Document",
+    "processing_method": "pdf_to_image_conversion",
+    "bol_recheck": true,
+    "bol_confidence": "high"
+  },
+  "bill_of_lading": "B870Y28X3TL",
+  "master_bill_of_lading": null
+}

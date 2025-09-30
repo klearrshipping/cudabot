@@ -1,0 +1,166 @@
+{
+  "document_type": "Air Waybill / Arrival Notice",
+  "top_right_code": "B870Y28X3TL",
+  "document_number_or_reference": "B870Y2",
+  "air_waybill_full_tracking_number": "1ZB870Y20417757098",
+  "date_issued_or_executed_on": "18/09/2025",
+  "airport_of_departure_code": "MIA",
+  "airport_of_departure_name": "Miami International Airport",
+  "shipper": {
+    "name": "QI TAN",
+    "account_number": "B870Y2",
+    "address_line_1": "RM 808 BLOCK B 13/F TEXACO ROAD",
+    "address_line_2": "INDUSTRIAL CENTRE 256-264 TEXACO RD TSUEN WAN 76900",
+    "country": "HK",
+    "contact": null
+  },
+  "consignee": {
+    "name": "RAFER JOHNSON",
+    "address_line_1": "34 ROEHAMPTON CLOSE",
+    "city": "KINGSTON",
+    "phone": "(8751876) 817-0065",
+    "contact": null,
+    "account_number": null
+  },
+  "also_notify_name_and_address": null,
+  "agent_iata_code": null,
+  "agent_account_no": null,
+  "routing_and_destination": {
+    "to": "KIN",
+    "by_first_carrier": "IBC CARRIERS",
+    "currency": "USD",
+    "charges_code_box_raw": "P/P X (WT/VAL)   OTHER  PPD COL X",
+    "declared_value_for_carriage": "NVD",
+    "declared_value_for_customs": "$900 USD"
+  },
+  "airport_of_destination": {
+    "code": "NMIA",
+    "flight_number_for_carrier_use": "VOA0589",
+    "flight_date": "17/09/2025",
+    "tail_number": "N1438"
+  },
+  "tracking_number": "1ZB870Y20417757098",
+  "handling_information": "ASYCUDA REF # JMKIN2025/1997 AJAS 2/ JMAJT",
+  "cargo_summary_table": {
+    "columns_raw_header": "NO. OF PIECES RCP | GROSS WEIGHT LB KG | RATE CLASS COMMODITY ITEM NO | CHARGEABLE WEIGHT | RATE | CHARGE | FREIGHT CHARGES | NATURE AND QUANTITY OF GOODS (INC. DIMENSIONS OR VOLUME)",
+    "rows": [
+      {
+        "no_of_pieces": "1",
+        "gross_weight": "21.3 K",
+        "gross_weight_unit": "K",
+        "chargeable_weight": "21.3 K",
+        "rate_class": null,
+        "commodity_item_no": null,
+        "rate": null,
+        "charge": "$",
+        "freight_charges": "75.00",
+        "nature_and_quantity_of_goods": "10KW INVERTER(HK HS CODE 85013200)"
+      }
+    ],
+    "additional_weight_line": {
+      "line_pieces": "1",
+      "line_weight": "21 K"
+    },
+    "total_freight_charges": "75.00"
+  },
+  "weights_measures_and_quantities": {
+    "pieces_total": "1",
+    "gross_weight_total": "21.3 K",
+    "chargeable_weight_total": "21.3 K",
+    "weight_unit": "K (appears as KG)"
+  },
+  "charges_and_fees": {
+    "currency": "USD",
+    "charge_markings_at_top": "P/P X (WT/VAL)   OTHER  PPD COL X",
+    "charges_table_rows": [
+      {
+        "charge_type": "FREIGHT CHARGES",
+        "currency": "USD",
+        "prepaid_amount": null,
+        "collect_amount": "75.00",
+        "local_prepaid_amount": null,
+        "local_collect_amount": null,
+        "notes": null
+      }
+    ],
+    "total_prepaid": null,
+    "total_collect": null,
+    "total_other_charges_due_agent": null,
+    "total_other_charges_due_carrier": null
+  },
+  "vessel_and_shipping_info": {
+    "vessel_name": null,
+    "voyage_number": null,
+    "flight_number": "VOA0589",
+    "flight_date": "17/09/2025",
+    "tail_number": "N1438",
+    "carrier_first": "IBC CARRIERS"
+  },
+  "ports_and_locations": {
+    "origin": "Miami (MIA)",
+    "loading_port_or_airport": "Miami International Airport",
+    "place_of_delivery_or_destination": "Kingston (KIN) / NMIA"
+  },
+  "document_text_and_statements": {
+    "air_waybill_notice": "Copies 1,2, and 3 of this Air Waybill are originals and have same validity",
+    "shipper_certification_text": "The shipper certifies that these commodities, technology or software were exported from the United States in accordance with the Export Administration Regulations. Diversion contrary to U.S. law is prohibited",
+    "shipper_signature_block_text": "Shipper certifies that the particulars on the face hereof are correct and that insofar as any part of the consignment contains dangerous goods, such part is properly described by name and is in proper condition for carriage by air according to applicable Dangerous Goods Regulations"
+  },
+  "additional_identifiers_and_codes": {
+    "B870Y2_occurrences": [
+      "Top left document reference B870Y2",
+      "Shipper's account number B870Y2"
+    ],
+    "other_codes": [
+      "B870Y28X3TL (top right code)",
+      "1ZB870Y20417757098 (tracking number)",
+      "JMKIN2025/1997 (ASYCUDA REF #)"
+    ]
+  },
+  "signature_and_signed_by": {
+    "company": "Tata Courier Services Ltd",
+    "signed_by": "J. Clarke",
+    "signature_image_present": true
+  },
+  "execution_and_dates": {
+    "executed_on": "18/09/2025",
+    "flight_date": "17/09/2025"
+  },
+  "barcodes_and_machine_readable": {
+    "barcode_present": true,
+    "barcode_text_if_any_visible": null
+  },
+  "images_and_stamps": {
+    "carrier_logo": "UPS logo (top right)",
+    "other_stamps_or_handwritten": "Blue ink stamp/signature: Tata Courier Services Ltd Signed by: J. Clarke"
+  },
+  "raw_visible_text_extract": {
+    "top_left": "AIRPORT OF DEPARTURE MIA",
+    "shipper_block": "SHIPPER'S NAME AND ADDRESS B870Y2 QI TAN RM 808 BLOCK B 13/F TEXACO ROAD INDUSTRIAL CENTRE 256-264 TEXACO RD TSUEN WAN 76900 HK",
+    "consignee_block": "CONSIGNEE'S NAME AND ADDRESS RAFER JOHNSON 34 ROEHAMPTON CLOSE KINGSTON (8751876) 817-0065",
+    "air_waybill_header": "NOT NEGOTIABLE AIR WAYBILL (AIR CONSIGNMENT NOTE)",
+    "routing_block": "TO KIN BY FIRST CARRIER IBC CARRIERS",
+    "currency_and_chgs": "CURRENCY USD P/P X WT/VAL PPD X OTHER PPD COL X",
+    "declared_values": "DECLARED VALUE FOR CARRIAGE NVD DECLARED VALUE FOR CUSTOMS $900 USD",
+    "airport_of_destination_block": "AIRPORT OF DESTINATION NMIA FOR CARRIER USE ONLY FLIGHT NUM VOA0589 FLIGHT/DATE 17-Sep-2025 TAIL NUMBER N1438 TRACKING NUMBER 1ZB870Y20417757098",
+    "handling_info": "ASYCUDA REF # JMKIN2025/1997 AJAS 2/ JMAJT",
+    "cargo_line": "1 21.3 K 21.3 K $ 75.00 10KW INVERTER(HK HS CODE 85013200)",
+    "total_freight_line": "$ 75.00",
+    "signature_block": "Tata Courier Services Ltd Signed by: J. Clarke",
+    "execution_date_line": "EXECUTED ON 9/18/2025"
+  },
+  "ocr_notes": "All values extracted from visible text on the provided Air Waybill image. Nulls indicate fields not present or not legible on the document.",
+  "charges": [],
+  "_metadata": {
+    "extraction_timestamp": "2025-09-28T18:55:29.728038",
+    "source_file": "C:\\Users\\rafer\\OneDrive\\Desktop\\projects\\cuda\\customs_api\\processed_orders\\ORD-20250928-003\\file_uploads\\bill_of_lading_20250928_185405.pdf",
+    "processor": "claude_sonnet_4_via_openrouter",
+    "model": "openai/gpt-5-mini",
+    "document_type": "Shipping Document",
+    "processing_method": "pdf_to_image_conversion",
+    "bol_recheck": true,
+    "bol_confidence": "high"
+  },
+  "bill_of_lading": "1ZB870Y20417757098",
+  "master_bill_of_lading": null
+}
