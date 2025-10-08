@@ -1,0 +1,154 @@
+{
+  "document_type": "Air Waybill (Air Consignment Note) / Arrival Notice",
+  "document_codes": {
+    "top_right_code": "B870Y28X3TL",
+    "air_waybill_number": null,
+    "ups_tracking_number": "1ZB870Y20417757098",
+    "shippers_account_number": "B870Y2",
+    "other_codes_on_form": "B870Y2"
+  },
+  "airport_of_departure": {
+    "code": "MIA",
+    "name": "Miami International Airport"
+  },
+  "shipper": {
+    "name": "QI TAN",
+    "account_number": "B870Y2",
+    "address_line_1": "RM 808 BLOCK B 13/F TEXACO ROAD",
+    "address_line_2": "INDUSTRIAL CENTRE 256-264 TEXACO RD TSUEN WAN 76900",
+    "country": "HK",
+    "additional_text": null
+  },
+  "consignee": {
+    "name": "RAFER JOHNSON",
+    "address_line_1": "34 ROEHAMPTON CLOSE",
+    "city": "KINGSTON",
+    "phone": "(8751876) 817-0065",
+    "country": null
+  },
+  "notify_party": {
+    "also_notify_name_and_address_optional_accounting_information": null
+  },
+  "agent": {
+    "iata_code": null,
+    "account_no": null
+  },
+  "routing_and_destination": {
+    "to": "KIN",
+    "by_first_carrier": "IBC CARRIERS",
+    "currency": "USD",
+    "wtval_pp": "X",
+    "wtval_other": "X"
+  },
+  "airports_and_ports": {
+    "airport_of_destination": "NMIA",
+    "destination_city_code": "KIN",
+    "destination_city_name": "Kingston"
+  },
+  "flight_and_vessel_info": {
+    "flight_number": "VOA0589",
+    "flight_date": "17/09/2025",
+    "tail_number": "N1438",
+    "vessel_name": null,
+    "voyage_number": null,
+    "flag": null
+  },
+  "handling_information": {
+    "asycuda_ref": "ASYCUDA REF # JMKIN2025/1997",
+    "ajs_code": "AJAS 2/ JMAJT",
+    "other_handling_text": null
+  },
+  "charges_and_values": {
+    "declared_value_for_carriage": "NVD",
+    "declared_value_for_customs": "$900 USD",
+    "currency": "USD",
+    "charges_table": [
+      {
+        "charge_type": "FREIGHT CHARGES",
+        "currency": "USD",
+        "prepaid_amount": "$ 75.00",
+        "collect_amount": null,
+        "other_display": "75.00"
+      }
+    ],
+    "wtval_pp_indicator": "P/P (marked X)",
+    "wtval_other_indicator": "OTHER (marked X)",
+    "total_prepaid": null,
+    "total_collect": null
+  },
+  "cargo": {
+    "number_of_pieces": "1",
+    "pieces_description_field_shows": "1",
+    "gross_weight": "21.3 K",
+    "gross_weight_units": "K",
+    "gross_weight_kg_display": "21.3 K",
+    "chargeable_weight": "21.3 K",
+    "chargeable_weight_units": "K",
+    "chargeable_weight_display": "21.3 K",
+    "packages_detail_line": "1 21 K",
+    "nature_and_quantity_of_goods": "10KW INVERTER(HK HS CODE 85013200)",
+    "commodity_hs_code": "85013200",
+    "marks_and_numbers": null,
+    "commodity_item_number": null,
+    "rate_class": null,
+    "rate": null
+  },
+  "containers": null,
+  "prepaid_collect_boxes": {
+    "prepaid": null,
+    "collect": null,
+    "ppd_indicator": "PPD marked (X) shown in WTVAl/PP area",
+    "coll_indicator": null
+  },
+  "signatures_and_execution": {
+    "signature_of_shipper_or_his_agent": "Tata Courier Services Ltd. Signed by: J.clarke",
+    "executed_on_date": "18/09/2025",
+    "signature_of_issuing_carrier_or_its_agent": null
+  },
+  "additional_information_and_text": {
+    "copies_note": "Copies 1,2, and 3 of this Air Waybill are originals and have same validity",
+    "shipper_certification_text_excerpt": "The shipper certifies that these commodities, technology or software were exported from the United States in accordance with the Export Administration Regulations. Diversion contrary U.S. law is prohibited",
+    "other_visible_text": "AIR WAYBILL (AIR CONSIGNMENT NOTE)",
+    "form_footer_barcodes_and_for_carriers_use_only": "FOR CARRIERS USE ONLY (barcodes visible)"
+  },
+  "all_visible_numbers_and_codes": {
+    "B870Y2": "appears multiple times (shipper/account)",
+    "B870Y28X3TL": "top right code",
+    "1ZB870Y20417757098": "tracking number",
+    "VOA0589": "flight number",
+    "N1438": "tail number",
+    "ASYCUDA_REF": "JMKIN2025/1997",
+    "AJAS_code": "AJAS 2/ JMAJT",
+    "phone": "(8751876) 817-0065",
+    "HS_code": "85013200",
+    "declared_value_customs": "$900 USD",
+    "freight_amount": "75.00"
+  },
+  "raw_extracted_text_snippets": {
+    "top_left": "AIRPORT OF DEPARTURE MIA",
+    "shipper_block": "B870Y2 QI TAN RM 808 BLOCK B 13/F TEXACO ROAD INDUSTRIAL CENTRE 256-264 TEXACO RD TSUEN WAN 76900 HK",
+    "consignee_block": "RAFER JOHNSON 34 ROEHAMPTON CLOSE KINGSTON (8751876) 817-0065",
+    "routing_block": "TO KIN BY FIRST CARRIER IBC CARRIERS",
+    "airport_of_destination_block": "NMIA",
+    "flight_block": "FLIGHT NUM VOA0589 FLIGHTDATE 17-Sep-2025 TAIL NUMBER N1438",
+    "tracking_block": "1ZB870Y20417757098",
+    "handling_block": "ASYCUDA REF # JMKIN2025/1997 AJAS 2/ JMAJT",
+    "commodity_block": "10KW INVERTER(HK HS CODE 85013200)",
+    "weight_block": "21.3 K",
+    "charges_block": "$ 75.00",
+    "declared_value_block": "NVD $900 USD"
+  },
+  "charges": [],
+  "_metadata": {
+    "extraction_timestamp": "2025-10-05T18:39:45.721673",
+    "source_file": "C:\\Users\\rafer\\OneDrive\\Desktop\\projects\\cuda\\customs_api\\processed_orders\\ORD-20251005-001\\file_uploads\\bill_of_lading_20251005_183850.pdf",
+    "processor": "claude_sonnet_4_via_openrouter",
+    "model": "openai/gpt-5-mini",
+    "document_type": "Shipping Document",
+    "processing_method": "pdf_to_image_conversion",
+    "bol_recheck": true,
+    "bol_confidence": "high"
+  },
+  "bill_of_lading": "B870Y28X3TL",
+  "master_bill_of_lading": null
+}

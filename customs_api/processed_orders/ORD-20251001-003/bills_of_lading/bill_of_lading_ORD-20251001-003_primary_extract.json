@@ -1,0 +1,151 @@
+{
+  "document_type": "Air Waybill / Arrival Notice",
+  "document_number": "B870Y28X3TL",
+  "air_waybill_notes": "Copies 1,2, and 3 of this Air Waybill are originals and have same validity",
+  "airport_of_departure_code": "MIA",
+  "airport_of_departure": "Miami International Airport",
+  "shipper": {
+    "prefix_or_code": "B870Y2",
+    "name": "QI TAN",
+    "address_line_1": "RM 808 BLOCK B 13/F TEXACO ROAD",
+    "address_line_2": "INDUSTRIAL CENTRE 256-264 TEXACO RD TSUEN WAN 76900",
+    "country": "HK",
+    "account_number": "B870Y2"
+  },
+  "consignee": {
+    "name": "RAFER JOHNSON",
+    "address_line_1": "34 ROEHAMPTON CLOSE",
+    "address_line_2": "KINGSTON",
+    "contact_phone": "(8751876) 817-0065",
+    "consignee_account_number": null
+  },
+  "notify_party": {
+    "name_and_address": null,
+    "optional_accounting_information": null
+  },
+  "agent": {
+    "iata_code": null,
+    "account_no": null
+  },
+  "routing_and_destination": {
+    "to": "KIN",
+    "by_first_carrier": "IBC CARRIERS",
+    "by_to_by_fields": null
+  },
+  "currency": "USD",
+  "payment_indicator": "P/P",
+  "wtval_charges_boxes": {
+    "PPD_WTVAL": "X",
+    "COLL_WTVAL": null,
+    "PPD_OTHER": "X",
+    "COLL_OTHER": null
+  },
+  "declared_value_for_carriage": "NVD",
+  "declared_value_for_customs": "$900 USD",
+  "airport_of_destination": "NMIA",
+  "flight_number": "VOA0589",
+  "flight_date_original": "17-Sep-2025",
+  "flight_date_ddmmyyyy": "17/09/2025",
+  "tail_number": "N1438",
+  "tracking_number": "1ZB870Y20417757098",
+  "handling_information": "ASYCUDA REF # JMKIN2025/1997 AJAS 2/ JMAJT",
+  "reference_numbers_and_codes": {
+    "shipper_prefix_code": "B870Y2",
+    "air_waybill_top_right": "B870Y28X3TL",
+    "other_reference_1": "JMKIN2025/1997",
+    "other_reference_2": "AJAS 2/ JMAJT"
+  },
+  "cargo_summary_table": {
+    "rows": [
+      {
+        "no_of_pieces": "1",
+        "piece_description": "RCP",
+        "gross_weight": "21.3 K",
+        "gross_weight_units": "K",
+        "chargeable_weight": "21.3 K",
+        "chargeable_weight_units": "K",
+        "rate_class_commodity_item_no": null,
+        "rate": null,
+        "charge_currency_symbol": "$",
+        "freight_charge_amount": "75.00",
+        "nature_and_quantity_of_goods": "10KW INVERTER(HK HS CODE 85013200)"
+      }
+    ],
+    "summary_row": {
+      "pieces": "1",
+      "weight": "21 K",
+      "weight_unit": "K"
+    }
+  },
+  "charges": [],
+  "charges_table_full_text_area": null,
+  "tax_and_valuation": {
+    "valuation_charge": null,
+    "tax": null
+  },
+  "shipper_rfc": null,
+  "delivery_charges": null,
+  "pickup_zone": null,
+  "child_tracking_number": null,
+  "signature_and_execution": {
+    "executed_on_original": "9/18/2025",
+    "executed_on_ddmmyyyy": "18/09/2025",
+    "signature_of_shipper_or_his_agent": null,
+    "signature_of_issuing_carrier_or_its_agent": null,
+    "signed_by": "J. Clarke",
+    "signing_company": "Tata Courier Services Ltd.",
+    "signature_stamp_text": "Tata Courier Services Ltd. Signed by: J. clarke"
+  },
+  "carrier_information": {
+    "carrier_name": "UPS",
+    "carrier_logo": "UPS logo present",
+    "issuing_carrier_prefix": null
+  },
+  "other_visible_text_blocks": {
+    "terms_and_conditions_excerpt": "It is agreed that the goods described herein are accepted in apparent good order and condition (except as noted) for carriage SUBJECT TO THE CONDITIONS OF CONTRACT ON THE REVERSE HEREOF. ALL GOODS MAY BE CARRIED BY ANY OTHER MEANS INCLUDING ROAD OR ANY OTHER CARRIER UNLESS SPECIFIC CONTRARY INSTRUCTIONS ARE GIVEN HEREON BY THE SHIPPER, AND SHIPPER AGREES THAT THE SHIPMENT MAY BE CARRIED VIA INTERMEDIATE STOPPING PLACES WHICH THE CARRIER DEEMS APPROPRIATE. THE SHIPPER'S ATTENTIONS IS DRAWN TO THE NOTICE CONCERNING CARRIER'S LIMITATION OF LIABILITY ON THE REVERSE HEREOF. Shipper may increase such limitation of liability by declaring a higher value for carriage and paying a supplemental charge if required.",
+    "export_control_statement": "The shipper certifies that these commodities, technology or software were exported from the United States in accordance with the Export Administration Regulations. Diversion contrary U.S. law is prohibited"
+  },
+  "barcodes_and_machine_readable": {
+    "barcode_areas": [
+      "long barcode at bottom right (image)",
+      "tracking number 1ZB870Y20417757098 printed near top-right area"
+    ],
+    "visible_codes": [
+      "1ZB870Y20417757098",
+      "N1438",
+      "B870Y28X3TL",
+      "B870Y2"
+    ]
+  },
+  "locations_ports_destinations": {
+    "origin": "Miami International Airport (MIA)",
+    "destination": "Kingston (KIN) / NMIA",
+    "intermediate_carrier": "IBC CARRIERS"
+  },
+  "weights_measures_quantities": {
+    "total_pieces": "1",
+    "gross_weight": "21.3 K",
+    "chargeable_weight": "21.3 K",
+    "other_weight_note": "21 K appears in summary row"
+  },
+  "commodity_details": {
+    "description": "10KW INVERTER",
+    "hs_code": "HK HS CODE 85013200"
+  },
+  "all_text_extract": {
+    "full_visible_text": "AIRPORT OF DEPARTURE MIA B870Y28X3TL SHIPPER'S NAME AND ADDRESS B870Y2 QI TAN RM 808 BLOCK B 13/F TEXACO ROAD INDUSTRIAL CENTRE 256-264 TEXACO RD TSUEN WAN 76900 HK SHIPPERS' ACCOUNT NUMBER B870Y2 NOT NEGOTIABLE AIR WAYBILL (AIR CONSIGNMENT NOTE) Copies 1,2, and 3 of this Air Waybill are originals and have same validity CONSGINEE'S NAME AND ADDRESS RAFER JOHNSON 34 ROEHAMPTON CLOSE KINGSTON (8751876) 817-0065 ALSO NOTIFY NAME AND ADDRESS (OPTIONAL ACCOUNTING INFORMATION) AGENT'S IATA CODE ACCOUNT NO. AIRPORT OF DEPARTURE (ADDRESS OF FIRST CARRIER) AND REQUESTED ROUTING Miami International Airport ROUTING AND DESTINATION TO KIN BY FIRST CARRIER IBC CARRIERS CURRENCY USD CHGS. CODE WTVAL P/P X OTHER PPD X DECLARED VALUE FOR CARRIAGE NVD DECLARED VALUE FOR CUSTOMS $900 USD AIRPORT OF DESTINATION NMIA FLIGHT NUM VOA0589 FOR CARRIER USE ONLY FLIGHT/DATE 17-Sep-2025 TAIL NUMBER N1438 TRACKING NUMBER 1ZB870Y20417757098 HANDLING INFORMATION ASYCUDA REF # JMKIN2025/1997 AJAS 2/ JMAJT NO. OF PIECES RCP 1 GROSS WEIGHT LB KG 21.3 K CHARGEABLE WEIGHT 21.3 K FREIGHT CHARGES $ 75.00 NATURE AND QUANTITY OF GOODS (INC. DIMENSIONS OR VOLUME) 10KW INVERTER(HK HS CODE 85013200) PREPAID WEIGHT CHARGE COLLECT P-UP ZONE PICKUP PREPAID CHILD TRACKING NUMBER VALUATION CHARGE DELIVERY CHARGES TAX SHIPPER'S R.F.C. TOTAL OTHER CHARGES DUE AGENT TOTAL OTHER CHARGES DUE CARRIER SIGNATURE OF SHIPPER OR HIS AGENT TOTAL PREPAID TOTAL COLLECT EXECUTED ON 9/18/2025 (Date) (Time) (Place) SIGNATURE OF ISSUING CARRIER OR ITS AGENT FOR CARRIERS USE ONLY"
+  },
+  "notes": "All text captured as visible on the provided document image. Fields not present or unreadable are set to null.",
+  "_metadata": {
+    "extraction_timestamp": "2025-10-01T21:42:06.874089",
+    "source_file": "C:\\Users\\rafer\\OneDrive\\Desktop\\projects\\cuda\\customs_api\\processed_orders\\ORD-20251001-003\\file_uploads\\bill_of_lading_20251001_214111.pdf",
+    "processor": "claude_sonnet_4_via_openrouter",
+    "model": "openai/gpt-5-mini",
+    "document_type": "Shipping Document",
+    "processing_method": "pdf_to_image_conversion",
+    "bol_recheck": true,
+    "bol_confidence": "high"
+  },
+  "bill_of_lading": "B870Y28X3TL",
+  "master_bill_of_lading": null
+}

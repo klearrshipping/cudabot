@@ -1,42 +1,26 @@
 #!/usr/bin/env python3
 """
-eSAD Manifest Tracker
+eSAD Manifest Tracker - Clean Version
 Automates BOL tracking on Jamaica Customs website and extracts manifest data
 """
 
-import json
-import re
-import time
-import requests
-from typing import Dict, List, Any, Optional
-from dataclasses import dataclass
-from datetime import datetime
-from pathlib import Path
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.chrome.options import Options
-from selenium.common.exceptions import TimeoutException, NoSuchElementException
-
-# Add parent directory to path to import config
-import sys
-import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-@dataclass
-class ManifestEntry:
-    """Single manifest entry from the tracking results"""
-    office: str
-    reference_id: str
-    date: str
-    status: str
+from selenium.common.exceptions import TimeoutException
+import time
+import json
+from typing import List, Dict, Optional, Any
+from dataclasses import dataclass
+from datetime import datetime
+from pathlib import Path
 
 @dataclass
 class ManifestResult:
     """Complete manifest tracking result"""
     bol_number: str
-    entries: List[ManifestEntry]
+    entries: List[Dict]
     total_entries: int
     tracking_url: str
     extraction_time: str
@@ -44,255 +28,205 @@ class ManifestResult:
     error_message: Optional[str] = None
 
 class ManifestTracker:
-    """Automated BOL tracking on Jamaica Customs website"""
+    """
+    A scraper for Jamaica Customs BOL (Bill of Lading) tracking system.
+    Uses Selenium to handle JavaScript-rendered modal dialogs.
+    """
     
-    def __init__(self):
-        """Initialize the manifest tracker"""
+    def __init__(self, headless: bool = True):
+        """
+        Initialize the tracker with Selenium WebDriver.
+        
+        Args:
+            headless: Run browser in headless mode (default: True)
+        """
         self.base_url = "https://jets.jacustoms.gov.jm/portal/services/docTracking/track.jsf"
-        self.driver = None
-        self.wait_timeout = 30
         
-    def setup_driver(self):
-        """Setup Chrome WebDriver with appropriate options"""
-        chrome_options = Options()
-        chrome_options.add_argument("--headless")  # Run in background - ENABLED FOR AUTOMATION
-        chrome_options.add_argument("--no-sandbox")
-        chrome_options.add_argument("--disable-dev-shm-usage")
-        chrome_options.add_argument("--disable-gpu")
-        chrome_options.add_argument("--window-size=1920,1080")
-        chrome_options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+        # Setup Chrome options
+        options = webdriver.ChromeOptions()
+        if headless:
+            options.add_argument('--headless')
+        options.add_argument('--no-sandbox')
+        options.add_argument('--disable-dev-shm-usage')
+        options.add_argument('--disable-blink-features=AutomationControlled')
         
-        try:
-            self.driver = webdriver.Chrome(options=chrome_options)
-            self.driver.implicitly_wait(10)
-            print("✅ WebDriver initialized successfully")
-            return True
-        except Exception as e:
-            print(f"❌ Failed to initialize WebDriver: {e}")
-            return False
+        # SSL certificate error handling
+        options.add_argument('--ignore-certificate-errors')
+        options.add_argument('--ignore-ssl-errors')
+        options.add_argument('--allow-insecure-localhost')
+        
+        # Suppress all Chrome logging
+        options.add_experimental_option('excludeSwitches', ['enable-logging'])
+        options.add_argument('--log-level=3')
+        options.add_argument('--silent')
+        options.add_argument('--disable-logging')
+        
+        options.add_experimental_option("excludeSwitches", ["enable-automation"])
+        options.add_experimental_option('useAutomationExtension', False)
+        
+        self.driver = webdriver.Chrome(options=options)
+        self.wait = WebDriverWait(self.driver, 20)  # Increased timeout
     
-    def navigate_to_tracking_page(self) -> bool:
-        """Navigate to the BOL tracking page"""
+    def track_bol(self, bol_number: str, verbose: bool = True) -> ManifestResult:
+        """
+        Track a BOL number and return the results from the modal.
+        
+        Args:
+            bol_number: The Bill of Lading number to track (e.g., 'B870Y28X3TL')
+            verbose: Show detailed progress output (default: True)
+            
+        Returns:
+            ManifestResult object with tracking data
+        """
         try:
-            print(f"🌐 Navigating to: {self.base_url}")
+            if verbose:
+                print(f"\n{'='*60}")
+                print(f"STEP 1: Initializing BOL Tracking")
+                print(f"{'='*60}")
+                print(f"BOL Number: {bol_number}")
+            
+            # Load the page
+            if verbose:
+                print(f"\nSTEP 2: Loading Jamaica Customs Portal...")
             self.driver.get(self.base_url)
             
-            # Wait for the page to load
-            WebDriverWait(self.driver, self.wait_timeout).until(
-                EC.presence_of_element_located((By.ID, "bolTracking"))
+            # Check for SSL warning page and bypass if present
+            try:
+                proceed_link = WebDriverWait(self.driver, 3).until(
+                    EC.presence_of_element_located((By.ID, "proceed-link"))
+                )
+                if verbose:
+                    print(f"   ⚠ SSL Warning detected - bypassing...")
+                proceed_link.click()
+                time.sleep(2)
+            except TimeoutException:
+                if verbose:
+                    print(f"   ✓ Portal loaded successfully")
+            
+            # Wait for the input field to be present
+            input_field = self.wait.until(
+                EC.presence_of_element_located((By.ID, "bolTracking:par3"))
             )
             
-            print("✅ Successfully loaded tracking page")
-            return True
+            # Enter BOL number
+            if verbose:
+                print(f"\nSTEP 3: Submitting BOL Query...")
+            input_field.clear()
+            input_field.send_keys(bol_number)
             
-        except TimeoutException:
-            print("❌ Timeout waiting for tracking page to load")
-            return False
-        except Exception as e:
-            print(f"❌ Error navigating to tracking page: {e}")
-            return False
-    
-    def enter_bol_number(self, bol_number: str) -> bool:
-        """Enter BOL number into the tracking form"""
-        try:
-            # Find the BOL input field
-            bol_input = self.driver.find_element(By.ID, "bolTracking:par3")
-            
-            # Clear any existing value and enter the BOL number
-            bol_input.clear()
-            bol_input.send_keys(bol_number)
-            
-            print(f"📝 Entered BOL number: {bol_number}")
-            return True
-            
-        except NoSuchElementException:
-            print("❌ Could not find BOL input field")
-            return False
-        except Exception as e:
-            print(f"❌ Error entering BOL number: {e}")
-            return False
-    
-    def submit_tracking_form(self) -> bool:
-        """Submit the tracking form and wait for BOL results"""
-        try:
-            # Find and click the submit button
+            # Click the submit button
             submit_button = self.driver.find_element(By.ID, "bolTracking:j_idt92")
             submit_button.click()
             
-            print("🔄 Submitting BOL tracking form...")
+            # Give the AJAX request time to initiate
+            time.sleep(1)
             
-            # Wait for the BOL tracking modal to appear and be visible
-            WebDriverWait(self.driver, self.wait_timeout).until(
+            # Wait for the modal dialog to appear
+            if verbose:
+                print(f"   ✓ Request submitted")
+                print(f"\nSTEP 4: Waiting for response...")
+            modal = self.wait.until(
                 EC.visibility_of_element_located((By.ID, "bolTracking:j_idt93"))
             )
             
-            # Wait for the BOL tracking table to be present
-            WebDriverWait(self.driver, self.wait_timeout).until(
-                EC.presence_of_element_located((By.ID, "bolTracking:j_idt98"))
+            # Wait specifically for the table tbody to be present and populated
+            tbody = self.wait.until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, "#bolTracking\\:j_idt98 tbody.ui-datatable-data"))
             )
             
-            # Wait for table data to load (either data rows or empty message)
-            WebDriverWait(self.driver, self.wait_timeout).until(
-                lambda driver: (
-                    driver.find_elements(By.CSS_SELECTOR, "#bolTracking\\:j_idt98 tbody tr[data-ri]") or
-                    driver.find_elements(By.CSS_SELECTOR, "#bolTracking\\:j_idt98 tbody .ui-datatable-empty-message")
-                )
+            # Wait for at least one row to appear in the tbody
+            self.wait.until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, "#bolTracking\\:j_idt98 tbody.ui-datatable-data tr"))
             )
             
-            # Additional wait for JavaScript execution
-            time.sleep(3)
-            
-            print("✅ BOL tracking results loaded")
-            return True
-            
-        except TimeoutException:
-            print("❌ Timeout waiting for BOL tracking results")
-            return False
-        except Exception as e:
-            print(f"❌ Error submitting form: {e}")
-            return False
-    
-    def extract_manifest_data(self) -> List[ManifestEntry]:
-        """Extract manifest data from the BOL tracking results table"""
-        entries = []
-        
-        try:
-            print(f"🔍 Extracting BOL tracking results...")
-            
-            # Wait for the BOL modal to be visible
-            WebDriverWait(self.driver, self.wait_timeout).until(
-                EC.visibility_of_element_located((By.ID, "bolTracking:j_idt93"))
+            # Critical: Wait for actual data cells (td elements) to be populated
+            self.wait.until(
+                lambda driver: len(driver.find_elements(By.CSS_SELECTOR, "#bolTracking\\:j_idt98 tbody.ui-datatable-data tr td")) >= 4
             )
             
-            # Additional wait for data to load
-            time.sleep(2)
+            # Additional wait to ensure all data is rendered
+            time.sleep(1)
             
-            # Use JavaScript to extract data from the specific BOL tracking table
-            js_script = """
-            var entries = [];
+            if verbose:
+                print(f"   ✓ Response received")
+                print(f"\nSTEP 5: Extracting tracking data...")
             
-            // Target the specific BOL tracking table
-            var bolTable = document.getElementById('bolTracking:j_idt98');
-            if (bolTable) {
-                var tbody = bolTable.querySelector('tbody.ui-datatable-data');
-                if (tbody) {
-                    // Look for data rows (they have data-ri attribute)
-                    var rows = tbody.querySelectorAll('tr[data-ri]');
+            # Extract BOL code from the modal
+            try:
+                bol_code_input = self.driver.find_element(By.NAME, "bolTracking:j_idt97")
+                bol_code = bol_code_input.get_attribute('value')
+            except:
+                bol_code = bol_number
+            
+            # Extract table data
+            table = self.driver.find_element(By.ID, "bolTracking:j_idt98")
+            tbody = table.find_element(By.CSS_SELECTOR, "tbody.ui-datatable-data")
+            rows = tbody.find_elements(By.TAG_NAME, "tr")
+            
+            results = []
+            
+            for idx, row in enumerate(rows):
+                try:
+                    cells = row.find_elements(By.TAG_NAME, "td")
                     
-                    for (var i = 0; i < rows.length; i++) {
-                        var cells = rows[i].querySelectorAll('td[role="gridcell"]');
+                    if len(cells) >= 4:
+                        office = cells[0].text.strip()
+                        reference_id = cells[1].text.strip()
+                        status = cells[3].text.strip()
                         
-                        if (cells.length >= 4) {
-                            var entry = {
-                                office: cells[0].textContent.trim(),
-                                reference_id: cells[1].textContent.trim(),
-                                date: cells[2].textContent.trim(),
-                                status: cells[3].textContent.trim()
-                            };
-                            entries.push(entry);
-                        }
-                    }
-                }
-            }
+                        # Only include "Direct Validate" status
+                        if status.lower() == "direct validate":
+                            record = {
+                                'office': office,
+                                'reference_id': reference_id,
+                                'manifest_reg_no': f"{office} {reference_id}",
+                                'date': cells[2].text.strip(),
+                                'status': status
+                            }
+                            results.append(record)
+                except Exception as e:
+                    if verbose:
+                        print(f"   ⚠ Warning: Error processing row {idx}: {str(e)}")
+                    continue
             
-            return entries;
-            """
+            if verbose:
+                if results:
+                    print(f"   ✓ Found 'Direct Validate' record")
+                    print(f"\n{'='*60}")
+                    print(f"RESULTS (JSON Format)")
+                    print(f"{'='*60}\n")
+                    print(json.dumps(results, indent=2))
+                else:
+                    print(f"   ⚠ No 'Direct Validate' record found")
             
-            # Execute JavaScript to extract data
-            js_result = self.driver.execute_script(js_script)
-            
-            # Convert to ManifestEntry objects
-            for entry_data in js_result:
-                entry = ManifestEntry(
-                    office=entry_data['office'],
-                    reference_id=entry_data['reference_id'],
-                    date=entry_data['date'],
-                    status=entry_data['status']
-                )
-                entries.append(entry)
-                print(f"✅ Extracted: {entry.office} - {entry.reference_id} - {entry.date} - {entry.status}")
-            
-            print(f"📊 Extracted {len(entries)} manifest entries")
-            return entries
-            
-        except Exception as e:
-            print(f"❌ Error extracting manifest data: {e}")
-            return []
-    
-    def track_bol(self, bol_number: str) -> ManifestResult:
-        """Main method to track a BOL and extract manifest data"""
-        
-        print(f"🚀 Starting BOL tracking for: {bol_number}")
-        
-        try:
-            # Setup WebDriver
-            if not self.setup_driver():
-                return ManifestResult(
-                    bol_number=bol_number,
-                    entries=[],
-                    total_entries=0,
-                    tracking_url=self.base_url,
-                    extraction_time=datetime.now().isoformat(),
-                    success=False,
-                    error_message="Failed to initialize WebDriver"
-                )
-            
-            # Navigate to tracking page
-            if not self.navigate_to_tracking_page():
-                return ManifestResult(
-                    bol_number=bol_number,
-                    entries=[],
-                    total_entries=0,
-                    tracking_url=self.base_url,
-                    extraction_time=datetime.now().isoformat(),
-                    success=False,
-                    error_message="Failed to navigate to tracking page"
-                )
-            
-            # Enter BOL number
-            if not self.enter_bol_number(bol_number):
-                return ManifestResult(
-                    bol_number=bol_number,
-                    entries=[],
-                    total_entries=0,
-                    tracking_url=self.base_url,
-                    extraction_time=datetime.now().isoformat(),
-                    success=False,
-                    error_message="Failed to enter BOL number"
-                )
-            
-            # Submit form
-            if not self.submit_tracking_form():
-                return ManifestResult(
-                    bol_number=bol_number,
-                    entries=[],
-                    total_entries=0,
-                    tracking_url=self.base_url,
-                    extraction_time=datetime.now().isoformat(),
-                    success=False,
-                    error_message="Failed to submit tracking form"
-                )
-            
-            # Extract manifest data
-            entries = self.extract_manifest_data()
-            
-            # Create result
-            result = ManifestResult(
+            return ManifestResult(
                 bol_number=bol_number,
-                entries=entries,
-                total_entries=len(entries),
+                entries=results,
+                total_entries=len(results),
                 tracking_url=self.base_url,
                 extraction_time=datetime.now().isoformat(),
                 success=True
             )
             
-            print(f"✅ BOL tracking completed successfully")
-            print(f"📋 Found {len(entries)} manifest entries")
-            
-            return result
-            
+        except TimeoutException:
+            if verbose:
+                print(f"\n{'='*60}")
+                print(f"ERROR: Timeout waiting for tracking data")
+                print(f"{'='*60}")
+            return ManifestResult(
+                bol_number=bol_number,
+                entries=[],
+                total_entries=0,
+                tracking_url=self.base_url,
+                extraction_time=datetime.now().isoformat(),
+                success=False,
+                error_message="Timeout waiting for tracking data"
+            )
         except Exception as e:
-            print(f"❌ Unexpected error during BOL tracking: {e}")
+            if verbose:
+                print(f"\n{'='*60}")
+                print(f"ERROR: {str(e)}")
+                print(f"{'='*60}")
             return ManifestResult(
                 bol_number=bol_number,
                 entries=[],
@@ -302,12 +236,40 @@ class ManifestTracker:
                 success=False,
                 error_message=str(e)
             )
+    
+    def track_multiple_bols(self, bol_numbers: List[str], verbose: bool = True) -> Dict[str, List[Dict]]:
+        """
+        Track multiple BOL numbers.
         
-        finally:
-            # Clean up WebDriver
-            if self.driver:
-                self.driver.quit()
-                print("🧹 WebDriver cleaned up")
+        Args:
+            bol_numbers: List of BOL numbers to track
+            verbose: Show detailed progress output (default: True)
+            
+        Returns:
+            Dictionary mapping BOL numbers to their tracking results
+        """
+        results = {}
+        for i, bol in enumerate(bol_numbers, 1):
+            if verbose:
+                print(f"\n\n{'#'*60}")
+                print(f"Processing BOL {i} of {len(bol_numbers)}")
+                print(f"{'#'*60}")
+            results[bol] = self.track_bol(bol, verbose=verbose)
+            time.sleep(1)  # Be nice to the server
+        return results
+    
+    def close(self):
+        """Close the browser and clean up."""
+        if self.driver:
+            self.driver.quit()
+    
+    def __enter__(self):
+        """Context manager entry."""
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit."""
+        self.close()
     
     def save_manifest_results(self, result: ManifestResult) -> Path:
         """Save manifest results to JSON file"""
@@ -321,15 +283,7 @@ class ManifestTracker:
         # Convert dataclass to dict for JSON serialization
         result_dict = {
             'bol_number': result.bol_number,
-            'entries': [
-                {
-                    'office': entry.office,
-                    'reference_id': entry.reference_id,
-                    'date': entry.date,
-                    'status': entry.status
-                }
-                for entry in result.entries
-            ],
+            'entries': result.entries,
             'total_entries': result.total_entries,
             'tracking_url': result.tracking_url,
             'extraction_time': result.extraction_time,
@@ -345,91 +299,6 @@ class ManifestTracker:
         print(f"💾 Manifest results saved to: {output_file}")
         return output_file
 
-def extract_bol_from_data(extracted_data: Dict[str, Any]) -> Optional[str]:
-    """Extract BOL number from extracted document data"""
-    
-    form_fields = extracted_data.get('form_fields', {})
-    
-    # Try different possible field names for BOL
-    bol_candidates = [
-        form_fields.get('bill_of_lading', ''),
-        form_fields.get('transport_document', ''),
-        form_fields.get('bol', ''),
-        form_fields.get('bl_number', ''),
-        form_fields.get('document_number', '')
-    ]
-    
-    # Return the first non-empty BOL number
-    for bol in bol_candidates:
-        if bol and bol.strip():
-            return bol.strip()
-    
-    return None
-
-def main():
-    """Test the manifest tracker with BOL from extracted data"""
-    print("=== eSAD MANIFEST TRACKER TEST ===\n")
-    
-    # Load the most recent extracted data file
-    extracted_data_dir = Path("extracted_data")
-    if extracted_data_dir.exists():
-        json_files = list(extracted_data_dir.glob("*.json"))
-        if json_files:
-            # Get the most recent file
-            latest_file = max(json_files, key=lambda x: x.stat().st_mtime)
-            print(f"📄 Loading data from: {latest_file}")
-            
-            with open(latest_file, 'r', encoding='utf-8') as f:
-                extracted_data = json.load(f)
-        else:
-            print("❌ No JSON files found in extracted_data directory")
-            return
-    else:
-        print("❌ extracted_data directory not found")
-        return
-    
-    # Extract BOL number from the data
-    bol_number = extract_bol_from_data(extracted_data)
-    
-    if not bol_number:
-        print("❌ No BOL number found in extracted data")
-        print("📋 Available fields:")
-        form_fields = extracted_data.get('form_fields', {})
-        for field, value in form_fields.items():
-            if value:
-                print(f"   {field}: {value}")
-        return
-    
-    print(f"🎯 Found BOL number: {bol_number}")
-    
-    # Initialize tracker
-    tracker = ManifestTracker()
-    
-    # Track BOL
-    result = tracker.track_bol(bol_number)
-    
-    # Save results
-    if result.success:
-        output_file = tracker.save_manifest_results(result)
-        
-        print(f"\n📊 MANIFEST TRACKING RESULTS:")
-        print(f"   BOL Number: {result.bol_number}")
-        print(f"   Total Entries: {result.total_entries}")
-        print(f"   Tracking URL: {result.tracking_url}")
-        print(f"   Extraction Time: {result.extraction_time}")
-        
-        print(f"\n📋 MANIFEST ENTRIES:")
-        for i, entry in enumerate(result.entries, 1):
-            print(f"   {i}. Office: {entry.office}")
-            print(f"      Reference ID: {entry.reference_id}")
-            print(f"      Date: {entry.date}")
-            print(f"      Status: {entry.status}")
-            print()
-    else:
-        print(f"\n❌ MANIFEST TRACKING FAILED:")
-        print(f"   Error: {result.error_message}")
-    
-    print(f"✅ Manifest tracking completed!")
 
 class ManifestProcessor:
     """Processor for manifest registration numbers"""
@@ -474,5 +343,33 @@ class ManifestProcessor:
                 'manifest_processed': None
             }
 
+
+# Example usage
 if __name__ == "__main__":
-    main() 
+    import json
+    import os
+    
+    # Suppress additional warnings
+    os.environ['WDM_LOG'] = '0'
+    
+    # Single BOL tracking
+    with ManifestTracker(headless=True) as tracker:
+        result = tracker.track_bol("B870Y28X3TL", verbose=True)
+        
+        if result.success and result.entries:
+            print(f"\n{'='*60}")
+            print(f"RESULTS (JSON Format)")
+            print(f"{'='*60}\n")
+            print(json.dumps(result.entries, indent=2))
+        else:
+            print("\n✗ No results found")
+    
+    # Multiple BOL tracking example
+    # bol_numbers = ["B870Y28X3TL", "ANOTHER_BOL_NUMBER"]
+    # with ManifestTracker(headless=True) as tracker:
+    #     all_results = {}
+    #     for bol in bol_numbers:
+    #         result = tracker.track_bol(bol, verbose=True)
+    #         all_results[bol] = result.entries
+    #     
+    #     print(json.dumps(all_results, indent=2))

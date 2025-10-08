@@ -8,6 +8,272 @@ from datetime import datetime
 import requests
 import os
 from config import OPENROUTER_API_KEY
+from config import OPENROUTER_GENERAL_MODELS
+
+# Comprehensive country code mappings
+ISO2_TO_COUNTRY = {
+    'AD': 'Andorra', 'AE': 'United Arab Emirates', 'AF': 'Afghanistan', 'AG': 'Antigua and Barbuda',
+    'AI': 'Anguilla', 'AL': 'Albania', 'AM': 'Armenia', 'AO': 'Angola', 'AQ': 'Antarctica',
+    'AR': 'Argentina', 'AS': 'American Samoa', 'AT': 'Austria', 'AU': 'Australia', 'AW': 'Aruba',
+    'AX': 'Åland Islands', 'AZ': 'Azerbaijan', 'BA': 'Bosnia and Herzegovina', 'BB': 'Barbados',
+    'BD': 'Bangladesh', 'BE': 'Belgium', 'BF': 'Burkina Faso', 'BG': 'Bulgaria', 'BH': 'Bahrain',
+    'BI': 'Burundi', 'BJ': 'Benin', 'BL': 'Saint Barthélemy', 'BM': 'Bermuda', 'BN': 'Brunei',
+    'BO': 'Bolivia', 'BQ': 'Caribbean Netherlands', 'BR': 'Brazil', 'BS': 'Bahamas', 'BT': 'Bhutan',
+    'BV': 'Bouvet Island', 'BW': 'Botswana', 'BY': 'Belarus', 'BZ': 'Belize', 'CA': 'Canada',
+    'CC': 'Cocos Islands', 'CD': 'Democratic Republic of the Congo', 'CF': 'Central African Republic',
+    'CG': 'Republic of the Congo', 'CH': 'Switzerland', 'CI': 'Côte d\'Ivoire', 'CK': 'Cook Islands',
+    'CL': 'Chile', 'CM': 'Cameroon', 'CN': 'China', 'CO': 'Colombia', 'CR': 'Costa Rica',
+    'CU': 'Cuba', 'CV': 'Cape Verde', 'CW': 'Curaçao', 'CX': 'Christmas Island', 'CY': 'Cyprus',
+    'CZ': 'Czech Republic', 'DE': 'Germany', 'DJ': 'Djibouti', 'DK': 'Denmark', 'DM': 'Dominica',
+    'DO': 'Dominican Republic', 'DZ': 'Algeria', 'EC': 'Ecuador', 'EE': 'Estonia', 'EG': 'Egypt',
+    'EH': 'Western Sahara', 'ER': 'Eritrea', 'ES': 'Spain', 'ET': 'Ethiopia', 'FI': 'Finland',
+    'FJ': 'Fiji', 'FK': 'Falkland Islands', 'FM': 'Micronesia', 'FO': 'Faroe Islands', 'FR': 'France',
+    'GA': 'Gabon', 'GB': 'United Kingdom', 'GD': 'Grenada', 'GE': 'Georgia', 'GF': 'French Guiana',
+    'GG': 'Guernsey', 'GH': 'Ghana', 'GI': 'Gibraltar', 'GL': 'Greenland', 'GM': 'Gambia',
+    'GN': 'Guinea', 'GP': 'Guadeloupe', 'GQ': 'Equatorial Guinea', 'GR': 'Greece', 'GS': 'South Georgia',
+    'GT': 'Guatemala', 'GU': 'Guam', 'GW': 'Guinea-Bissau', 'GY': 'Guyana', 'HK': 'Hong Kong',
+    'HM': 'Heard Island', 'HN': 'Honduras', 'HR': 'Croatia', 'HT': 'Haiti', 'HU': 'Hungary',
+    'ID': 'Indonesia', 'IE': 'Ireland', 'IL': 'Israel', 'IM': 'Isle of Man', 'IN': 'India',
+    'IO': 'British Indian Ocean Territory', 'IQ': 'Iraq', 'IR': 'Iran', 'IS': 'Iceland',
+    'IT': 'Italy', 'JE': 'Jersey', 'JM': 'Jamaica', 'JO': 'Jordan', 'JP': 'Japan',
+    'KE': 'Kenya', 'KG': 'Kyrgyzstan', 'KH': 'Cambodia', 'KI': 'Kiribati', 'KM': 'Comoros',
+    'KN': 'Saint Kitts and Nevis', 'KP': 'North Korea', 'KR': 'South Korea', 'KW': 'Kuwait',
+    'KY': 'Cayman Islands', 'KZ': 'Kazakhstan', 'LA': 'Laos', 'LB': 'Lebanon', 'LC': 'Saint Lucia',
+    'LI': 'Liechtenstein', 'LK': 'Sri Lanka', 'LR': 'Liberia', 'LS': 'Lesotho', 'LT': 'Lithuania',
+    'LU': 'Luxembourg', 'LV': 'Latvia', 'LY': 'Libya', 'MA': 'Morocco', 'MC': 'Monaco',
+    'MD': 'Moldova', 'ME': 'Montenegro', 'MF': 'Saint Martin', 'MG': 'Madagascar', 'MH': 'Marshall Islands',
+    'MK': 'North Macedonia', 'ML': 'Mali', 'MM': 'Myanmar', 'MN': 'Mongolia', 'MO': 'Macao',
+    'MP': 'Northern Mariana Islands', 'MQ': 'Martinique', 'MR': 'Mauritania', 'MS': 'Montserrat',
+    'MT': 'Malta', 'MU': 'Mauritius', 'MV': 'Maldives', 'MW': 'Malawi', 'MX': 'Mexico',
+    'MY': 'Malaysia', 'MZ': 'Mozambique', 'NA': 'Namibia', 'NC': 'New Caledonia', 'NE': 'Niger',
+    'NF': 'Norfolk Island', 'NG': 'Nigeria', 'NI': 'Nicaragua', 'NL': 'Netherlands', 'NO': 'Norway',
+    'NP': 'Nepal', 'NR': 'Nauru', 'NU': 'Niue', 'NZ': 'New Zealand', 'OM': 'Oman',
+    'PA': 'Panama', 'PE': 'Peru', 'PF': 'French Polynesia', 'PG': 'Papua New Guinea', 'PH': 'Philippines',
+    'PK': 'Pakistan', 'PL': 'Poland', 'PM': 'Saint Pierre and Miquelon', 'PN': 'Pitcairn Islands',
+    'PR': 'Puerto Rico', 'PS': 'Palestine', 'PT': 'Portugal', 'PW': 'Palau', 'PY': 'Paraguay',
+    'QA': 'Qatar', 'RE': 'Réunion', 'RO': 'Romania', 'RS': 'Serbia', 'RU': 'Russia',
+    'RW': 'Rwanda', 'SA': 'Saudi Arabia', 'SB': 'Solomon Islands', 'SC': 'Seychelles', 'SD': 'Sudan',
+    'SE': 'Sweden', 'SG': 'Singapore', 'SH': 'Saint Helena', 'SI': 'Slovenia', 'SJ': 'Svalbard',
+    'SK': 'Slovakia', 'SL': 'Sierra Leone', 'SM': 'San Marino', 'SN': 'Senegal', 'SO': 'Somalia',
+    'SR': 'Suriname', 'SS': 'South Sudan', 'ST': 'São Tomé and Príncipe', 'SV': 'El Salvador',
+    'SX': 'Sint Maarten', 'SY': 'Syria', 'SZ': 'Eswatini', 'TC': 'Turks and Caicos Islands',
+    'TD': 'Chad', 'TF': 'French Southern Territories', 'TG': 'Togo', 'TH': 'Thailand',
+    'TJ': 'Tajikistan', 'TK': 'Tokelau', 'TL': 'East Timor', 'TM': 'Turkmenistan', 'TN': 'Tunisia',
+    'TO': 'Tonga', 'TR': 'Turkey', 'TT': 'Trinidad and Tobago', 'TV': 'Tuvalu', 'TW': 'Taiwan',
+    'TZ': 'Tanzania', 'UA': 'Ukraine', 'UG': 'Uganda', 'UM': 'United States Minor Outlying Islands',
+    'US': 'United States', 'UY': 'Uruguay', 'UZ': 'Uzbekistan', 'VA': 'Vatican City',
+    'VC': 'Saint Vincent and the Grenadines', 'VE': 'Venezuela', 'VG': 'British Virgin Islands',
+    'VI': 'United States Virgin Islands', 'VN': 'Vietnam', 'VU': 'Vanuatu', 'WF': 'Wallis and Futuna',
+    'WS': 'Samoa', 'YE': 'Yemen', 'YT': 'Mayotte', 'ZA': 'South Africa', 'ZM': 'Zambia', 'ZW': 'Zimbabwe'
+}
+
+# Major airport codes to country mapping
+AIRPORT_TO_COUNTRY = {
+    'MIA': 'United States', 'JFK': 'United States', 'LAX': 'United States', 'ORD': 'United States',
+    'DFW': 'United States', 'DEN': 'United States', 'ATL': 'United States', 'SEA': 'United States',
+    'LAS': 'United States', 'PHX': 'United States', 'IAH': 'United States', 'MCO': 'United States',
+    'BOS': 'United States', 'DTW': 'United States', 'MSP': 'United States', 'EWR': 'United States',
+    'SFO': 'United States', 'CLT': 'United States', 'PHL': 'United States', 'LGA': 'United States',
+    'BWI': 'United States', 'DCA': 'United States', 'IAD': 'United States', 'FLL': 'United States',
+    'TPA': 'United States', 'MCI': 'United States', 'STL': 'United States', 'PDX': 'United States',
+    'SAN': 'United States', 'AUS': 'United States', 'BNA': 'United States', 'MSY': 'United States',
+    'SLC': 'United States', 'HNL': 'United States', 'KIN': 'Jamaica', 'NMIA': 'Jamaica',
+    'HKG': 'Hong Kong', 'PEK': 'China', 'PVG': 'China', 'CAN': 'China', 'SZX': 'China',
+    'NRT': 'Japan', 'HND': 'Japan', 'KIX': 'Japan', 'ICN': 'South Korea', 'GMP': 'South Korea',
+    'SIN': 'Singapore', 'KUL': 'Malaysia', 'BKK': 'Thailand', 'DMK': 'Thailand',
+    'MNL': 'Philippines', 'CGK': 'Indonesia', 'DPS': 'Indonesia', 'BOM': 'India',
+    'DEL': 'India', 'BLR': 'India', 'MAA': 'India', 'CCU': 'India', 'HYD': 'India',
+    'DXB': 'United Arab Emirates', 'AUH': 'United Arab Emirates', 'DOH': 'Qatar',
+    'KWI': 'Kuwait', 'BAH': 'Bahrain', 'RUH': 'Saudi Arabia', 'JED': 'Saudi Arabia',
+    'IST': 'Turkey', 'SAW': 'Turkey', 'TLV': 'Israel', 'CAI': 'Egypt', 'JNB': 'South Africa',
+    'CPT': 'South Africa', 'DUR': 'South Africa', 'LHR': 'United Kingdom', 'LGW': 'United Kingdom',
+    'STN': 'United Kingdom', 'MAN': 'United Kingdom', 'BHX': 'United Kingdom', 'GLA': 'United Kingdom',
+    'EDI': 'United Kingdom', 'BFS': 'United Kingdom', 'CDG': 'France', 'ORY': 'France',
+    'LYS': 'France', 'MRS': 'France', 'NCE': 'France', 'TLS': 'France', 'BOD': 'France',
+    'FRA': 'Germany', 'MUC': 'Germany', 'DUS': 'Germany', 'HAM': 'Germany', 'CGN': 'Germany',
+    'STR': 'Germany', 'LEJ': 'Germany', 'FCO': 'Italy', 'MXP': 'Italy', 'LIN': 'Italy',
+    'VCE': 'Italy', 'NAP': 'Italy', 'BGO': 'Italy', 'MAD': 'Spain', 'BCN': 'Spain',
+    'VLC': 'Spain', 'SVQ': 'Spain', 'BIO': 'Spain', 'AGP': 'Spain', 'LIS': 'Portugal',
+    'OPO': 'Portugal', 'AMS': 'Netherlands', 'EIN': 'Netherlands', 'RTM': 'Netherlands',
+    'BRU': 'Belgium', 'CRL': 'Belgium', 'VIE': 'Austria', 'ZUR': 'Switzerland', 'GVA': 'Switzerland',
+    'ARN': 'Sweden', 'GOT': 'Sweden', 'CPH': 'Denmark', 'OSL': 'Norway', 'HEL': 'Finland',
+    'WAW': 'Poland', 'KRK': 'Poland', 'PRG': 'Czech Republic', 'BUD': 'Hungary',
+    'OTP': 'Romania', 'SOF': 'Bulgaria', 'ATH': 'Greece', 'SKG': 'Greece',
+    'DUB': 'Ireland', 'SNN': 'Ireland', 'KEF': 'Iceland', 'REK': 'Iceland',
+    'YUL': 'Canada', 'YYZ': 'Canada', 'YVR': 'Canada', 'YYC': 'Canada', 'YEG': 'Canada',
+    'YWG': 'Canada', 'YHZ': 'Canada', 'YOW': 'Canada', 'YQB': 'Canada', 'YQR': 'Canada',
+    'GRU': 'Brazil', 'GIG': 'Brazil', 'BSB': 'Brazil', 'CGH': 'Brazil', 'CNF': 'Brazil',
+    'EZE': 'Argentina', 'AEP': 'Argentina', 'COR': 'Argentina', 'MDZ': 'Argentina',
+    'SCL': 'Chile', 'LIM': 'Peru', 'BOG': 'Colombia', 'UIO': 'Ecuador', 'ASU': 'Paraguay',
+    'MVD': 'Uruguay', 'CCS': 'Venezuela', 'PTY': 'Panama', 'SJO': 'Costa Rica',
+    'GUA': 'Guatemala', 'SAP': 'Honduras', 'SAL': 'El Salvador', 'MGA': 'Nicaragua',
+    'TGU': 'Honduras', 'BZE': 'Belize', 'CUN': 'Mexico', 'MEX': 'Mexico', 'GDL': 'Mexico',
+    'MTY': 'Mexico', 'TIJ': 'Mexico', 'PVR': 'Mexico', 'CZM': 'Mexico', 'ACA': 'Mexico',
+    'HAV': 'Cuba', 'SNU': 'Cuba', 'VRA': 'Cuba', 'SDQ': 'Dominican Republic', 'PUJ': 'Dominican Republic',
+    'STI': 'Dominican Republic', 'POP': 'Dominican Republic', 'SJU': 'Puerto Rico',
+    'BGI': 'Barbados', 'POS': 'Trinidad and Tobago', 'GND': 'Grenada', 'SLU': 'Saint Lucia',
+    'ANU': 'Antigua and Barbuda', 'SKB': 'Saint Kitts and Nevis', 'SVD': 'Saint Vincent and the Grenadines',
+    'DOM': 'Dominica', 'TAB': 'Tobago', 'PLS': 'Turks and Caicos Islands', 'NAS': 'Bahamas',
+    'FPO': 'Bahamas', 'GCM': 'Cayman Islands', 'UVF': 'Saint Lucia', 'BDA': 'Bermuda',
+    'SXM': 'Sint Maarten', 'AXA': 'Anguilla', 'EIS': 'British Virgin Islands', 'VIJ': 'British Virgin Islands',
+    'STT': 'United States Virgin Islands', 'STX': 'United States Virgin Islands'
+}
+
+# Major seaport codes to country mapping  
+SEAPORT_TO_COUNTRY = {
+    'LAX': 'United States', 'LGB': 'United States', 'OAK': 'United States', 'SEA': 'United States',
+    'NYC': 'United States', 'BAL': 'United States', 'NOR': 'United States', 'SAV': 'United States',
+    'CHA': 'United States', 'MOB': 'United States', 'HOU': 'United States', 'GAL': 'United States',
+    'COR': 'United States', 'POR': 'United States', 'BOS': 'United States', 'PHI': 'United States',
+    'JAX': 'United States', 'TAM': 'United States', 'KIN': 'Jamaica',
+    'HKG': 'Hong Kong', 'SHA': 'China', 'TSN': 'China', 'QIN': 'China', 'DAL': 'China',
+    'NGB': 'China', 'FOC': 'China', 'XMN': 'China', 'ZHA': 'China', 'YAN': 'China',
+    'YOK': 'Japan', 'OSA': 'Japan', 'NAG': 'Japan', 'KOB': 'Japan', 'HAK': 'Japan',
+    'BUS': 'South Korea', 'INC': 'South Korea', 'PUS': 'South Korea', 'ULS': 'South Korea',
+    'SIN': 'Singapore', 'KUL': 'Malaysia', 'PEN': 'Malaysia', 'JOH': 'Malaysia',
+    'BKK': 'Thailand', 'LCH': 'Thailand', 'SON': 'Thailand', 'SAT': 'Thailand',
+    'MNL': 'Philippines', 'CEB': 'Philippines', 'DVO': 'Philippines', 'ILO': 'Philippines',
+    'JKT': 'Indonesia', 'SBY': 'Indonesia', 'MDN': 'Indonesia', 'PLM': 'Indonesia',
+    'BOM': 'India', 'CAL': 'India', 'MAA': 'India', 'COC': 'India', 'VIZ': 'India',
+    'CCU': 'India', 'KAN': 'India', 'PAR': 'India', 'GOA': 'India',
+    'DXB': 'United Arab Emirates', 'AUH': 'United Arab Emirates', 'SHJ': 'United Arab Emirates',
+    'DOH': 'Qatar', 'KWI': 'Kuwait', 'BAH': 'Bahrain', 'RUH': 'Saudi Arabia',
+    'JED': 'Saudi Arabia', 'DAM': 'Saudi Arabia', 'IST': 'Turkey', 'IZM': 'Turkey',
+    'MER': 'Turkey', 'SAM': 'Turkey', 'TLV': 'Israel', 'HAI': 'Israel', 'ASH': 'Israel',
+    'CAI': 'Egypt', 'ALE': 'Egypt', 'POR': 'Egypt', 'SUE': 'Egypt',
+    'JNB': 'South Africa', 'CPT': 'South Africa', 'DUR': 'South Africa', 'PLZ': 'South Africa',
+    'LON': 'United Kingdom', 'LIV': 'United Kingdom', 'MAN': 'United Kingdom', 'BIR': 'United Kingdom',
+    'GLA': 'United Kingdom', 'EDI': 'United Kingdom', 'BEL': 'United Kingdom', 'CAR': 'United Kingdom',
+    'PAR': 'France', 'MAR': 'France', 'LYO': 'France', 'NIC': 'France', 'BOR': 'France',
+    'LEH': 'France', 'TOU': 'France', 'HAR': 'France', 'DUN': 'France', 'CAL': 'France',
+    'HAM': 'Germany', 'BRE': 'Germany', 'KIE': 'Germany', 'LUE': 'Germany',
+    'ROS': 'Germany', 'EMD': 'Germany', 'DUI': 'Germany', 'KOB': 'Germany', 'BRA': 'Germany',
+    'ROM': 'Italy', 'MIL': 'Italy', 'GEN': 'Italy', 'VEN': 'Italy', 'NAP': 'Italy',
+    'BOL': 'Italy', 'TAR': 'Italy', 'MES': 'Italy', 'CAG': 'Italy', 'PAL': 'Italy',
+    'MAD': 'Spain', 'BAR': 'Spain', 'VAL': 'Spain', 'SEV': 'Spain', 'BIL': 'Spain',
+    'COR': 'Spain', 'VIG': 'Spain', 'ALG': 'Spain', 'CAD': 'Spain', 'SAN': 'Spain',
+    'LIS': 'Portugal', 'OPO': 'Portugal', 'SET': 'Portugal', 'AVE': 'Portugal', 'FAR': 'Portugal',
+    'AMS': 'Netherlands', 'ROT': 'Netherlands', 'EIN': 'Netherlands', 'GRO': 'Netherlands',
+    'BRU': 'Belgium', 'ANT': 'Belgium', 'GHE': 'Belgium', 'ZEE': 'Belgium', 'OST': 'Belgium',
+    'VIE': 'Austria', 'GRA': 'Austria', 'LIN': 'Austria', 'SAL': 'Austria', 'KLG': 'Austria',
+    'ZUR': 'Switzerland', 'BAS': 'Switzerland', 'BER': 'Switzerland', 'GEN': 'Switzerland',
+    'STO': 'Sweden', 'GOT': 'Sweden', 'MAL': 'Sweden', 'NOR': 'Sweden', 'HEL': 'Sweden',
+    'COP': 'Denmark', 'AAR': 'Denmark', 'ODS': 'Denmark', 'AAL': 'Denmark', 'ESB': 'Denmark',
+    'OSL': 'Norway', 'BER': 'Norway', 'TRO': 'Norway', 'STA': 'Norway', 'KRI': 'Norway',
+    'HEL': 'Finland', 'TUR': 'Finland', 'TAM': 'Finland', 'POR': 'Finland', 'KOT': 'Finland',
+    'WAR': 'Poland', 'GDA': 'Poland', 'SZC': 'Poland', 'WRO': 'Poland', 'POZ': 'Poland',
+    'PRA': 'Czech Republic', 'OST': 'Czech Republic', 'BRN': 'Czech Republic', 'PLZ': 'Czech Republic',
+    'BUD': 'Hungary', 'DEB': 'Hungary', 'SZE': 'Hungary', 'PEC': 'Hungary', 'GYO': 'Hungary',
+    'BUC': 'Romania', 'CON': 'Romania', 'GAL': 'Romania', 'BRA': 'Romania', 'TIM': 'Romania',
+    'SOF': 'Bulgaria', 'VAR': 'Bulgaria', 'BUR': 'Bulgaria', 'RUS': 'Bulgaria', 'PLE': 'Bulgaria',
+    'ATH': 'Greece', 'THE': 'Greece', 'VOL': 'Greece', 'PAT': 'Greece', 'HER': 'Greece',
+    'DUB': 'Ireland', 'COR': 'Ireland', 'LIM': 'Ireland', 'GAL': 'Ireland', 'WAT': 'Ireland',
+    'REK': 'Iceland', 'AKU': 'Iceland', 'ISF': 'Iceland', 'VES': 'Iceland', 'HOF': 'Iceland',
+    'TOR': 'Canada', 'MON': 'Canada', 'VAN': 'Canada', 'CAL': 'Canada', 'EDM': 'Canada',
+    'WIN': 'Canada', 'HAL': 'Canada', 'OTT': 'Canada', 'QUE': 'Canada', 'REG': 'Canada',
+    'SAO': 'Brazil', 'RIO': 'Brazil', 'BRA': 'Brazil', 'CAM': 'Brazil', 'BEL': 'Brazil',
+    'BUE': 'Argentina', 'COR': 'Argentina', 'MEN': 'Argentina', 'ROS': 'Argentina',
+    'SAN': 'Chile', 'VAL': 'Chile', 'ANT': 'Chile', 'CON': 'Chile', 'TAL': 'Chile',
+    'LIM': 'Peru', 'CAL': 'Peru', 'ARE': 'Peru', 'TAC': 'Peru', 'CHI': 'Peru',
+    'BOG': 'Colombia', 'MED': 'Colombia', 'CAL': 'Colombia', 'BAR': 'Colombia', 'BUC': 'Colombia',
+    'QUI': 'Ecuador', 'GUA': 'Ecuador', 'CUE': 'Ecuador', 'MAN': 'Ecuador', 'POR': 'Ecuador',
+    'ASU': 'Paraguay', 'ENC': 'Paraguay', 'CDE': 'Paraguay', 'PED': 'Paraguay', 'VIL': 'Paraguay',
+    'MON': 'Uruguay', 'PAY': 'Uruguay', 'COL': 'Uruguay', 'SAL': 'Uruguay', 'FRA': 'Uruguay',
+    'CAR': 'Venezuela', 'MAR': 'Venezuela', 'VAL': 'Venezuela', 'BAR': 'Venezuela', 'CUM': 'Venezuela',
+    'PAN': 'Panama', 'COL': 'Panama', 'BOC': 'Panama', 'DAV': 'Panama', 'CHI': 'Panama',
+    'SAN': 'Costa Rica', 'LIM': 'Costa Rica', 'PUN': 'Costa Rica', 'CAR': 'Costa Rica', 'HER': 'Costa Rica',
+    'GUA': 'Guatemala', 'QUE': 'Guatemala', 'ESC': 'Guatemala', 'RET': 'Guatemala', 'COB': 'Guatemala',
+    'TEG': 'Honduras', 'SAN': 'Honduras', 'LA': 'Honduras', 'TOC': 'Honduras', 'CHO': 'Honduras',
+    'SAN': 'El Salvador', 'MAN': 'Nicaragua', 'LEO': 'Nicaragua', 'GRA': 'Nicaragua', 'EST': 'Nicaragua', 'CHI': 'Nicaragua',
+    'BEL': 'Belize', 'CAN': 'Mexico', 'MEX': 'Mexico', 'GUA': 'Mexico', 'MON': 'Mexico', 'TIJ': 'Mexico',
+    'PUE': 'Mexico', 'MER': 'Mexico', 'LEO': 'Mexico', 'TOR': 'Mexico', 'HER': 'Mexico',
+    'HAV': 'Cuba', 'SAN': 'Cuba', 'CAM': 'Cuba', 'BAY': 'Cuba', 'HOL': 'Cuba',
+    'SAN': 'Dominican Republic', 'PUE': 'Dominican Republic', 'LA': 'Dominican Republic', 'ROM': 'Dominican Republic', 'HER': 'Dominican Republic',
+    'SAN': 'Puerto Rico', 'PON': 'Puerto Rico', 'MAY': 'Puerto Rico', 'AGU': 'Puerto Rico', 'FAJ': 'Puerto Rico',
+    'BRI': 'Barbados', 'POR': 'Trinidad and Tobago', 'SAN': 'Trinidad and Tobago', 'CHA': 'Trinidad and Tobago', 'COU': 'Trinidad and Tobago', 'SCA': 'Trinidad and Tobago',
+    'SAI': 'Grenada', 'CAS': 'Saint Lucia', 'SAI': 'Antigua and Barbuda', 'BAS': 'Saint Kitts and Nevis',
+    'KIN': 'Saint Vincent and the Grenadines', 'ROS': 'Dominica', 'SCA': 'Tobago',
+    'PRO': 'Turks and Caicos Islands', 'NAS': 'Bahamas', 'FRE': 'Bahamas', 'GEO': 'Bahamas', 'EXU': 'Bahamas', 'ELE': 'Bahamas',
+    'GEO': 'Cayman Islands', 'CAS': 'Saint Lucia', 'HAM': 'Bermuda', 'PHI': 'Sint Maarten',
+    'ROA': 'Anguilla', 'ROA': 'British Virgin Islands', 'CHA': 'United States Virgin Islands'
+}
+
+def _infer_country_from_codes(text: str) -> Optional[str]:
+    """Infer country from airport codes, seaport codes, or ISO codes in text."""
+    if not text:
+        return None
+    
+    text_upper = text.upper().strip()
+    
+    # Check ISO2 codes first
+    if text_upper in ISO2_TO_COUNTRY:
+        return ISO2_TO_COUNTRY[text_upper]
+    
+    # Check airport codes
+    if text_upper in AIRPORT_TO_COUNTRY:
+        return AIRPORT_TO_COUNTRY[text_upper]
+    
+    # Check seaport codes
+    if text_upper in SEAPORT_TO_COUNTRY:
+        return SEAPORT_TO_COUNTRY[text_upper]
+    
+    # Look for codes within text (e.g., "MIA" in "Miami International Airport")
+    for code, country in AIRPORT_TO_COUNTRY.items():
+        if code in text_upper:
+            return country
+    
+    for code, country in SEAPORT_TO_COUNTRY.items():
+        if code in text_upper:
+            return country
+    
+    return None
+
+def _infer_country_from_airports_ports(document: dict) -> Tuple[Optional[str], Optional[str]]:
+    """Extract country information from airport/port data in the document."""
+    consignor_country = None
+    consignee_country = None
+    
+    # Check airport information
+    airport_info = document.get('airport_info', {})
+    if airport_info:
+        # Check departure airport
+        departure_code = airport_info.get('airport_of_departure_code')
+        if departure_code:
+            consignor_country = _infer_country_from_codes(departure_code)
+        
+        # Check destination airport
+        destination_code = airport_info.get('airport_of_destination')
+        if destination_code:
+            consignee_country = _infer_country_from_codes(destination_code)
+    
+    # Check routing information
+    routing = document.get('routing_and_destination', {})
+    if routing:
+        to_code = routing.get('TO')
+        if to_code and not consignee_country:
+            consignee_country = _infer_country_from_codes(to_code)
+    
+    # Check ports information
+    ports = document.get('ports', {})
+    if ports:
+        origin = ports.get('origin')
+        if origin and not consignor_country:
+            consignor_country = _infer_country_from_codes(origin)
+        
+        destination = ports.get('routing_to')
+        if destination and not consignee_country:
+            consignee_country = _infer_country_from_codes(destination)
+    
+    # Check raw text snippets for airport/port codes
+    raw_text = document.get('raw_visible_text_snippets', [])
+    if raw_text:
+        text_content = ' '.join(raw_text)
+        if not consignor_country:
+            consignor_country = _infer_country_from_codes(text_content)
+        if not consignee_country:
+            consignee_country = _infer_country_from_codes(text_content)
+    
+    return consignor_country, consignee_country
 
 @dataclass
 class AddressComponent:
@@ -27,276 +293,254 @@ class FormattedAddress:
     issues: List[str]
 
 class AddressFormatter:
-    """Formats addresses into the structure: Street name or Town, City, State/Province/Parish, Country using LLM assistance"""
+    """Enhanced address processor with consignor/consignee extraction capabilities"""
     
     def __init__(self):
         self.api_key = OPENROUTER_API_KEY
         # Use general models for secondary processing tasks
-        from config import OPENROUTER_GENERAL_MODELS
-        self.primary_model = OPENROUTER_GENERAL_MODELS["gpt_5"]
+        self.primary_model = OPENROUTER_GENERAL_MODELS["kimi_standard"]
         self.backup_model = OPENROUTER_GENERAL_MODELS["kimi_standard"]
         
-        # Common Jamaican parishes
-        self.jamaican_parishes = {
-            'kingston', 'st. andrew', 'st. catherine', 'clarendon', 'manchester',
-            'st. elizabeth', 'westmoreland', 'hanover', 'st. james', 'trelawny',
-            'st. ann', 'st. mary', 'portland', 'st. thomas', 'st. elizabeth'
-        }
-        
-        # Common Jamaican cities
-        self.jamaican_cities = {
-            'kingston', 'montego bay', 'spanish town', 'portmore', 'ochi rios',
-            'may pen', 'mandeville', 'savanna-la-mar', 'lucea', 'falmouth',
-            'st. ann\'s bay', 'port antonio', 'morant bay', 'black river'
-        }
-        
-        # Common countries
-        self.countries = {
-            'jamaica', 'united states', 'usa', 'canada', 'united kingdom', 'uk',
-            'china', 'japan', 'germany', 'france', 'spain', 'italy', 'brazil',
-            'mexico', 'trinidad and tobago', 'barbados', 'guyana', 'suriname'
-        }
-        
-        # Address patterns
-        self.patterns = {
-            'street_number': r'\b\d+\s+',
-            'postal_code': r'\b\d{5}(?:-\d{4})?\b',
-            'phone_number': r'\b\d{3}[-.]?\d{3}[-.]?\d{4}\b',
-            'email': r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
-        }
-    
-    def clean_address(self, address: str) -> str:
-        """Clean and normalize address text"""
-        if not address:
+    def extract_consignor_consignee(self, document: dict) -> dict:
+        """
+        Using the preferred LLM model, extract consignor (shipper) and consignee
+        name, street, city, and combined address from a shipping document (AWB/BOL).
+
+        Returns a dict with keys: {"consignor": {"name": str|None, "street": str|None, "city": str|None, "address": str|None, "country": str|None},
+        "consignee": {"name": str|None, "street": str|None, "city": str|None, "address": str|None, "country": str|None}}
+        """
+        import json as _json
+        import requests as _requests
+
+        def _extract_street(party: dict) -> str:
+            """Extract street address from party data."""
+            if not isinstance(party, dict):
+                return ""
+            street_parts = []
+            # Look for street-specific fields
+            for key in ('address_line1', 'address_line_1', 'street', 'street1', 'street_1'):
+                val = party.get(key)
+                if isinstance(val, str) and val.strip():
+                    street_parts.append(val.strip())
+            return ", ".join(street_parts) if street_parts else ""
+
+        def _extract_city(party: dict) -> str:
+            """Extract city from party data."""
+            if not isinstance(party, dict):
+                return ""
+            # Look for city-specific fields
+            for key in ('city', 'city_region', 'state', 'province', 'parish', 'region'):
+                val = party.get(key)
+                if isinstance(val, str) and val.strip():
+                    return val.strip()
+            
+            # Try to extract city from address_line2 if it looks like a city
+            address_line2 = party.get('address_line2', '') or party.get('address_line_2', '')
+            if address_line2 and isinstance(address_line2, str):
+                # Look for common city indicators in address_line2
+                city_indicators = ['TSUEN WAN', 'KINGSTON', 'MIAMI', 'HONG KONG', 'NEW YORK', 'LONDON']
+                for indicator in city_indicators:
+                    if indicator in address_line2.upper():
+                        return indicator
+                # If address_line2 doesn't contain numbers and looks like a city name
+                if not any(char.isdigit() for char in address_line2) and len(address_line2.split()) <= 3:
+                    return address_line2.strip()
+            
             return ""
         
-        # Convert to lowercase for processing
-        cleaned = address.lower().strip()
-        
-        # Remove common unwanted patterns
-        cleaned = re.sub(self.patterns['postal_code'], '', cleaned)
-        cleaned = re.sub(self.patterns['phone_number'], '', cleaned)
-        cleaned = re.sub(self.patterns['email'], '', cleaned)
-        
-        # Remove extra whitespace and punctuation
-        cleaned = re.sub(r'\s+', ' ', cleaned)
-        cleaned = re.sub(r'[^\w\s,.-]', '', cleaned)
-        cleaned = cleaned.strip()
-        
-        return cleaned
-    
-    def extract_components(self, address: str) -> AddressComponent:
-        """Extract address components from cleaned address"""
-        parts = [part.strip() for part in address.split(',') if part.strip()]
-        
-        # Initialize components
-        street_town = ""
-        city = ""
-        state_province_parish = ""
-        country = ""
-        
-        if len(parts) >= 1:
-            street_town = parts[0]
-        
-        if len(parts) >= 2:
-            city = parts[1]
-        
-        if len(parts) >= 3:
-            state_province_parish = parts[2]
-        
-        if len(parts) >= 4:
-            country = parts[3]
-        
-        return AddressComponent(
-            street_town=street_town,
-            city=city,
-            state_province_parish=state_province_parish,
-            country=country
-        )
-    
-    def smart_parse_address(self, address: str) -> AddressComponent:
-        """Intelligently parse address using pattern recognition"""
-        cleaned = self.clean_address(address)
-        issues = []
-        
-        # If already comma-separated, use that
-        if ',' in cleaned:
-            return self.extract_components(cleaned)
-        
-        # Try to identify components by keywords
-        words = cleaned.split()
-        components = {
-            'street_town': [],
-            'city': [],
-            'state_province_parish': [],
-            'country': []
-        }
-        
-        i = 0
-        while i < len(words):
-            word = words[i].lower()
-            
-            # Check for country
-            if word in self.countries or any(country in word for country in self.countries):
-                components['country'].append(words[i])
-                i += 1
-                continue
-            
-            # Check for Jamaican parish
-            if word in self.jamaican_parishes or any(parish in word for parish in self.jamaican_parishes):
-                components['state_province_parish'].append(words[i])
-                i += 1
-                continue
-            
-            # Check for city
-            if word in self.jamaican_cities or any(city in word for city in self.jamaican_cities):
-                components['city'].append(words[i])
-                i += 1
-                continue
-            
-            # Default to street/town
-            components['street_town'].append(words[i])
-            i += 1
-        
-        return AddressComponent(
-            street_town=' '.join(components['street_town']),
-            city=' '.join(components['city']),
-            state_province_parish=' '.join(components['state_province_parish']),
-            country=' '.join(components['country'])
-        )
-    
-    def call_llm_for_address_formatting(self, address: str) -> Dict:
-        """Use LLM to format address with primary/backup model approach"""
-        prompt = f"""
-You are an expert address formatter for customs documentation. Format the following address into the structure: "Street name or Town, City, State/Province/Parish, Country"
+        def _combine_address_fields(party: dict) -> str:
+            if not isinstance(party, dict):
+                return ""
+            parts = []
+            # Support multiple common variants
+            for key in (
+                'address', 'address_line1', 'address_line_1', 'address_line2', 'address_line_2',
+                'street', 'street1', 'street_1', 'street2', 'street_2',
+                'city', 'city_region', 'state', 'province', 'parish', 'region',
+                'postal_code', 'zip', 'country'
+            ):
+                val = party.get(key)
+                if isinstance(val, str) and val.strip():
+                    parts.append(val.strip())
+            # De-duplicate while preserving order
+            seen = set()
+            unique_parts = []
+            for p in parts:
+                if p not in seen:
+                    seen.add(p)
+                    unique_parts.append(p)
+            return ", ".join(unique_parts) if unique_parts else ""
 
-Address to format: {address}
-
-Requirements:
-1. Extract street name or town
-2. Identify the city
-3. Identify state/province/parish
-4. Identify the country
-5. Format as: "Street/Town, City, State/Province/Parish, Country"
-6. For Jamaican addresses, use proper parish names (St. Andrew, St. James, etc.)
-7. Remove any phone numbers, emails, or postal codes
-8. Keep only the essential address components
-
-Return ONLY a JSON object with this structure:
-{{
-    "formatted_address": "Street/Town, City, State/Province/Parish, Country",
-    "components": {{
-        "street_town": "street name or town",
-        "city": "city name",
-        "state_province_parish": "state/province/parish",
-        "country": "country name"
-    }},
-    "confidence": 0.95,
-    "explanation": "brief explanation of formatting decisions"
-}}
-"""
-        
-        try:
-            # Try primary model first
-            response = requests.post(
-                url="https://openrouter.ai/api/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {self.api_key}",
-                    "Content-Type": "application/json",
-                    "HTTP-Referer": "https://github.com/your-repo",
-                    "X-Title": "ESAD Address Formatter"
-                },
-                json={
-                    "model": self.primary_model,
-                    "messages": [{"role": "user", "content": prompt}],
-                    "temperature": 0.1,
-                    "max_tokens": 500
-                },
-                timeout=30
-            )
+        def _country_name_from_value(val: Optional[str]) -> Optional[str]:
+            if not val:
+                return None
+            v = str(val).strip()
             
-            if response.status_code == 200:
-                result = response.json()
-                content = result['choices'][0]['message']['content']
-                return self._parse_llm_response(content, "primary")
-            else:
-                print(f"⚠️ Primary model failed, trying backup...")
-                return self._call_backup_model(prompt)
-                
-        except Exception as e:
-            print(f"❌ Primary model error: {e}")
-            return self._call_backup_model(prompt)
-    
-    def _call_backup_model(self, prompt: str) -> Dict:
-        """Call backup model when primary fails"""
-        try:
-            response = requests.post(
-                url="https://openrouter.ai/api/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {self.api_key}",
-                    "Content-Type": "application/json",
-                    "HTTP-Referer": "https://github.com/your-repo",
-                    "X-Title": "ESAD Address Formatter"
-                },
-                json={
-                    "model": self.backup_model,
-                    "messages": [{"role": "user", "content": prompt}],
-                    "temperature": 0.1,
-                    "max_tokens": 500
-                },
-                timeout=30
-            )
+            # Use comprehensive country inference
+            country = _infer_country_from_codes(v)
+            if country:
+                return country
             
-            if response.status_code == 200:
-                result = response.json()
-                content = result['choices'][0]['message']['content']
-                return self._parse_llm_response(content, "backup")
-            else:
-                raise Exception(f"Backup model failed with status {response.status_code}")
-                
-        except Exception as e:
-            print(f"❌ Backup model error: {e}")
+            # If looks like a full country name already
+            return v
+
+        def _fallback_from_dict(doc: dict) -> dict:
+            consignor = doc.get('shipper') or doc.get('consignor') or {}
+            consignee = doc.get('consignee') or {}
+            consignor_name = consignor.get('name') or None
+            consignee_name = consignee.get('name') or None
+            consignor_street = _extract_street(consignor) or None
+            consignee_street = _extract_street(consignee) or None
+            consignor_city = _extract_city(consignor) or None
+            consignee_city = _extract_city(consignee) or None
+            consignor_addr = _combine_address_fields(consignor) or None
+            consignee_addr = _combine_address_fields(consignee) or None
+            
+            # Try direct country field first
+            consignor_country = _country_name_from_value(consignor.get('country'))
+            consignee_country = _country_name_from_value(consignee.get('country'))
+            
+            # If no country found, try airport/port inference
+            if not consignor_country or not consignee_country:
+                airport_consignor, airport_consignee = _infer_country_from_airports_ports(doc)
+                if not consignor_country and airport_consignor:
+                    consignor_country = airport_consignor
+                if not consignee_country and airport_consignee:
+                    consignee_country = airport_consignee
+            
             return {
-                "formatted_address": "",
-                "components": {"street_town": "", "city": "", "state_province_parish": "", "country": ""},
-                "confidence": 0.0,
-                "explanation": f"Both LLM models failed: {str(e)}",
-                "model_used": "none"
+                'consignor': {'name': consignor_name, 'street': consignor_street, 'city': consignor_city, 'address': consignor_addr, 'country': consignor_country},
+                'consignee': {'name': consignee_name, 'street': consignee_street, 'city': consignee_city, 'address': consignee_addr, 'country': consignee_country},
             }
-    
-    def _parse_llm_response(self, content: str, model_type: str) -> Dict:
-        """Parse LLM response and extract formatted address"""
+
+        # Prepare prompt (truncate large docs)
+        doc_snippet = document
         try:
-            # Clean the response
-            content = content.strip()
+            serialized = _json.dumps(document, ensure_ascii=False)
+            if len(serialized) > 12000:
+                # Re-serialize a trimmed view to keep prompt size reasonable
+                keys_to_keep = ['shipper', 'consignor', 'consignee', 'addresses', 'barcodes_and_numbers', 'raw_visible_text_snippets']
+                doc_snippet = {k: document.get(k) for k in keys_to_keep if k in document}
+        except Exception:
+            doc_snippet = document
+
+        system_instructions = (
+            "You are given a shipping document (Air Waybill or Bill of Lading).\n"
+            "Extract and return only the following information in JSON format:\n\n"
+            "* Consignor (Shipper)\n  - Name\n  - Street (street address, building number, street name)\n  - City (city, town, or region name)\n  - Address (combine all address fields into one string if multiple are present)\n  - Country (establish from explicit text, 2-digit or 3-digit ISO country codes, or infer from any listed ports/airports if not explicitly stated)\n\n"
+            "* Consignee\n  - Name\n  - Street (street address, building number, street name)\n  - City (city, town, or region name)\n  - Address (combine all address fields into one string if multiple are present)\n  - Country (establish from explicit text, 2-digit or 3-digit ISO country codes, or infer from any listed ports/airports if not explicitly stated)\n\n"
+            "For country inference, use this priority:\n"
+            "1. Explicit country names in address fields\n"
+            "2. ISO country codes (2-letter like 'US', 'HK', 'JM' or 3-letter like 'USA', 'HKG', 'JAM')\n"
+            "3. Airport codes (like 'MIA' for Miami/US, 'KIN' for Kingston/Jamaica, 'HKG' for Hong Kong)\n"
+            "4. Seaport codes (like 'LAX' for Los Angeles/US, 'KIN' for Kingston/Jamaica)\n"
+            "5. City names that clearly indicate country (like 'Kingston' likely Jamaica, 'Miami' likely US)\n\n"
+            "If any field is missing, set its value to null. Return ONLY valid JSON without commentary."
+        )
+
+        example_json = {
+            "consignor": {
+                "name": "QI TAN",
+                "street": "RM 808 BLOCK B 13/F TEXACO ROAD, INDUSTRIAL CENTRE 256-264 TEXACO RD",
+                "city": "TSUEN WAN",
+                "address": "RM 808 BLOCK B 13/F TEXACO ROAD, INDUSTRIAL CENTRE 256-264 TEXACO RD TSUEN WAN 76900, TSUEN WAN, HK",
+                "country": "Hong Kong"
+            },
+            "consignee": {
+                "name": "RAFER JOHNSON",
+                "street": "34 ROEHAMPTON CLOSE",
+                "city": "KINGSTON",
+                "address": "34 ROEHAMPTON CLOSE, KINGSTON",
+                "country": "Jamaica"
+            }
+        }
+
+        messages = [
+            {"role": "system", "content": system_instructions},
+            {"role": "user", "content": f"Document JSON:\n{_json.dumps(doc_snippet, ensure_ascii=False)}\n\nExample Output:\n{_json.dumps(example_json, ensure_ascii=False)}"}
+        ]
+
+        model = OPENROUTER_GENERAL_MODELS.get("kimi_standard")
+        headers = {
+            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                    "Content-Type": "application/json",
+            "HTTP-Referer": "https://github.com/klearrshipping/cudabot",
+            "X-Title": "ESAD Address Party Extractor"
+        }
+
+        try:
+            resp = _requests.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers=headers,
+                json={"model": model, "messages": messages, "temperature": 0.0, "max_tokens": 400},
+                timeout=30,
+            )
+            if resp.status_code != 200:
+                return _fallback_from_dict(document)
+            payload = resp.json()
+            content = payload["choices"][0]["message"]["content"].strip()
+            # Strip code fences if any
             if content.startswith("```json"):
                 content = content[7:]
             if content.endswith("```"):
                 content = content[:-3]
-            
-            # Parse JSON
-            result = json.loads(content)
-            
-            return {
-                "formatted_address": result.get("formatted_address", ""),
-                "components": result.get("components", {}),
-                "confidence": result.get("confidence", 0.8),
-                "explanation": result.get("explanation", ""),
-                "model_used": model_type
+            result = _json.loads(content)
+
+            # Normalize and ensure required keys
+            consignor = result.get('consignor') or {}
+            consignee = result.get('consignee') or {}
+            out = {
+                'consignor': {
+                    'name': consignor.get('name') if consignor.get('name') not in ("", None) else None,
+                    'street': consignor.get('street') if consignor.get('street') not in ("", None) else None,
+                    'city': consignor.get('city') if consignor.get('city') not in ("", None) else None,
+                    'address': consignor.get('address') if consignor.get('address') not in ("", None) else None,
+                    'country': consignor.get('country') if consignor.get('country') not in ("", None) else None,
+                },
+                'consignee': {
+                    'name': consignee.get('name') if consignee.get('name') not in ("", None) else None,
+                    'street': consignee.get('street') if consignee.get('street') not in ("", None) else None,
+                    'city': consignee.get('city') if consignee.get('city') not in ("", None) else None,
+                    'address': consignee.get('address') if consignee.get('address') not in ("", None) else None,
+                    'country': consignee.get('country') if consignee.get('country') not in ("", None) else None,
+                },
             }
+            # If LLM missed data, patch with fallback fields
+            fb = _fallback_from_dict(document)
+            if out['consignor']['name'] is None:
+                out['consignor']['name'] = fb['consignor']['name']
+            if out['consignor']['street'] is None:
+                out['consignor']['street'] = fb['consignor']['street']
+            if out['consignor']['city'] is None:
+                out['consignor']['city'] = fb['consignor']['city']
+            if out['consignor']['address'] is None:
+                out['consignor']['address'] = fb['consignor']['address']
+            if out['consignor']['country'] is None:
+                out['consignor']['country'] = fb['consignor']['country']
+            if out['consignee']['name'] is None:
+                out['consignee']['name'] = fb['consignee']['name']
+            if out['consignee']['street'] is None:
+                out['consignee']['street'] = fb['consignee']['street']
+            if out['consignee']['city'] is None:
+                out['consignee']['city'] = fb['consignee']['city']
+            if out['consignee']['address'] is None:
+                out['consignee']['address'] = fb['consignee']['address']
+            if out['consignee']['country'] is None:
+                out['consignee']['country'] = fb['consignee']['country']
             
-        except Exception as e:
-            print(f"❌ Failed to parse LLM response: {e}")
-            return {
-                "formatted_address": "",
-                "components": {"street_town": "", "city": "", "state_province_parish": "", "country": ""},
-                "confidence": 0.0,
-                "explanation": f"Failed to parse LLM response: {str(e)}",
-                "model_used": model_type
-            }
+            # Final country inference attempt for any remaining null countries
+            if not out['consignor']['country'] or not out['consignee']['country']:
+                airport_consignor, airport_consignee = _infer_country_from_airports_ports(document)
+                if not out['consignor']['country'] and airport_consignor:
+                    out['consignor']['country'] = airport_consignor
+                if not out['consignee']['country'] and airport_consignee:
+                    out['consignee']['country'] = airport_consignee
+            return out
+        except Exception:
+            return _fallback_from_dict(document)
     
     def format_address(self, address: str) -> FormattedAddress:
-        """Format address into the required structure using LLM assistance"""
+        """Use LLM to intelligently parse and format address with comprehensive country inference"""
         if not address:
             return FormattedAddress(
                 original=address,
@@ -306,308 +550,174 @@ Return ONLY a JSON object with this structure:
                 issues=["Empty address provided"]
             )
         
-        original = address
-        issues = []
+        print(f"🔎 RAW Address Input: {address[:100]}...")
         
-        print(f"🤖 Using LLM to format address: {address[:50]}...")
+        # Use LLM for intelligent address parsing
+        import json as _json
+        import requests as _requests
         
-        # Use LLM for formatting
-        llm_result = self.call_llm_for_address_formatting(address)
-        
-        # Extract components from LLM result
-        components = AddressComponent(
-            street_town=llm_result.get("components", {}).get("street_town", ""),
-            city=llm_result.get("components", {}).get("city", ""),
-            state_province_parish=llm_result.get("components", {}).get("state_province_parish", ""),
-            country=llm_result.get("components", {}).get("country", "")
+        system_instructions = (
+            "You are an expert address parser for customs documentation. Parse the following address and extract components.\n\n"
+            "Use this comprehensive reference for country inference:\n"
+            "1. ISO2 codes: US, JM, HK, CN, GB, etc.\n"
+            "2. Airport codes: MIA (Miami/US), KIN (Kingston/Jamaica), HKG (Hong Kong), etc.\n"
+            "3. Seaport codes: NYC (New York/US), KIN (Kingston/Jamaica), etc.\n"
+            "4. City inference: Kingston/Montego Bay = Jamaica, Miami/New York = US, Hong Kong/Tsuen Wan = Hong Kong\n\n"
+            "Return ONLY valid JSON in this exact format:\n"
+            "{\n"
+            '  "street_town": "street address or town",\n'
+            '  "city": "city name",\n'
+            '  "state_province_parish": "state/province/parish",\n'
+            '  "country": "full country name",\n'
+            '  "formatted_address": "Street, City, State/Province/Parish, Country"\n'
+            "}\n\n"
+            "If any field is missing or unclear, set to null. Return ONLY valid JSON without commentary."
         )
         
-        formatted = llm_result.get("formatted_address", "")
-        confidence = llm_result.get("confidence", 0.0)
-        model_used = llm_result.get("model_used", "unknown")
+        messages = [
+            {"role": "system", "content": system_instructions},
+            {"role": "user", "content": f"Parse this address: {address}"}
+        ]
         
-        # Add issues based on LLM processing
-        if not formatted:
-            issues.append("LLM failed to format address")
-        if confidence < 0.5:
-            issues.append(f"Low confidence formatting ({confidence:.2f})")
-        if model_used == "backup":
-            issues.append("Used backup model due to primary model failure")
-        if model_used == "none":
-            issues.append("Both LLM models failed, using fallback")
-        
-        # Fallback to rule-based formatting if LLM fails
-        if not formatted or confidence < 0.3:
-            print(f"⚠️ LLM formatting failed, using fallback method...")
-            fallback_result = self._format_address_fallback(address)
-            formatted = fallback_result.formatted
-            components = fallback_result.components
-            confidence = fallback_result.confidence
-            issues.extend(fallback_result.issues)
-            issues.append("Used fallback rule-based formatting")
-        
-        return FormattedAddress(
-            original=original,
-            formatted=formatted,
-            components=components,
-            confidence=confidence,
-            issues=issues
-        )
-    
-    def _format_address_fallback(self, address: str) -> FormattedAddress:
-        """Fallback rule-based address formatting when LLM fails"""
-        original = address
-        issues = []
-        confidence = 1.0
-        
-        # Clean the address
-        cleaned = self.clean_address(address)
-        if cleaned != address.lower().strip():
-            issues.append("Address cleaned of unwanted characters")
-            confidence -= 0.1
-        
-        # Parse components
-        if ',' in cleaned:
-            components = self.extract_components(cleaned)
-        else:
-            components = self.smart_parse_address(cleaned)
-            issues.append("Address parsed using pattern recognition")
-            confidence -= 0.2
-        
-        # Validate components
-        if not components.street_town:
-            issues.append("No street/town identified")
-            confidence -= 0.3
-        
-        if not components.city:
-            issues.append("No city identified")
-            confidence -= 0.2
-        
-        if not components.state_province_parish:
-            issues.append("No state/province/parish identified")
-            confidence -= 0.2
-        
-        if not components.country:
-            issues.append("No country identified")
-            confidence -= 0.3
-        
-        # Format the address
-        formatted_parts = []
-        if components.street_town:
-            formatted_parts.append(components.street_town)
-        if components.city:
-            formatted_parts.append(components.city)
-        if components.state_province_parish:
-            formatted_parts.append(components.state_province_parish)
-        if components.country:
-            formatted_parts.append(components.country)
-        
-        formatted = ", ".join(formatted_parts)
-        
-        return FormattedAddress(
-            original=original,
-            formatted=formatted,
-            components=components,
-            confidence=max(0.0, confidence),
-            issues=issues
-        )
-    
-    def process_esad_data(self, data: Dict) -> Dict:
-        """Process ESAD data and format addresses"""
-        results = {
-            'importer_address': None,
-            'exporter_address': None,
-            'processing_timestamp': datetime.now().isoformat(),
-            'summary': {
-                'total_addresses_processed': 0,
-                'successfully_formatted': 0,
-                'issues_found': 0
-            }
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://github.com/klearrshipping/cudabot",
+            "X-Title": "ESAD Address Parser"
         }
         
-        # Process importer address
-        if 'importer_address' in data and data['importer_address']:
-            # Show raw importer input before formatting
-            try:
-                print(f"🔎 RAW Importer Address Input: {str(data['importer_address'])[:200]}")
-            except Exception:
-                pass
-            importer_result = self.format_address(data['importer_address'])
-            results['importer_address'] = {
-                'original': importer_result.original,
-                'formatted': importer_result.formatted,
-                'components': {
-                    'street_town': importer_result.components.street_town,
-                    'city': importer_result.components.city,
-                    'state_province_parish': importer_result.components.state_province_parish,
-                    'country': importer_result.components.country
-                },
-                'confidence': importer_result.confidence,
-                'issues': importer_result.issues
-            }
-            results['summary']['total_addresses_processed'] += 1
-            if importer_result.formatted:
-                results['summary']['successfully_formatted'] += 1
-            if importer_result.issues:
-                results['summary']['issues_found'] += 1
+        try:
+            resp = _requests.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers=headers,
+                json={"model": self.primary_model, "messages": messages, "temperature": 0.0, "max_tokens": 400},
+                timeout=15,
+            )
+            
+            if resp.status_code == 200:
+                payload = resp.json()
+                content = payload["choices"][0]["message"]["content"].strip()
+                
+                # Clean JSON response
+                if content.startswith("```json"):
+                    content = content[7:]
+                if content.endswith("```"):
+                    content = content[:-3]
+                
+                result = _json.loads(content)
+                
+                street_town = result.get("street_town", "") or ""
+                city = result.get("city", "") or ""
+                state_province_parish = result.get("state_province_parish", "") or ""
+                country = result.get("country", "") or ""
+                formatted = result.get("formatted_address", "") or ""
+                
+                components = AddressComponent(
+                    street_town=street_town,
+                    city=city,
+                    state_province_parish=state_province_parish,
+                    country=country
+                )
+                
+                print(f"✅ LLM Address Parsing: {formatted}")
+                
+                return FormattedAddress(
+                    original=address,
+                    formatted=formatted,
+                    components=components,
+                    confidence=0.9,
+                    issues=[]
+                )
+            else:
+                raise Exception(f"LLM API error: {resp.status_code}")
+                
+        except Exception as e:
+            print(f"⚠️ LLM parsing failed, using fallback: {e}")
+            
+            # Enhanced fallback parsing using our comprehensive mappings
+            parts = [part.strip() for part in address.split() if part.strip()]
+            
+            street_town = ""
+            city = ""
+            state_province_parish = ""
+            country = ""
+            
+            # Try to identify country using our comprehensive mappings
+            country_found = None
+            for i, part in enumerate(parts):
+                if len(part) <= 3 and part.isalpha() and len(part) >= 2:
+                    potential_country = _infer_country_from_codes(part)
+                    if potential_country:
+                        country_found = potential_country
+                        parts = [p for j, p in enumerate(parts) if j != i]
+                        break
+            
+            if country_found:
+                country = country_found
+            
+            # Parse remaining parts
+            if len(parts) >= 1:
+                street_town = parts[0]
+            if len(parts) >= 2:
+                city = parts[1]
+            if len(parts) >= 3:
+                state_province_parish = parts[2]
+            
+            components = AddressComponent(
+                street_town=street_town,
+                city=city,
+                state_province_parish=state_province_parish,
+                country=country
+            )
+            
+            formatted = ", ".join([part for part in [street_town, city, state_province_parish, country] if part])
+            
+            print(f"✅ Fallback Address Parsing: {formatted}")
         
-        # Process exporter address
-        if 'exporter_address' in data and data['exporter_address']:
-            # Show raw exporter input before formatting
-            try:
-                print(f"🔎 RAW Exporter Address Input: {str(data['exporter_address'])[:200]}")
-            except Exception:
-                pass
-            exporter_result = self.format_address(data['exporter_address'])
-            results['exporter_address'] = {
-                'original': exporter_result.original,
-                'formatted': exporter_result.formatted,
-                'components': {
-                    'street_town': exporter_result.components.street_town,
-                    'city': exporter_result.components.city,
-                    'state_province_parish': exporter_result.components.state_province_parish,
-                    'country': exporter_result.components.country
-                },
-                'confidence': exporter_result.confidence,
-                'issues': exporter_result.issues
-            }
-            results['summary']['total_addresses_processed'] += 1
-            if exporter_result.formatted:
-                results['summary']['successfully_formatted'] += 1
-            if exporter_result.issues:
-                results['summary']['issues_found'] += 1
-        
-        return results
-    
-    def save_results(self, results: Dict, output_dir: str = "address_results") -> Path:
-        """Save formatted address results to JSON file"""
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        output_path = Path(output_dir)
-        output_path.mkdir(exist_ok=True)
-        
-        output_file = output_path / f"address_formatted_{timestamp}.json"
-        
-        with open(output_file, 'w', encoding='utf-8') as f:
-            json.dump(results, f, indent=2, ensure_ascii=False)
-        
-        print(f"💾 Address formatting results saved to: {output_file}")
-        return output_file
+        return FormattedAddress(
+                original=address,
+            formatted=formatted,
+            components=components,
+                confidence=0.5,
+                issues=[f"LLM failed, used fallback: {str(e)}"]
+            )
 
 def main():
-    """Main function to demonstrate LLM-enhanced address formatting"""
-    import sys
+    """Main function to demonstrate enhanced address processing"""
     formatter = AddressFormatter()
 
-    # If a JSON file is provided as an argument, use it
-    if len(sys.argv) > 1:
-        input_path = sys.argv[1]
-        with open(input_path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-        print(f"🏠 ESAD Address Formatter: Processing addresses from {input_path}")
-
-        # If this looks like a BOL JSON (has shipper/consignee), build addresses from party data
-        shipper = data.get('shipper') if isinstance(data.get('shipper'), dict) else None
-        consignee = data.get('consignee') if isinstance(data.get('consignee'), dict) else None
-
-        def _field(d: Dict, *names: str) -> str:
-            for n in names:
-                if isinstance(d, dict) and n in d and d.get(n):
-                    return str(d.get(n)).strip()
-            return ""
-
-        def _country_full(code: str) -> str:
-            if not code:
-                return ""
-            m = {
-                'HK': 'Hong Kong',
-                'JM': 'Jamaica',
-                'US': 'United States',
-                'CN': 'China',
-                'GB': 'United Kingdom'
-            }
-            return m.get(str(code).upper(), code)
-
-        def _build_address_from_party(party: Dict) -> str:
-            if not isinstance(party, dict):
-                return ""
-            parts = []
-            parts.append(_field(party, 'address_line1', 'address_line_1'))
-            parts.append(_field(party, 'address_line2', 'address_line_2'))
-            parts.append(_field(party, 'city', 'city_region'))
-            parts.append(_field(party, 'postal_code', 'zip'))
-            parts.append(_country_full(_field(party, 'country')))
-            return " ".join([p for p in parts if p]).strip()
-
-        if shipper or consignee:
-            if consignee:
-                print("🔎 RAW Consignee Object:")
-                try:
-                    print(json.dumps(consignee, indent=2, ensure_ascii=False))
-                except Exception:
-                    print(str(consignee))
-            if shipper:
-                print("🔎 RAW Shipper Object:")
-                try:
-                    print(json.dumps(shipper, indent=2, ensure_ascii=False))
-                except Exception:
-                    print(str(shipper))
-
-            importer_address = _build_address_from_party(consignee or {})
-            exporter_address = _build_address_from_party(shipper or {})
-            print("🔧 Fields used to build Importer Address:",
-                  _field(consignee or {}, 'address_line1', 'address_line_1'),
-                  _field(consignee or {}, 'city', 'city_region'),
-                  _field(consignee or {}, 'country'))
-            print("🔧 Fields used to build Exporter Address:",
-                  _field(shipper or {}, 'address_line1', 'address_line_1'),
-                  _field(shipper or {}, 'city', 'city_region'),
-                  _field(shipper or {}, 'country'))
-            addresses = {
-                'importer_address': importer_address,
-                'exporter_address': exporter_address
-            }
-        else:
-            # Fallback to original shape: extract from result.extracted_fields
-            extracted_fields = data.get('result', {}).get('extracted_fields', {})
-            addresses = {
-                'importer_address': extracted_fields.get('importer_address', ''),
-                'exporter_address': extracted_fields.get('exporter_address', '')
-            }
-    else:
-        # Fallback to hardcoded test addresses
-        addresses = {
-            'importer_address': 'Lot 226C Spanish Town Road Kingston 11 St. Andrew Jamaica',
-            'exporter_address': '123 Main Street, Montego Bay, St. James, Jamaica'
+    # Example usage
+    sample_document = {
+        "shipper": {
+            "name": "QI TAN",
+            "address_line1": "RM 808 BLOCK B 13/F TEXACO ROAD, INDUSTRIAL CENTRE 256-264 TEXACO RD",
+            "city": "TSUEN WAN",
+            "country": "HK"
+        },
+        "consignee": {
+            "name": "RAFER JOHNSON",
+            "address_line1": "34 ROEHAMPTON CLOSE",
+            "city": "KINGSTON",
+            "country": "JM"
         }
-        print("🏠 ESAD Address Formatter with LLM Enhancement (Test Mode)")
-
-    print("=" * 60)
-    results = formatter.process_esad_data(addresses)
-
-    print("\n📋 LLM-ENHANCED FORMATTING RESULTS:")
-    print("-" * 40)
-    for address_type, result in results.items():
-        if result and isinstance(result, dict) and 'original' in result:
-            print(f"📍 {address_type.replace('_', ' ').title()}:")
-            print(f"   Original: {result['original']}")
-            print(f"   Formatted: {result['formatted']}")
-            print(f"   Confidence: {result['confidence']:.2f}")
-            if result.get('components'):
-                print(f"   Components:")
-                for comp, value in result['components'].items():
-                    if value:
-                        print(f"     {comp.replace('_', ' ').title()}: {value}")
-            if result.get('issues'):
-                print(f"   Issues: {', '.join(result['issues'])}")
-            print()
-    print(f"📊 Summary:")
-    print(f"   Total addresses processed: {results['summary']['total_addresses_processed']}")
-    print(f"   Successfully formatted: {results['summary']['successfully_formatted']}")
-    print(f"   Issues found: {results['summary']['issues_found']}")
-
-    # Save results
-    output_file = formatter.save_results(results)
-    print(f"\n✅ Results saved to: {output_file}")
+    }
+    
+    print("🏠 Enhanced ESAD Address Processor")
+    print("=" * 50)
+    
+    # Test new functionality
+    result = formatter.extract_consignor_consignee(sample_document)
+    
+    print("📍 Consignor/Consignee Extraction Results:")
+    print(f"Consignor: {result['consignor']}")
+    print(f"Consignee: {result['consignee']}")
+    
+    # Test backward compatibility
+    test_address = "123 Main Street, Kingston, St. Andrew, Jamaica"
+    formatted = formatter.format_address(test_address)
+    print(f"\n📍 Address Formatting (Backward Compatibility):")
+    print(f"Original: {formatted.original}")
+    print(f"Formatted: {formatted.formatted}")
 
 if __name__ == "__main__":
     main()

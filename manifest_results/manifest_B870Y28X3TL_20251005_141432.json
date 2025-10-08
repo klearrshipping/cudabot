@@ -1,0 +1,34 @@
+{
+  "bol_number": "B870Y28X3TL",
+  "entries": [
+    {
+      "office": "JMKIN",
+      "reference_id": "2025 1997",
+      "date": "02/10/2025",
+      "status": "Totally un-discharge"
+    },
+    {
+      "office": "JMKIN",
+      "reference_id": "2025 1997",
+      "date": "26/09/2025",
+      "status": "Total Discharge"
+    },
+    {
+      "office": "JMKIN",
+      "reference_id": "2025 1997",
+      "date": "18/09/2025",
+      "status": "Direct Validate"
+    },
+    {
+      "office": "JMKIN",
+      "reference_id": "2025 1997",
+      "date": "18/09/2025",
+      "status": "System Store"
+    }
+  ],
+  "total_entries": 4,
+  "tracking_url": "https://jets.jacustoms.gov.jm/portal/services/docTracking/track.jsf",
+  "extraction_time": "2025-10-05T14:14:30.497258",
+  "success": true,
+  "error_message": null
+}

@@ -342,11 +342,20 @@ class ESADProcessor:
             print(f"\n--- {invoice_key.upper()} PRODUCT CLASSIFICATION ---")
             if product_result['success']:
                 print(f"✅ Success: {product_result['success']}")
-                print(f"📋 Commercial Description: {product_result['commercial_description']}")
-                print(f"🏷️  Commodity Code: {product_result['commodity_code']}")
-                print(f"🔢 HS Code: {product_result['hs_code']}")
-                print(f"📝 HS Description: {product_result['hs_description']}")
-                print(f"📄 Original Description: {product_result['original_description']}")
+                
+                # Output JSON format
+                classification_data = {
+                    "commercial_description": product_result['commercial_description'],
+                    "hs_code": product_result['hs_code'],
+                    "hs_description": product_result['hs_description'],
+                    "commodity_code": product_result['commodity_code']
+                }
+                print(f"\n{'='*60}")
+                print(f"CLASSIFICATION RESULTS (JSON Format)")
+                print(f"{'='*60}\n")
+                print(json.dumps(classification_data, indent=2))
+                
+                print(f"\n📄 Original Description: {product_result['original_description']}")
                 print(f"📊 Processing Notes: {product_result['processing_notes']}")
             else:
                 print(f"❌ Processing Failed: {product_result['error']}")
@@ -365,12 +374,21 @@ class ESADProcessor:
         cif_result = cif_processor.process(base_input_data)
         if cif_result['success']:
             print(f"✅ CIF Processing Successful")
-            print(f"📋 Invoice Total: ${cif_result.get('val_note_invoice_total_including_freight', 0):,.2f}" if cif_result.get('val_note_invoice_total_including_freight') else "📋 Invoice Total: Not found")
-            print(f"📦 Goods Value: ${cif_result.get('val_note_invoice_value_goods_only', 0):,.2f}" if cif_result.get('val_note_invoice_value_goods_only') else "📦 Goods Value: Not found")
-            print(f"🚢 Freight (Invoice): ${cif_result.get('val_note_freight_charges_invoice', 0):,.2f}" if cif_result.get('val_note_freight_charges_invoice') else "🚢 Freight (Invoice): Not found")
-            print(f"🛡️ Insurance: ${cif_result.get('val_note_insurance_charges_invoice', 0):,.2f}" if cif_result.get('val_note_insurance_charges_invoice') else "🛡️ Insurance: Not found")
-            print(f"💵 Cost & Freight: ${cif_result.get('val_note_cost_and_freight', 0):,.2f}" if cif_result.get('val_note_cost_and_freight') else "💵 Cost & Freight: Not calculated")
-            print(f"🌍 CIF (Cost + Insurance + Freight): ${cif_result.get('val_note_cif', 0):,.2f}" if cif_result.get('val_note_cif') else "🌍 CIF: Not calculated")
+            
+            # Output JSON format
+            cif_data = {
+                "cost": cif_result.get('val_note_invoice_value_goods_only', 0) or 0,
+                "freight": cif_result.get('val_note_freight_charges_invoice', 0) or cif_result.get('val_note_freight_charges_bol', 0) or 0,
+                "cost_and_freight": cif_result.get('val_note_cost_and_freight', 0) or 0,
+                "insurance": cif_result.get('val_note_insurance_charges_invoice', 0) or cif_result.get('val_note_insurance_charges_bol', 0) or 0,
+                "cif_value": cif_result.get('val_note_cif', 0) or 0
+            }
+            print(f"\n{'='*60}")
+            print(f"CIF RESULTS (JSON Format)")
+            print(f"{'='*60}\n")
+            print(json.dumps(cif_data, indent=2))
+            
+            print(f"\n📋 Invoice Total: ${cif_result.get('val_note_invoice_total_including_freight', 0):,.2f}" if cif_result.get('val_note_invoice_total_including_freight') else "📋 Invoice Total: Not found")
             print(f"💱 Invoice Currency: {cif_result.get('invoice_currency', 'Not found')}")
             print(f"📋 Incoterms: {cif_result.get('incoterms', 'Not found')}")
         else:
@@ -462,25 +480,29 @@ class ESADProcessor:
         # Process addresses
         print("\n🏠 BOX 2 & BOX 8: Processing addresses (Exporter/Consignee)...")
         try:
-            # Process importer address
-            if bol_data and bol_data.get('consignee'):
-                consignee_name = bol_data['consignee'].get('name', '').strip()
-                consignee_address = f"{bol_data['consignee'].get('address_line1', '')} {bol_data['consignee'].get('city', '')} {bol_data['consignee'].get('country', '')}".strip()
-                if consignee_address:
-                    importer_result = address_formatter.format_address(consignee_address)
-                    if consignee_name:
-                        print(f"👤 Consignee Name: {consignee_name}")
-                    print(f"✅ Importer Address: {importer_result.formatted}")
-            
-            # Process exporter address  
-            if bol_data and bol_data.get('shipper'):
-                shipper_name = bol_data['shipper'].get('name', '').strip()
-                shipper_address = f"{bol_data['shipper'].get('address_line1', '')} {bol_data['shipper'].get('city', '')} {bol_data['shipper'].get('country', '')}".strip()
-                if shipper_address:
-                    exporter_result = address_formatter.format_address(shipper_address)
-                    if shipper_name:
-                        print(f"🏢 Consignor Name: {shipper_name}")
-                    print(f"✅ Exporter Address: {exporter_result.formatted}")
+            # Extract detailed consignor/consignee information
+            if bol_data:
+                address_result = address_formatter.extract_consignor_consignee(bol_data)
+                
+                # Format Consignor output vertically
+                print('"consignor": {')
+                consignor = address_result['consignor']
+                print(f'    "name": "{consignor["name"]}",')
+                print(f'    "street": "{consignor["street"]}",')
+                print(f'    "city": "{consignor["city"]}",')
+                print(f'    "address": "{consignor["address"]}",')
+                print(f'    "country": "{consignor["country"]}"')
+                print('  }')
+                
+                # Format Consignee output vertically
+                print('"consignee": {')
+                consignee = address_result['consignee']
+                print(f'    "name": "{consignee["name"]}",')
+                print(f'    "street": "{consignee["street"]}",')
+                print(f'    "city": "{consignee["city"]}",')
+                print(f'    "address": "{consignee["address"]}",')
+                print(f'    "country": "{consignee["country"]}"')
+                print('  }')
         except Exception as e:
             print(f"❌ Address processing failed: {e}")
         

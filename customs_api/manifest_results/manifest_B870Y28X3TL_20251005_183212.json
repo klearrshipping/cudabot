@@ -1,0 +1,17 @@
+{
+  "bol_number": "B870Y28X3TL",
+  "entries": [
+    {
+      "office": "JMKIN",
+      "reference_id": "2025 1997",
+      "manifest_reg_no": "JMKIN 2025 1997",
+      "date": "18/09/2025",
+      "status": "Direct Validate"
+    }
+  ],
+  "total_entries": 1,
+  "tracking_url": "https://jets.jacustoms.gov.jm/portal/services/docTracking/track.jsf",
+  "extraction_time": "2025-10-05T18:32:12.677752",
+  "success": true,
+  "error_message": null
+}

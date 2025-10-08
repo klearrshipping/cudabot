@@ -1,0 +1,57 @@
+{
+  "supplier": {
+    "name": "Shenzhen Jinsdon Lighting Technology CO.,LTD",
+    "address": "NO.68, BaiGongAo Industrial Zone, Xikeng Community, Guanlan Town, Longhua District, Shenzhen, 518110, China",
+    "contact": {
+      "phone_top": "0086-755-89918655",
+      "fax": "0086-755-89918656",
+      "phone_from_section": "+86 19811979697",
+      "contact_person": "Peter Wu"
+    }
+  },
+  "buyer": {
+    "name": "Rafer Johnson",
+    "address": "34 RoehamptonCloseKingston 19Jamaica West indies",
+    "contact": {
+      "phone": "+1 (876) 817-0065",
+      "contact_person": "Rafer Johnson"
+    }
+  },
+  "invoice_details": {
+    "invoice_number": "JSDXS2025091202",
+    "date": "9/10/2025",
+    "incoterms": "ups",
+    "country_of_origin": "China",
+    "hs_code": "8501320000",
+    "issued_by": "Shenzhen Jinsdon Lighting Technology CO.,LTD",
+    "issued_by_stamp": "red circular company seal (Shenzhen Jinsdon Lighting Technology CO., LTD)"
+  },
+  "items": [
+    {
+      "item_number": "1",
+      "description": "10kw inverter",
+      "quantity": 1.0,
+      "unit_price": 900.0,
+      "total_price": 900.0
+    }
+  ],
+  "totals": {
+    "subtotal": 900.0,
+    "total_amount": 900.0,
+    "currency_symbol": "$"
+  },
+  "shipping": {
+    "method": "ups"
+  },
+  "payment_terms": {},
+  "currency": "USD",
+  "document_type": "commercial invoice",
+  "extraction_confidence": "high",
+  "_metadata": {
+    "extraction_timestamp": "2025-10-01T20:18:06.277472",
+    "source_file": "C:\\Users\\rafer\\OneDrive\\Desktop\\projects\\cuda\\customs_api\\processed_orders\\ORD-20251001-001\\file_uploads\\invoice_20251001_201603.pdf",
+    "processor": "claude_sonnet_4_via_openrouter",
+    "model": "openai/gpt-5-mini",
+    "processing_method": "pdf_to_image_conversion"
+  }
+}

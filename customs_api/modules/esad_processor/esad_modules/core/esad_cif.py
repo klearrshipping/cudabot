@@ -32,7 +32,9 @@ def ask_llm_for_cif_components(invoice_data: Dict, bol_data: Dict) -> Dict[str, 
     bol_summary = {
         "freight_and_charges": bol_data.get("freight_and_charges", ""),
         "charges_table": bol_data.get("charges_table", []),
-        "vessel_and_voyage": bol_data.get("vessel_and_voyage", "")
+        "vessel_and_voyage": bol_data.get("vessel_and_voyage", ""),
+        "freight_charge_amount": bol_data.get("freight_charge_amount", ""),
+        "cargo_summary_table": bol_data.get("cargo_summary_table", {})
     }
     
     prompt = f"""
@@ -54,11 +56,11 @@ FOR INVOICE:
 5. Extract other costs if any (separate from goods value)
 6. Extract currency of the invoice document
 
-FOR BILL OF LADING:
-1. Extract freight cost in FOREIGN currency (exclude any JMD/local currency amounts)
-2. Extract insurance cost in FOREIGN currency (exclude any JMD/local currency amounts)
-3. Extract other costs in FOREIGN currency (exclude any JMD/local currency amounts)
-4. Extract currency of the foreign currency amounts in BOL
+FOR SHIPPING DOCUMENT (BOL/Air Waybill/etc.):
+1. Extract ANY freight/shipping/transport cost mentioned in FOREIGN currency (search entire document for freight, shipping, transport, carriage charges - exclude any JMD/local currency amounts)
+2. Extract ANY insurance cost mentioned in FOREIGN currency (search entire document for insurance, premium charges - exclude any JMD/local currency amounts)
+3. Extract ANY other costs mentioned in FOREIGN currency (search entire document for handling, documentation, customs fees - exclude any JMD/local currency amounts)
+4. Extract currency of the foreign currency amounts in shipping document
 
 Return format:
 {{
@@ -77,9 +79,11 @@ Return format:
 
 IMPORTANT: 
 - Only extract values that are explicitly stated in the documents
-- For BOL, ONLY extract foreign currency amounts (exclude JMD/local currency)
+- For shipping documents, search the ENTIRE document for freight/shipping/transport costs (not just specific fields)
+- ONLY extract foreign currency amounts (exclude JMD/local currency)
 - Use null for missing values
 - Do not calculate or estimate anything
+- Look for freight costs anywhere in the document - tables, text blocks, charge summaries, etc.
 """
 
     # Try priority models with early termination
