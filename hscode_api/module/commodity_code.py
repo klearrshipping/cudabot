@@ -23,6 +23,7 @@ import logging
 import os
 import argparse
 import re
+import time
 from datetime import datetime
 from typing import List, Dict, Optional, Any
 from pathlib import Path
@@ -58,6 +59,64 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# RETRY LOGIC FOR CONNECTION FAILURES
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def retry_with_backoff(func, max_retries=3, initial_delay=1, backoff_factor=2, 
+                       timeout_increase=30, operation_name="operation"):
+    """
+    Retry a function with exponential backoff on failure.
+    
+    Args:
+        func: Callable that takes timeout as parameter and returns result
+        max_retries: Maximum number of retry attempts (default 3)
+        initial_delay: Initial delay between retries in seconds (default 1)
+        backoff_factor: Multiplier for delay on each retry (default 2)
+        timeout_increase: Additional timeout seconds per retry (default 30)
+        operation_name: Name of operation for logging
+        
+    Returns:
+        Result from func, or None if all retries failed
+    """
+    delay = initial_delay
+    base_timeout = 60
+    
+    for attempt in range(max_retries):
+        try:
+            current_timeout = base_timeout + (attempt * timeout_increase)
+            logger.info(f"[RETRY] {operation_name}: Attempt {attempt + 1}/{max_retries} (timeout: {current_timeout}s)")
+            result = func(current_timeout)
+            if attempt > 0:
+                logger.info(f"[RETRY] {operation_name}: Success on attempt {attempt + 1}")
+            return result
+            
+        except (requests.exceptions.Timeout, 
+                requests.exceptions.ConnectionError,
+                ConnectionError,
+                TimeoutError) as e:
+            
+            if attempt < max_retries - 1:
+                logger.warning(f"[RETRY] {operation_name}: Failed (attempt {attempt + 1}/{max_retries}): {str(e)}")
+                logger.warning(f"[RETRY] {operation_name}: Retrying in {delay} seconds...")
+                time.sleep(delay)
+                delay *= backoff_factor
+            else:
+                logger.error(f"[RETRY] {operation_name}: All {max_retries} attempts failed: {str(e)}")
+                return None
+                
+        except Exception as e:
+            logger.error(f"[RETRY] {operation_name}: Unexpected error: {str(e)}")
+            if attempt < max_retries - 1:
+                logger.warning(f"[RETRY] {operation_name}: Retrying in {delay} seconds...")
+                time.sleep(delay)
+                delay *= backoff_factor
+            else:
+                logger.error(f"[RETRY] {operation_name}: All {max_retries} attempts failed")
+                return None
+    
+    return None
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # 10-STAGE COMMODITY CODE WORKFLOW
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -78,18 +137,32 @@ def lookup_commodity_codes(hs_codes: list[str]) -> dict:
     print("-" * 50)
     
     for hs_code in hs_codes:
-        # Find all matches - simple database query
+        # Find all matches - simple database query with retry logic
         clean_hs_code = hs_code.replace(".", "")
-        try:
+        
+        def _query_database(timeout):
+            """Inner function for retry logic"""
             response = (
                 lookup.supabase.table("tariff_codes")
                 .select("tariff_code,description")
                 .ilike("tariff_code", f"{clean_hs_code}%")
                 .execute()
             )
-            all_matches = response.data or []
+            return response.data or []
+        
+        try:
+            all_matches = retry_with_backoff(
+                _query_database,
+                max_retries=3,
+                initial_delay=2,
+                backoff_factor=2,
+                operation_name=f"Database query for {hs_code}"
+            )
             
-            if not all_matches:
+            if all_matches is None:
+                print(f"├── {hs_code}: [ERROR] Database query failed after retries")
+                results[hs_code] = []
+            elif not all_matches:
                 print(f"├── {hs_code}: [X] No commodity codes found")
                 results[hs_code] = []
             else:
@@ -101,6 +174,7 @@ def lookup_commodity_codes(hs_codes: list[str]) -> dict:
                 
         except Exception as e:
             print(f"├── {hs_code}: [ERROR] {str(e)}")
+            logger.error(f"Unexpected error in lookup_commodity_codes for {hs_code}: {str(e)}")
             results[hs_code] = []
     
     return results
@@ -138,12 +212,12 @@ def generate_questions_from_codes(code_lookup_results: dict, product_name: str, 
             continue
         
         if len(commodity_codes) == 1:
-            print(f"│   └── [SKIP] Only one code - no questions needed")
+            print(f"│   └── Only one code found - will proceed to final selection")
             results[hs_code] = {
                 'stage': 4,
-                'status': 'single_code',
-                'selected_code': commodity_codes[0],
-                'message': 'Only one commodity code available'
+                'status': 'no_questions',
+                'commodity_codes': commodity_codes,
+                'message': 'Only one commodity code available - no questions needed'
             }
             continue
         
@@ -407,11 +481,12 @@ def generate_questions_from_filtered_codes(filtered_code_results: dict, product_
             results[hs_code] = { 'stage': 6, 'status': 'no_codes', 'message': 'No codes to analyze' }
             continue
         if len(commodity_codes) == 1:
+            print(f"│   └── Only one code found - will proceed to final selection")
             results[hs_code] = {
                 'stage': 6,
-                'status': 'single_code',
-                'selected_code': commodity_codes[0],
-                'message': 'Only one commodity code available'
+                'status': 'no_questions',
+                'commodity_codes': commodity_codes,
+                'message': 'Only one commodity code available - no questions needed'
             }
             continue
         print(f"│ └── [LLM] Generating questions...")
@@ -524,9 +599,12 @@ def answer_questions_core(stage4_results: dict, stage5_results: dict, product_na
             }
         else:
             print(f"   [SKIP] No questions to answer (status: {stage4_data.get('status')})")
+            # Get commodity_codes from stage4_data if available
+            commodity_codes = stage4_data.get('commodity_codes', [])
             results[hs_code] = {
                 'stage': 6,
                 'status': 'no_questions',
+                'commodity_codes': commodity_codes,
                 'stage4_data': stage4_data,
                 'message': 'No questions to answer with LLM'
             }
@@ -591,9 +669,12 @@ def list_unanswered_questions(stage6_results: dict) -> dict:
                 }
         else:
             print(f"│   └── [SKIP] No questions to check (status: {stage6_data.get('status')})")
+            # Get commodity_codes from stage6_data if available
+            commodity_codes = stage6_data.get('commodity_codes', [])
             results[hs_code] = {
                 'stage': 7,
                 'status': 'no_questions',
+                'commodity_codes': commodity_codes,
                 'stage6_data': stage6_data,
                 'message': 'No questions to check for unanswered status'
             }
@@ -621,21 +702,21 @@ def _build_context_summary(contextual_data: Dict[str, Any], product_name: str,
     # Contextual data from Stage 5 - Enhanced to handle nested structure
     if contextual_data:
         # Buyer/Consignee information
-        buyer_info = contextual_data.get('buyer_info', {})
+        buyer_info = contextual_data.get('buyer_info') or {}
         if buyer_info.get('name'):
             context_parts.append(f"Buyer: {buyer_info['name']}")
         if buyer_info.get('address'):
             context_parts.append(f"Buyer Address: {buyer_info['address']}")
         
         # Supplier/Shipper information  
-        supplier_info = contextual_data.get('supplier_info', {})
+        supplier_info = contextual_data.get('supplier_info') or {}
         if supplier_info.get('name'):
             context_parts.append(f"Supplier: {supplier_info['name']}")
         if supplier_info.get('address'):
             context_parts.append(f"Supplier Address: {supplier_info['address']}")
         
         # Product details
-        product_details = contextual_data.get('product_details', {})
+        product_details = contextual_data.get('product_details') or {}
         if product_details.get('description'):
             context_parts.append(f"Product Description: {product_details['description']}")
         if product_details.get('quantity'):
@@ -930,8 +1011,8 @@ def complete_loop(stage8_results: dict, stage5_results: dict = None, user_answer
     for hs_code, stage8_data in stage8_results.items():
         print(f"\n├── {hs_code}: Completing the loop with user answers")
         
-        # Handle 'context_displayed', 'all_answers_provided', and 'no_input_needed' statuses
-        if stage8_data.get('status') in ['context_displayed', 'all_answers_provided', 'no_input_needed', 'all_answered']:
+        # Handle 'context_displayed', 'all_answers_provided', 'no_input_needed', 'all_answered', and 'no_questions' statuses
+        if stage8_data.get('status') in ['context_displayed', 'all_answers_provided', 'no_input_needed', 'all_answered', 'no_questions']:
             answered_questions = stage8_data.get('answered_questions', {})
             unanswered_questions = stage8_data.get('unanswered_questions', [])
             resolved_context = stage8_data.get('resolved_context', {})
@@ -1615,7 +1696,7 @@ def extract_context_from_query(original_question: str, product_name: str, produc
 
 def get_order_context_by_id(order_id: int) -> Dict[str, Any]:
     """
-    Fetch order context from customs_api via HTTP request.
+    Fetch order context from customs_api via HTTP request with retry logic.
     
     Args:
         order_id: The order ID to fetch context for
@@ -1629,51 +1710,52 @@ def get_order_context_by_id(order_id: int) -> Dict[str, Any]:
         
         # Configuration
         from config import CUSTOMS_API_BASE_URL, CUSTOMS_API_TIMEOUT
-        timeout = CUSTOMS_API_TIMEOUT
         
-        # Make HTTP request
         url = f"{CUSTOMS_API_BASE_URL}/api/orders/{order_id}/context"
-        
         print(f"🌐 Fetching order context from: {url}")
         
-        response = requests.get(
-            url,
-            timeout=timeout,
-            headers={
-                "Content-Type": "application/json",
-                "Accept": "application/json"
-            }
+        def _fetch_context(timeout):
+            """Inner function for retry logic"""
+            response = requests.get(
+                url,
+                timeout=timeout,
+                headers={
+                    "Content-Type": "application/json",
+                    "Accept": "application/json"
+                }
+            )
+            
+            # Handle response
+            if response.status_code == 200:
+                return response.json()
+            elif response.status_code == 404:
+                logger.warning(f"Order {order_id} not found in customs_api")
+                return {}
+            else:
+                raise ValueError(f"HTTP {response.status_code}: {response.text}")
+        
+        # Use retry logic for order context fetch
+        result = retry_with_backoff(
+            _fetch_context,
+            max_retries=3,
+            initial_delay=2,
+            backoff_factor=2,
+            timeout_increase=15,
+            operation_name=f"Fetch order context for {order_id}"
         )
         
-        # Handle response
-        if response.status_code == 200:
-            data = response.json()
+        if result is None:
+            print(f"❌ Failed to fetch order context for {order_id} after retries")
+            return {}
+        
+        if result:
             print(f"✅ Successfully fetched context for order {order_id}")
-            return data
-            
-        elif response.status_code == 404:
-            print(f"❌ Order {order_id} not found in customs_api")
-            return {}
-            
-        else:
-            print(f"❌ Error fetching order context: HTTP {response.status_code}")
-            print(f"   Response: {response.text}")
-            return {}
-            
-    except requests.exceptions.Timeout:
-        print(f"❌ Timeout fetching order context for {order_id}")
-        return {}
         
-    except requests.exceptions.ConnectionError:
-        print(f"❌ Cannot connect to customs_api at {CUSTOMS_API_BASE_URL}")
-        return {}
-        
-    except requests.exceptions.RequestException as e:
-        print(f"❌ Request error fetching order context: {e}")
-        return {}
-        
+        return result
+            
     except Exception as e:
         print(f"❌ Unexpected error fetching order context: {e}")
+        logger.error(f"Unexpected error in get_order_context_by_id: {e}")
         return {}
 
 def reason_with_llm_fn(prompt: str, hs_code: str = None) -> str:
@@ -1723,42 +1805,57 @@ def chat_completion(messages, model_alias="gpt_5"):
 
 def call_llm(messages, model_alias, config, models):
     """
-    Make the actual HTTP request to the LLM API.
+    Make the actual HTTP request to the LLM API with retry logic.
     """
     model = models[model_alias]["name"]
     payload = {
         "model": model,
         "messages": messages,
-        "temperature": 0.1,  # Lower temperature for consistent output
-        "max_tokens": 3000,  # Increased token limit to prevent truncation
-        # Remove response_format to allow more flexible parsing
+        "temperature": 0.1,
+        "max_tokens": 3000,
     }
     
     print(f"[DEBUG] Making LLM request to model: {model}")
     print(f"[DEBUG] Payload: {payload}")
     
-    response = requests.post(
-        config["api_url"],
-        headers=config["headers"],
-        json=payload,
-        timeout=60,
+    def _make_llm_request(timeout):
+        """Inner function for retry logic"""
+        response = requests.post(
+            config["api_url"],
+            headers=config["headers"],
+            json=payload,
+            timeout=timeout,
+        )
+        response.raise_for_status()
+        result = response.json()
+        
+        # Check if response has expected structure
+        if "choices" not in result or not result["choices"]:
+            raise ValueError(f"Invalid LLM response structure: {result}")
+        
+        choice = result["choices"][0]
+        if "message" not in choice or "content" not in choice["message"]:
+            raise ValueError(f"Invalid choice structure: {choice}")
+        
+        return result
+    
+    # Use retry logic for LLM API calls
+    result = retry_with_backoff(
+        _make_llm_request,
+        max_retries=3,
+        initial_delay=2,
+        backoff_factor=2,
+        timeout_increase=30,
+        operation_name=f"LLM API call to {model}"
     )
-    response.raise_for_status()
-    result = response.json()
+    
+    if result is None:
+        logger.error(f"LLM API call failed after all retries")
+        return ""
     
     print(f"[DEBUG] LLM API response: {result}")
     
-    # Check if response has expected structure
-    if "choices" not in result or not result["choices"]:
-        logger.error(f"Invalid LLM response structure: {result}")
-        return ""
-    
-    choice = result["choices"][0]
-    if "message" not in choice or "content" not in choice["message"]:
-        logger.error(f"Invalid choice structure: {choice}")
-        return ""
-    
-    content = choice["message"]["content"]
+    content = result["choices"][0]["message"]["content"]
     print(f"[DEBUG] Extracted content: {content[:200]}...")
     return content
 

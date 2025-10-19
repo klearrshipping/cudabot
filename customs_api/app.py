@@ -15,10 +15,14 @@ from typing import Optional, List
 import json
 from datetime import datetime
 from pathlib import Path
+import logging
 
 # Add the modules directory to the path
 sys.path.append(os.path.join(os.path.dirname(__file__), 'modules'))
 sys.path.append(os.path.join(os.path.dirname(__file__), 'shared'))
+
+# Configure logging - suppress httpx INFO logs to reduce clutter
+logging.getLogger("httpx").setLevel(logging.WARNING)
 
 # Import our modules
 from orders.models import create_order, get_order_by_id, validate_order_completeness
@@ -27,6 +31,7 @@ from documents.models import create_document_record
 from shared.file_utils import save_document_file, validate_file_upload
 from shared.order_generator import generate_order_number
 from modules.order_process.process_order import OrderProcessor
+from modules.utils.log_formatter import LogFormatter
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -161,7 +166,17 @@ async def upload_documents(
             
             # Process documents and eSAD in background (non-blocking)
             import threading
-            print(f"[WF] Scheduling complete workflow for {order_number}")
+            
+            # Log workflow scheduling
+            LogFormatter.print_section_header(4, "WORKFLOW ORCHESTRATION")
+            workflow_data = {
+                "event": "workflow_scheduling",
+                "order_id": order_number,
+                "status": "scheduling",
+                "mode": "background_thread"
+            }
+            LogFormatter.print_json(workflow_data)
+            
             processing_thread = threading.Thread(
                 target=process_complete_workflow,
                 args=(order_number,)
@@ -169,7 +184,7 @@ async def upload_documents(
             processing_thread.daemon = True
             processing_thread.start()
             
-            print(f"🔄 Started automatic complete workflow for order: {order_number}")
+            LogFormatter.print_status(f"Automatic complete workflow started for order: {order_number}", "success")
             processing_started = True
             
         except Exception as e:
@@ -387,11 +402,17 @@ def process_complete_workflow(order_number: str):
         order_number (str): Order number to process
     """
     try:
-        print(f"[WF] Begin complete workflow: {order_number}")
+        # Log workflow start
+        workflow_start_data = {
+            "event": "workflow_start",
+            "order_id": order_number,
+            "status": "starting",
+            "stages": ["document_extraction", "esad_processing"]
+        }
+        LogFormatter.print_json(workflow_start_data)
         
         # Stage 1: Document Extraction
-        print(f"📄 STAGE 1: Document Extraction")
-        print(f"─────────────────────────────────")
+        LogFormatter.print_subsection_header("5.1", "STAGE 1: Document Extraction")
         
         from modules.extraction_process.document_processor import DocumentProcessor
         doc_processor = DocumentProcessor()
@@ -400,19 +421,25 @@ def process_complete_workflow(order_number: str):
         doc_results = doc_processor.process_order_documents(order_number)
         
         if 'error' in doc_results:
-            print(f"❌ Document extraction failed: {doc_results['error']}")
+            LogFormatter.print_status(f"Document extraction failed: {doc_results['error']}", "error")
             return
         
         try:
             result_keys = list(doc_results.keys()) if isinstance(doc_results, dict) else []
         except Exception:
             result_keys = []
-        print(f"[WF] Extraction finished: {order_number} result_keys={result_keys}")
-        print(f"✅ Document extraction completed successfully")
+        
+        stage1_data = {
+            "event": "stage_1_complete",
+            "order_id": order_number,
+            "status": "completed",
+            "result_keys": result_keys
+        }
+        LogFormatter.print_json(stage1_data)
+        LogFormatter.print_status("Document extraction completed successfully", "success")
 
         # Stage 2: eSAD Processing
-        print(f"\n🔧 STAGE 2: eSAD Processing")
-        print(f"─────────────────────────────")
+        LogFormatter.print_subsection_header("6", "STAGE 2: eSAD Processing")
         
         # Importing ESADProcessor
         try:
@@ -434,27 +461,48 @@ def process_complete_workflow(order_number: str):
             raise
         
         # Process eSAD
-        print(f"[WF] ESAD start: {order_number}")
         esad_success = esad_orchestrator.process_esad(order_number)
         
         if esad_success:
-            print(f"[WF] ESAD done: {order_number} status=success")
-            print(f"✅ eSAD processing completed successfully!")
+            stage2_data = {
+                "event": "stage_2_complete",
+                "order_id": order_number,
+                "status": "success"
+            }
+            LogFormatter.print_json(stage2_data)
+            LogFormatter.print_status("eSAD processing completed successfully", "success")
         else:
-            print(f"[WF] ESAD done: {order_number} status=error")
-            print(f"❌ eSAD processing failed")
+            stage2_error_data = {
+                "event": "stage_2_failed",
+                "order_id": order_number,
+                "status": "error"
+            }
+            LogFormatter.print_json(stage2_error_data)
+            LogFormatter.print_status("eSAD processing failed", "error")
             return
         
         # Stage 3: Workflow Complete
-        print(f"\n🎉 COMPLETE WORKFLOW FINISHED")
-        print(f"═══════════════════════════════")
-        print(f"   Order: {order_number}")
-        print(f"   Status: Ready for customs submission")
-        print(f"   Files: Document extraction + eSAD form generated")
+        LogFormatter.print_subsection_header("8", "WORKFLOW COMPLETION")
+        completion_data = {
+            "event": "workflow_complete",
+            "order_id": order_number,
+            "status": "completed",
+            "message": "Ready for customs submission",
+            "files_generated": ["document_extraction", "esad_form"],
+            "stages_completed": ["document_extraction", "esad_processing"]
+        }
+        LogFormatter.print_json(completion_data)
+        LogFormatter.print_status("COMPLETE WORKFLOW FINISHED", "success")
         
     except Exception as e:
-        print(f"[WF] ERROR in complete workflow {order_number}: {e}")
-        print(f"❌ Complete workflow failed: {e}")
+        error_data = {
+            "event": "workflow_error",
+            "order_id": order_number,
+            "status": "failed",
+            "error": str(e)
+        }
+        LogFormatter.print_json(error_data)
+        LogFormatter.print_status(f"Complete workflow failed: {e}", "error")
         import traceback
         traceback.print_exc()
 
@@ -463,13 +511,24 @@ if __name__ == "__main__":
     os.makedirs("uploads", exist_ok=True)
     os.makedirs("temp", exist_ok=True)
     
-    print("🚀 Starting Customs Declaration API Server...")
-    print("📋 Available endpoints:")
-    print("   GET  /                    - Upload interface")
-    print("   POST /api/upload-documents - Upload documents")
-    print("   GET  /api/orders/{id}     - Get order")
-    print("   GET  /api/health          - Health check")
-    print("\n🌐 Server will be available at: http://localhost:8000")
+    # Print startup section with structured logging
+    LogFormatter.print_section_header(1, "SERVER STARTUP")
+    
+    startup_data = {
+        "event": "server_startup",
+        "status": "initializing",
+        "endpoints": [
+            {"method": "GET", "path": "/", "description": "Upload interface"},
+            {"method": "POST", "path": "/api/upload-documents", "description": "Upload documents"},
+            {"method": "GET", "path": "/api/orders/{id}", "description": "Get order"},
+            {"method": "GET", "path": "/api/health", "description": "Health check"}
+        ],
+        "server_url": "http://localhost:8000",
+        "port": 8000
+    }
+    
+    LogFormatter.print_json(startup_data)
+    print()
     
     # Run using the app object directly to avoid importing the wrong module ('app:app' ambiguity)
     uvicorn.run(
