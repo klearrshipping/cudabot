@@ -18,7 +18,7 @@ def _get_csv_path(filename: str) -> str:
     return os.path.join(current_dir, 'data', filename)
 
 def _load_csv_data(filename: str, use_cache: bool = True) -> pd.DataFrame:
-    """Load CSV data with optional caching"""
+    """Load CSV data with optional caching and encoding fallback"""
     if use_cache and filename in _csv_cache:
         return _csv_cache[filename]
     
@@ -26,12 +26,22 @@ def _load_csv_data(filename: str, use_cache: bool = True) -> pd.DataFrame:
     if not os.path.exists(csv_path):
         raise FileNotFoundError(f"CSV file not found: {csv_path}")
     
-    df = pd.read_csv(csv_path)
+    # Try different encodings to handle potential encoding issues
+    encodings = ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1']
     
-    if use_cache:
-        _csv_cache[filename] = df
+    for encoding in encodings:
+        try:
+            df = pd.read_csv(csv_path, encoding=encoding)
+            if use_cache:
+                _csv_cache[filename] = df
+            return df
+        except UnicodeDecodeError:
+            continue
+        except Exception as e:
+            print(f"❌ Error reading {filename} with {encoding}: {e}")
+            continue
     
-    return df
+    raise RuntimeError(f"Failed to load {filename} with any encoding")
 
 def fetch_package_types() -> List[Dict]:
     """Fetch package types from package_type.csv"""
@@ -49,6 +59,15 @@ def fetch_locodes() -> List[Dict]:
         return df.to_dict('records')
     except Exception as e:
         print(f"Error loading locodes: {e}")
+        return []
+
+def fetch_regime_types() -> List[Dict]:
+    """Fetch regime types from regime_types.csv"""
+    try:
+        df = _load_csv_data('regime_types.csv')
+        return df.to_dict('records')
+    except Exception as e:
+        print(f"Error loading regime types: {e}")
         return []
 
 def fetch_package_type_by_code(code: str) -> List[Dict]:

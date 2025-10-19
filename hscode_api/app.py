@@ -1435,8 +1435,13 @@ async def classify_product_stream(request: ClassificationRequest):
             yield stream_thinking_step("stage1", "📊 **Stage 1: Initial HS Code Classification**\n\nAnalyzing product characteristics and gathering information from multiple AI models...", True)
             await asyncio.sleep(1)
             
-            # Run the actual classification
-            results = orchestrator.classify_complete_pipeline(request.product_name, order_id=request.order_id)
+            # Run the actual classification with contextual data
+            contextual_data = request.contextual_data.dict() if request.contextual_data else None
+            results = orchestrator.classify_complete_pipeline(
+                request.product_name, 
+                order_id=request.order_id,
+                contextual_data=contextual_data
+            )
             
             # Show Stage 1 results
             stage1_results = results.get("stage1_classification", {})
@@ -1579,6 +1584,34 @@ async def classify_product_stream(request: ClassificationRequest):
             # Stream the final response
             async for chunk in stream_text(response_message):
                 yield chunk
+            
+            # Send the actual results
+            final_results = results.get("final_results", {})
+            confirmed_code = final_results.get("confirmed_hs_code")
+            
+            # Get commodity code if available
+            commodity_code = None
+            if "commodity_results" in results:
+                commodity_results = results["commodity_results"]
+                if isinstance(commodity_results, dict) and "selected_commodity" in commodity_results:
+                    selected_commodity = commodity_results["selected_commodity"]
+                    if selected_commodity:
+                        commodity_code = selected_commodity.get("tariff_code")
+            
+            # Send results chunk
+            results_chunk = {
+                "id": f"results_{int(time.time() * 1000)}",
+                "object": "classification.results",
+                "created": int(time.time()),
+                "data": {
+                    "hs_code": confirmed_code,
+                    "commodity_code": commodity_code,
+                    "description": final_results.get("description", ""),
+                    "product_name": request.product_name,
+                    "success": True
+                }
+            }
+            yield f"data: {json.dumps(results_chunk)}\n\n"
             
             # Mark completion
             final_chunk = {

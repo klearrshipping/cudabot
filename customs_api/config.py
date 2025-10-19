@@ -37,11 +37,14 @@ OPENROUTER_HEADERS = {
 # OpenRouter Models - General Purpose (Used for general AI tasks)
 OPENROUTER_GENERAL_MODELS = {
     "mistral_small": "mistralai/mistral-small-3.2-24b-instruct",
+    "claude_haiku": "anthropic/claude-haiku-4.5",
+    "claude_sonnet": "anthropic/claude-sonnet-4.5",
     "kimi": "moonshotai/kimi-k2:free",
     "kimi_standard": "moonshotai/kimi-k2",
     "grok_mini": "x-ai/grok-3-mini",
-    "gpt_5_nano": "openai/gpt-5-nano",
-    "gpt_5": "openai/gpt-5"
+    "gpt_4o_mini": "openai/gpt-4o-mini",  # Valid OpenAI model
+    "gpt_4o": "openai/gpt-4o",              # Valid OpenAI model
+    "gpt_5": "openai/gpt-5"                          
 }
 
 # OpenRouter Models - Document Extraction (Used for eSAD extraction scripts)
@@ -51,7 +54,7 @@ OPENROUTER_EXTRACTION_MODELS = {
     "llama_3_2_11b_vision": "meta-llama/llama-3.2-11b-vision-instruct",  # 2nd - Secondary model
     "gemini_2_5_pro": "google/gemini-2.5-pro",                            # 3rd - Google alternative
     "gpt_5_nano": "openai/gpt-5-nano",                                    # 4th - Lightweight option
-    "claude_sonnet_4": "anthropic/claude-sonnet-4",                       # 5th - Alternative option
+    "claude_sonnet_4": "anthropic/claude-sonnet-4.5",                     # 5th - Alternative option
     "gpt_5": "openai/gpt-5"                                               # 6th - High-end option
 }
 
