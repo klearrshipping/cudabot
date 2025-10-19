@@ -174,16 +174,15 @@ class ManifestTracker:
                         reference_id = cells[1].text.strip()
                         status = cells[3].text.strip()
                         
-                        # Only include "Direct Validate" status
-                        if status.lower() == "direct validate":
-                            record = {
-                                'office': office,
-                                'reference_id': reference_id,
-                                'manifest_reg_no': f"{office} {reference_id}",
-                                'date': cells[2].text.strip(),
-                                'status': status
-                            }
-                            results.append(record)
+                        # Extract all records, not just "Direct Validate"
+                        record = {
+                            'office': office,
+                            'reference_id': reference_id,
+                            'manifest_reg_no': f"{office} {reference_id}",
+                            'date': cells[2].text.strip(),
+                            'status': status
+                        }
+                        results.append(record)
                 except Exception as e:
                     if verbose:
                         print(f"   ⚠ Warning: Error processing row {idx}: {str(e)}")
@@ -191,13 +190,13 @@ class ManifestTracker:
             
             if verbose:
                 if results:
-                    print(f"   ✓ Found 'Direct Validate' record")
+                    print(f"   ✓ Found {len(results)} manifest record(s)")
                     print(f"\n{'='*60}")
                     print(f"RESULTS (JSON Format)")
                     print(f"{'='*60}\n")
                     print(json.dumps(results, indent=2))
                 else:
-                    print(f"   ⚠ No 'Direct Validate' record found")
+                    print(f"   ⚠ No manifest records found")
             
             return ManifestResult(
                 bol_number=bol_number,
@@ -271,14 +270,8 @@ class ManifestTracker:
         """Context manager exit."""
         self.close()
     
-    def save_manifest_results(self, result: ManifestResult) -> Path:
-        """Save manifest results to JSON file"""
-        
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        
-        # Create output directory if it doesn't exist
-        output_dir = Path("manifest_results")
-        output_dir.mkdir(exist_ok=True)
+    def save_manifest_results(self, result: ManifestResult) -> Dict[str, Any]:
+        """Return manifest results as dictionary for consolidation (no longer saves separate files)"""
         
         # Convert dataclass to dict for JSON serialization
         result_dict = {
@@ -288,16 +281,12 @@ class ManifestTracker:
             'tracking_url': result.tracking_url,
             'extraction_time': result.extraction_time,
             'success': result.success,
-            'error_message': result.error_message
+            'error_message': result.error_message,
+            'timestamp': datetime.now().isoformat()
         }
         
-        output_file = output_dir / f"manifest_{result.bol_number}_{timestamp}.json"
-        
-        with open(output_file, 'w', encoding='utf-8') as f:
-            json.dump(result_dict, f, indent=2, ensure_ascii=False)
-        
-        print(f"💾 Manifest results saved to: {output_file}")
-        return output_file
+        print(f"💾 Manifest results prepared for consolidation: {result.bol_number}")
+        return result_dict
 
 
 class ManifestProcessor:
@@ -342,6 +331,140 @@ class ManifestProcessor:
                 'error': f'Manifest processing failed: {str(e)}',
                 'manifest_processed': None
             }
+
+
+def process_manifest_fields(manifest_fields: Dict[str, str], verbose: bool = False) -> Dict[str, Any]:
+    """
+    Process manifest-related fields from eSAD data using Jamaica Customs BOL tracking.
+    
+    Args:
+        manifest_fields: Dictionary containing manifest_registration_number
+        verbose: Show detailed output (default: False)
+        
+    Returns:
+        Dictionary containing processed manifest data with tracking results
+    """
+    try:
+        manifest_number = manifest_fields.get('manifest_registration_number', '')
+        
+        if not manifest_number:
+            return {
+                'success': False,
+                'error': 'No manifest registration number found',
+                'manifest_processed': None
+            }
+        
+        if verbose:
+            print(f"🔍 Tracking manifest number: {manifest_number}")
+            print(f"🌐 Connecting to Jamaica Customs portal...")
+        
+        # Use ManifestTracker to actually track the BOL on Jamaica Customs website
+        with ManifestTracker(headless=True) as tracker:
+            if verbose:
+                print(f"📡 Submitting BOL tracking request...")
+            
+            # Track the BOL number and get detailed results
+            manifest_result = tracker.track_bol(manifest_number, verbose=verbose)
+            
+            if manifest_result.success:
+                if verbose:
+                    print(f"✅ BOL tracking successful!")
+                    print(f"📋 Total entries found: {manifest_result.total_entries}")
+                    if manifest_result.entries:
+                        print(f"🏢 Office: {manifest_result.entries[0].get('office', 'N/A')}")
+                        print(f"🆔 Reference ID: {manifest_result.entries[0].get('reference_id', 'N/A')}")
+                        print(f"📅 Date: {manifest_result.entries[0].get('date', 'N/A')}")
+                        print(f"✅ Status: {manifest_result.entries[0].get('status', 'N/A')}")
+                
+                # Consolidate results - if office, reference_id, and manifest_reg_no are the same, return simplified format
+                consolidated_results = []
+                seen_combinations = set()
+                
+                for entry in manifest_result.entries:
+                    key = (entry['office'], entry['reference_id'], entry['manifest_reg_no'])
+                    if key not in seen_combinations:
+                        consolidated_results.append({
+                            'office': entry['office'],
+                            'reference_id': entry['reference_id'],
+                            'manifest_reg_no': entry['manifest_reg_no']
+                        })
+                        seen_combinations.add(key)
+                
+                # Prepare comprehensive result
+                result = {
+                    'success': True,
+                    'manifest_processed': manifest_number,
+                    'tracking_results': consolidated_results[0] if consolidated_results else None,
+                    'error': None
+                }
+                
+                if verbose:
+                    print(f"✅ Manifest tracking completed successfully")
+                
+                return result
+            else:
+                error_msg = manifest_result.error_message or "BOL tracking failed"
+                if verbose:
+                    print(f"❌ BOL tracking failed: {error_msg}")
+                
+                return {
+                    'success': False,
+                    'error': error_msg,
+                    'manifest_processed': None,
+                    'tracking_results': None
+                }
+        
+    except Exception as e:
+        error_msg = f'Manifest processing failed: {str(e)}'
+        if verbose:
+            print(f"❌ {error_msg}")
+        
+        return {
+            'success': False,
+            'error': error_msg,
+            'manifest_processed': None,
+            'tracking_results': None
+        }
+
+
+def main(manifest_number: str = None, verbose: bool = True):
+    """
+    Main function for processing manifest data.
+    
+    Args:
+        manifest_number: The manifest/BOL number to process (if None, will look for test data)
+        verbose: Show detailed output (default: True)
+        
+    Returns:
+        Dictionary containing processed manifest data
+    """
+    import json
+    import os
+    
+    # Suppress additional warnings
+    os.environ['WDM_LOG'] = '0'
+    
+    # Use provided manifest number or fallback to test data
+    if not manifest_number:
+        manifest_number = "PSHFHKIN25072146"  # Fallback for standalone testing
+        if verbose:
+            print("🧪 Using fallback test data for standalone execution")
+    
+    if verbose:
+        print(f"🔍 Processing manifest number: {manifest_number}")
+    
+    # Prepare manifest fields
+    manifest_fields = {
+        'manifest_registration_number': manifest_number
+    }
+    
+    # Process manifest fields
+    result = process_manifest_fields(manifest_fields, verbose=verbose)
+    
+    if verbose:
+        print(f"\n📋 Final Result: {json.dumps(result, indent=2, ensure_ascii=False)}")
+    
+    return result
 
 
 # Example usage

@@ -7,19 +7,38 @@ Uses LLM to analyze invoice and BOL data to extract CIF components (Cost, Insura
 import json
 import re
 import sys
+import os
 from typing import Dict, Any, Optional
+
+# Add path for config import
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', '..', '..'))
+
 from modules.core.llm_client import LLMClient
+
+# Module-level initialization
+llm = LLMClient()
+
+# Model configuration
+try:
+    from config import OPENROUTER_GENERAL_MODELS
+except ImportError:
+    from customs_api.config import OPENROUTER_GENERAL_MODELS
+
+# Priority models for CIF extraction
+PRIORITY_MODELS = []
+if "claude_haiku" in OPENROUTER_GENERAL_MODELS:
+    PRIORITY_MODELS.append(OPENROUTER_GENERAL_MODELS["claude_haiku"])
+
+if "claude_sonnet" in OPENROUTER_GENERAL_MODELS:
+    PRIORITY_MODELS.append(OPENROUTER_GENERAL_MODELS["claude_sonnet"])
+
+# Fallback to any available model
+if not PRIORITY_MODELS and OPENROUTER_GENERAL_MODELS:
+    PRIORITY_MODELS.append(list(OPENROUTER_GENERAL_MODELS.values())[0])
+
 
 def ask_llm_for_cif_components(invoice_data: Dict, bol_data: Dict) -> Dict[str, Any]:
     """Get CIF components using LLM analysis."""
-    # Optimized model selection: Use general models for financial analysis
-    from config import OPENROUTER_GENERAL_MODELS
-    priority_models = [
-        OPENROUTER_GENERAL_MODELS["gpt_5"],        # Primary - Best for financial analysis
-        OPENROUTER_GENERAL_MODELS["kimi_standard"]       # Backup - Reliable fallback
-    ]
-    
-    llm = LLMClient()
     
     # Format the data for the prompt
     invoice_summary = {
@@ -32,74 +51,59 @@ def ask_llm_for_cif_components(invoice_data: Dict, bol_data: Dict) -> Dict[str, 
     bol_summary = {
         "freight_and_charges": bol_data.get("freight_and_charges", ""),
         "charges_table": bol_data.get("charges_table", []),
-        "vessel_and_voyage": bol_data.get("vessel_and_voyage", ""),
+        "charges": bol_data.get("charges", []),  # Individual charges array
+        "charges_totals": bol_data.get("charges_totals", {}),  # Add charges totals
         "freight_charge_amount": bol_data.get("freight_charge_amount", ""),
-        "cargo_summary_table": bol_data.get("cargo_summary_table", {})
+        "cargo_summary_table": bol_data.get("cargo_summary_table", {}),
+        "document_type": bol_data.get("document_type", ""),
+        "vessel_info": bol_data.get("vessel_info", {})
     }
     
+    # Enhanced prompt for prepayment detection
     prompt = f"""
-You are a customs documentation expert. Analyze the following invoice and bill of lading data to EXTRACT raw CIF-related values:
+Extract CIF values from these documents, distinguishing between prepaid and collect amounts:
 
-INVOICE DATA:
+INVOICE:
 {json.dumps(invoice_summary, indent=2)}
 
-BILL OF LADING DATA:
+BILL OF LADING:
 {json.dumps(bol_summary, indent=2)}
 
-EXTRACTION REQUIREMENTS:
-
-FOR INVOICE:
-1. Extract total invoice amount (total amount of the invoice)
-2. Extract goods value only (excluding freight, insurance, other charges)
-3. Extract freight cost if any (separate from goods value)
-4. Extract insurance cost if any (separate from goods value)
-5. Extract other costs if any (separate from goods value)
-6. Extract currency of the invoice document
-
-FOR SHIPPING DOCUMENT (BOL/Air Waybill/etc.):
-1. Extract ANY freight/shipping/transport cost mentioned in FOREIGN currency (search entire document for freight, shipping, transport, carriage charges - exclude any JMD/local currency amounts)
-2. Extract ANY insurance cost mentioned in FOREIGN currency (search entire document for insurance, premium charges - exclude any JMD/local currency amounts)
-3. Extract ANY other costs mentioned in FOREIGN currency (search entire document for handling, documentation, customs fees - exclude any JMD/local currency amounts)
-4. Extract currency of the foreign currency amounts in shipping document
-
-Return format:
+Return JSON with:
 {{
-    "val_note_invoice_total_including_freight": <total_invoice_amount_or_null>,
-    "val_note_invoice_value_goods_only": <goods_value_only_or_null>,
-    "val_note_freight_charges_invoice": <freight_from_invoice_or_null>,
-    "val_note_insurance_charges_invoice": <insurance_from_invoice_or_null>,
-    "val_note_other_charges_invoice": <other_costs_from_invoice_or_null>,
-    "val_note_freight_charges_bol": <freight_from_bol_foreign_currency_or_null>,
-    "val_note_insurance_charges_bol": <insurance_from_bol_foreign_currency_or_null>,
-    "val_note_other_charges_bol": <other_costs_from_bol_foreign_currency_or_null>,
-    "invoice_currency": "<invoice_document_currency>",
-    "bol_foreign_currency": "<bol_foreign_currency>",
-    "incoterms": "<extracted_incoterms_terms>"
+    "val_note_invoice_total_including_freight": <total_or_null>,
+    "val_note_invoice_value_goods_only": <goods_value_or_null>,
+    "val_note_freight_charges_invoice": <freight_or_null>,
+    "val_note_insurance_charges_invoice": <insurance_or_null>,
+    "val_note_other_charges_invoice": <other_costs_or_null>,
+    "val_note_freight_charges_bol_prepaid": <prepaid_freight_or_null>,
+    "val_note_freight_charges_bol_collect": <collect_freight_or_null>,
+    "val_note_insurance_charges_bol_prepaid": <prepaid_insurance_or_null>,
+    "val_note_insurance_charges_bol_collect": <collect_insurance_or_null>,
+    "val_note_other_charges_bol_prepaid": <prepaid_other_or_null>,
+    "val_note_other_charges_bol_collect": <collect_other_or_null>,
+    "invoice_currency": "<currency>",
+    "bol_foreign_currency": "<currency_or_null>",
+    "incoterms": "<terms_or_null>"
 }}
 
 IMPORTANT: 
-- Only extract values that are explicitly stated in the documents
-- For shipping documents, search the ENTIRE document for freight/shipping/transport costs (not just specific fields)
-- ONLY extract foreign currency amounts (exclude JMD/local currency)
+- Use charges_totals section to identify prepaid vs collect amounts
+- Prepaid amounts are already paid (usually with invoice)
+- Collect amounts are still owed (to be paid later)
+- Extract foreign currency amounts only (exclude JMD)
 - Use null for missing values
-- Do not calculate or estimate anything
-- Look for freight costs anywhere in the document - tables, text blocks, charge summaries, etc.
 """
 
-    # Try priority models with early termination
-    for model in priority_models:
+    # Try models with early termination
+    for model in PRIORITY_MODELS:
         model_name = model.split('/')[-1].split(':')[0]
         try:
             raw_response = llm.send_prompt(prompt, model=model)
-            cif_data = parse_llm_cif_response(raw_response)
+            cif_data = parse_llm_response(raw_response)
             
             if cif_data:
                 cif_data['_model_used'] = model_name
-                cif_data['_debug_info'] = {
-                    'model_tested': model_name,
-                    'raw_response': raw_response,
-                    'parsed_data': cif_data
-                }
                 return cif_data
             else:
                 print(f"❌ Model {model_name} did not return valid CIF data.")
@@ -107,8 +111,8 @@ IMPORTANT:
         except Exception as e:
             print(f"❌ Exception for model {model_name}: {e}")
     
-    # If both models fail, return error
-    print("🔄 Both models failed to process CIF data.")
+    # Return error if all models fail
+    print("🔄 All models failed to process CIF data.")
     return {
         'success': False,
         'error': 'LLM processing failed',
@@ -117,403 +121,383 @@ IMPORTANT:
         'val_note_freight_charges_invoice': None,
         'val_note_insurance_charges_invoice': None,
         'val_note_other_charges_invoice': None,
-        'val_note_freight_charges_bol': None,
-        'val_note_insurance_charges_bol': None,
-        'val_note_other_charges_bol': None
+        'val_note_freight_charges_bol_prepaid': None,
+        'val_note_freight_charges_bol_collect': None,
+        'val_note_insurance_charges_bol_prepaid': None,
+        'val_note_insurance_charges_bol_collect': None,
+        'val_note_other_charges_bol_prepaid': None,
+        'val_note_other_charges_bol_collect': None,
+        'invoice_currency': None,
+        'bol_foreign_currency': None,
+        'incoterms': None
     }
 
-def parse_llm_cif_response(response) -> Optional[Dict[str, Any]]:
+
+def calculate_insurance_if_missing(cif_summary: Dict[str, Any], bol_data: Dict[str, Any]) -> Dict[str, Any]:
+    """Calculate insurance if missing based on transport mode and freight rates."""
+    
+    # Insurance rates by transport mode
+    sea_freight_rate = 0.015  # 1.5%
+    air_freight_rate = 0.01   # 1%
+    
+    # Check if insurance is missing or zero
+    insurance_charges = cif_summary.get('insurance_charges')
+    if insurance_charges is not None and insurance_charges > 0:
+        # Insurance already exists, return as-is
+        return cif_summary
+    
+    # Insurance is missing, determine transport mode
+    transport_result = determine_transport_mode(bol_data)
+    
+    if transport_result.get('success') == False:
+        print(f"❌ Could not determine transport mode: {transport_result.get('error')}")
+        return cif_summary
+    
+    transport_mode = transport_result.get('transport_mode', '').lower()
+    cost_of_goods = cif_summary.get('cost_of_goods', 0) or 0
+    freight_charges = cif_summary.get('freight_charges', 0) or 0
+    cost_and_freight = cif_summary.get('cost_and_freight')
+    
+    # Calculate insurance based on transport mode
+    if transport_mode == 'sea':
+        insurance_rate = sea_freight_rate
+        rate_description = "1.5%"
+    elif transport_mode == 'air':
+        insurance_rate = air_freight_rate
+        rate_description = "1%"
+    else:
+        print(f"❌ Unknown transport mode: {transport_mode}")
+        return cif_summary
+    
+    # Calculate insurance: (cost + freight) * rate
+    if cost_and_freight is None:
+        total_value = cost_of_goods + freight_charges
+    else:
+        total_value = float(cost_and_freight or 0)
+    calculated_insurance = total_value * insurance_rate
+    
+    # Update the CIF summary with calculated insurance
+    updated_summary = cif_summary.copy()
+    updated_summary['insurance_charges'] = round(calculated_insurance, 2)
+    updated_summary['cost_and_freight'] = round(total_value, 2)
+    updated_summary['total_cif_value'] = round(total_value + calculated_insurance, 2)
+    updated_summary['_insurance_calculated'] = True
+    updated_summary['_insurance_rate'] = rate_description
+    updated_summary['_transport_mode'] = transport_mode
+    updated_summary['_insurance_evidence'] = transport_result.get('evidence', '')
+    
+    print(f"✅ Calculated insurance: ${calculated_insurance:.2f} ({rate_description} of ${total_value:.2f}) for {transport_mode} transport")
+    
+    return updated_summary
+
+
+def determine_transport_mode(bol_data: Dict[str, Any]) -> Dict[str, Any]:
+    """Determine the mode of transport from bill of lading using LLM."""
+    
+    # Prepare data for transport mode analysis
+    transport_prompt = f"""
+Analyze this bill of lading to determine the mode of transport:
+
+BILL OF LADING DATA:
+{json.dumps(bol_data, indent=2)}
+
+Return JSON with:
+{{
+    "transport_mode": "<sea_or_air>",
+    "confidence": "<high_or_medium_or_low>",
+    "evidence": "<specific_text_or_field_that_indicates_transport_mode>"
+}}
+
+RULES:
+- Look for vessel information, flight numbers, port names, airport codes
+- "sea" for ocean/ship transport (vessels, ports, maritime terms)
+- "air" for aircraft transport (flights, airports, aviation terms)
+- Provide specific evidence from the document
+- Use "high" confidence if clear indicators, "medium" if some indicators, "low" if unclear
+"""
+    
+    # Try models for transport mode determination
+    for model in PRIORITY_MODELS:
+        model_name = model.split('/')[-1].split(':')[0]
+        try:
+            raw_response = llm.send_prompt(transport_prompt, model=model)
+            transport_data = parse_llm_response(raw_response)
+            
+            if transport_data:
+                transport_data['_model_used'] = model_name
+                return transport_data
+            else:
+                print(f"❌ Model {model_name} did not return valid transport mode data.")
+                
+        except Exception as e:
+            print(f"❌ Exception for transport mode model {model_name}: {e}")
+    
+    # Return error if all models fail
+    print("🔄 All models failed to determine transport mode.")
+    return {
+        'success': False,
+        'error': 'LLM transport mode determination failed',
+        'transport_mode': None,
+        'confidence': None,
+        'evidence': None
+    }
+
+
+def aggregate_cif_summary(cif_data: Dict[str, Any]) -> Dict[str, Any]:
+    """Aggregate CIF data into clean summary format using LLM."""
+    
+    # Prepare data for aggregation prompt
+    aggregation_prompt = f"""
+Analyze this CIF extraction data and provide a clean summary:
+
+CIF EXTRACTION DATA:
+{json.dumps(cif_data, indent=2)}
+
+Provide a summary JSON with ONLY these fields:
+{{
+    "cost_of_goods": <goods_value_only>,
+    "freight_charges": <total_freight_amount>,
+    "insurance_charges": <insurance_amount_or_null>,
+    "total_cif_value": <total_including_freight_and_insurance>,
+    "currency": "<currency>",
+    "cost_and_freight": <cost_of_goods_plus_freight>
+}}
+
+RULES:
+- freight_charges should reflect TOTAL freight (prepaid + collect amounts)
+- Total freight = prepaid freight + collect freight + collect other charges
+- Cost of goods is the goods value only (excluding freight/insurance)
+- Total CIF includes goods + total freight + insurance
+- IMPORTANT: Invoice freight and BOL prepaid freight are the SAME payment - do NOT double count
+- Prepaid amount = BOL prepaid freight only (not invoice + BOL prepaid)
+- Use null ONLY for insurance_charges if no insurance found
+- DO NOT include any other fields - only the 5 fields listed above
+- DO NOT include null values for non-insurance fields
+"""
+    
+    # Try models for aggregation
+    for model in PRIORITY_MODELS:
+        model_name = model.split('/')[-1].split(':')[0]
+        try:
+            raw_response = llm.send_prompt(aggregation_prompt, model=model)
+            summary_data = parse_llm_response(raw_response)
+            
+            if summary_data:
+                # Compute cost_and_freight if missing
+                try:
+                    cof_val = float(summary_data.get("cost_of_goods") or 0)
+                    frt_val = float(summary_data.get("freight_charges") or 0)
+                except Exception:
+                    cof_val, frt_val = 0.0, 0.0
+                cof_plus_frt = summary_data.get("cost_and_freight")
+                if cof_plus_frt is None:
+                    cof_plus_frt = round(cof_val + frt_val, 2)
+
+                # Build in exact required order
+                filtered_summary = {
+                    "cost_of_goods": summary_data.get("cost_of_goods"),
+                    "freight_charges": summary_data.get("freight_charges"),
+                    "cost_and_freight": cof_plus_frt,
+                    "insurance_charges": summary_data.get("insurance_charges"),
+                    "total_cif_value": summary_data.get("total_cif_value"),
+                    "currency": summary_data.get("currency"),
+                }
+                filtered_summary['_aggregation_model_used'] = model_name
+                return filtered_summary
+            else:
+                print(f"❌ Model {model_name} did not return valid aggregation data.")
+                
+        except Exception as e:
+            print(f"❌ Exception for aggregation model {model_name}: {e}")
+    
+    # Return error if all models fail
+    print("🔄 All models failed to process CIF aggregation.")
+    return {
+        'success': False,
+        'error': 'LLM aggregation failed',
+        'cost_of_goods': None,
+        'freight_charges': None,
+        'insurance_charges': None,
+        'total_cif_value': None,
+        'currency': None
+    }
+
+
+def parse_llm_response(response) -> Optional[Dict[str, Any]]:
     """Parse LLM response to extract CIF components."""
     try:
-        # Handle different response types (string, tuple, etc.)
+        # Handle different response types
         if isinstance(response, tuple):
-            # If it's a tuple, take the first element (usually the content)
             response = response[0] if response else ""
         elif not isinstance(response, str):
-            # Convert to string if it's not already
             response = str(response)
         
-        # Clean the response
         response = response.strip()
         
-        # Remove markdown code blocks if present
-        if response.startswith('```json'):
-            response = response[7:]
-        if response.endswith('```'):
-            response = response[:-3]
-        if response.startswith('```'):
-            response = response[3:]
+        # Extract JSON from markdown code blocks
+        json_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', response, re.DOTALL)
+        if json_match:
+            response = json_match.group(1)
+        else:
+            # Find JSON object anywhere in the response
+            json_match = re.search(r'\{.*\}', response, re.DOTALL)
+            if json_match:
+                response = json_match.group(0)
             
         # Parse JSON
         cif_data = json.loads(response)
         
-        # Validate required fields (now focused on extraction)
-        required_fields = ['val_note_invoice_total_including_freight', 'invoice_currency']
+        # Validate required fields
+        required_fields = [
+            'val_note_invoice_total_including_freight',
+            'val_note_invoice_value_goods_only',
+            'val_note_freight_charges_invoice',
+            'val_note_insurance_charges_invoice',
+            'val_note_other_charges_invoice',
+            'val_note_freight_charges_bol',
+            'val_note_insurance_charges_bol',
+            'val_note_other_charges_bol',
+            'invoice_currency',
+            'bol_foreign_currency',
+            'incoterms'
+        ]
+        
+        # Ensure all required fields exist
         for field in required_fields:
             if field not in cif_data:
-                return None
+                cif_data[field] = None
                 
         return cif_data
         
-    except (json.JSONDecodeError, KeyError, AttributeError) as e:
+    except Exception as e:
         print(f"❌ Failed to parse LLM response: {e}")
-        print(f"Raw response type: {type(response)}")
-        print(f"Raw response: {response}")
         return None
 
-def compute_insurance_if_none(extracted_data: Dict[str, Any], transport_mode: str = None) -> Dict[str, Any]:
-    """Compute insurance charges if not found in extracted data."""
-    # Check if insurance is already found in either invoice or BOL
-    invoice_insurance = extracted_data.get('val_note_insurance_charges_invoice')
-    bol_insurance = extracted_data.get('val_note_insurance_charges_bol')
-    
-    if invoice_insurance is not None or bol_insurance is not None:
-        # Insurance already found, return as-is
-        return extracted_data
-    
-    # Calculate insurance based on transport mode - include all charges
-    goods_value = extracted_data.get('val_note_invoice_value_goods_only', 0) or 0
-    freight_invoice = extracted_data.get('val_note_freight_charges_invoice', 0) or 0
-    freight_bol = extracted_data.get('val_note_freight_charges_bol', 0) or 0
-    other_charges_invoice = extracted_data.get('val_note_other_charges_invoice', 0) or 0
-    other_charges_bol = extracted_data.get('val_note_other_charges_bol', 0) or 0
-    
-    # Use the higher freight amount or sum if both exist
-    total_freight = max(freight_invoice, freight_bol) if freight_invoice and freight_bol else (freight_invoice or freight_bol)
-    
-    # Sum other charges from both invoice and BOL
-    total_other_charges = (other_charges_invoice or 0) + (other_charges_bol or 0)
-    
-    if goods_value <= 0:
-        extracted_data['val_note_insurance_charges_invoice'] = 0.0
-        extracted_data['_insurance_debug'] = "⚠️ No goods value available - insurance set to $0.00"
-        return extracted_data
-    
-    # Calculate insurance based on transport mode - use total CF value
-    total_value = goods_value + total_freight + total_other_charges
-    
-    if transport_mode in ['SEA', 'OCEAN', 'MARITIME', 'VESSEL', 'SHIP']:
-        insurance_rate = 0.015  # 1.5% for sea transport
-        calculated_insurance = round(total_value * insurance_rate, 2)
-        extracted_data['val_note_insurance_charges_invoice'] = calculated_insurance
-        extracted_data['_insurance_debug'] = f"🚢 Insurance calculated (SEA transport): ${total_value:,.2f} × 1.5% = ${calculated_insurance:,.2f}"
-    elif transport_mode in ['AIR', 'AIRFREIGHT', 'AIRWAY', 'FLIGHT']:
-        insurance_rate = 0.01   # 1.0% for air transport
-        calculated_insurance = round(total_value * insurance_rate, 2)
-        extracted_data['val_note_insurance_charges_invoice'] = calculated_insurance
-        extracted_data['_insurance_debug'] = f"✈️ Insurance calculated (AIR transport): ${total_value:,.2f} × 1.0% = ${calculated_insurance:,.2f}"
-    else:
-        # Default to 1.0% for other transport modes
-        insurance_rate = 0.01   # 1.0% default
-        calculated_insurance = round(total_value * insurance_rate, 2)
-        extracted_data['val_note_insurance_charges_invoice'] = calculated_insurance
-        extracted_data['_insurance_debug'] = f"🚛 Insurance calculated ({transport_mode or 'Unknown'} transport): ${total_value:,.2f} × 1.0% = ${calculated_insurance:,.2f}"
-    
-    return extracted_data
 
-def compute_cost_and_freight(extracted_data: Dict[str, Any]) -> Dict[str, Any]:
-    """Compute Cost and Freight (CF) value including all charges."""
-    goods_value = extracted_data.get('val_note_invoice_value_goods_only', 0) or 0
-    freight_invoice = extracted_data.get('val_note_freight_charges_invoice', 0) or 0
-    freight_bol = extracted_data.get('val_note_freight_charges_bol', 0) or 0
-    other_charges_invoice = extracted_data.get('val_note_other_charges_invoice', 0) or 0
-    other_charges_bol = extracted_data.get('val_note_other_charges_bol', 0) or 0
+def process_cif_fields(invoice_data: Dict[str, Any], bol_data: Dict[str, Any], verbose: bool = False) -> Dict[str, Any]:
+    """Process CIF fields from invoice and BOL data."""
     
-    # Use the higher freight amount or sum if both exist
-    total_freight = max(freight_invoice, freight_bol) if freight_invoice and freight_bol else (freight_invoice or freight_bol)
+    if verbose:
+        print("🧮 Processing CIF components...")
     
-    # Sum other charges from both invoice and BOL
-    total_other_charges = (other_charges_invoice or 0) + (other_charges_bol or 0)
-    
-    cost_and_freight = goods_value + total_freight + total_other_charges
-    extracted_data['val_note_cost_and_freight'] = round(cost_and_freight, 2)
-    
-    # Build detailed debug message
-    debug_parts = [f"Goods: ${goods_value:,.2f}"]
-    if total_freight > 0:
-        debug_parts.append(f"Freight: ${total_freight:,.2f}")
-    if total_other_charges > 0:
-        debug_parts.append(f"Other: ${total_other_charges:,.2f}")
-    
-    extracted_data['_cf_debug'] = f"💰 Cost & Freight calculation: {' + '.join(debug_parts)} = ${cost_and_freight:,.2f}"
-    
-    return extracted_data
-
-def compute_cif(extracted_data: Dict[str, Any]) -> Dict[str, Any]:
-    """Compute CIF value (Cost + Insurance + Freight)."""
-    goods_value = extracted_data.get('val_note_invoice_value_goods_only', 0) or 0
-    freight_invoice = extracted_data.get('val_note_freight_charges_invoice', 0) or 0
-    freight_bol = extracted_data.get('val_note_freight_charges_bol', 0) or 0
-    insurance_invoice = extracted_data.get('val_note_insurance_charges_invoice', 0) or 0
-    insurance_bol = extracted_data.get('val_note_insurance_charges_bol', 0) or 0
-    other_charges_invoice = extracted_data.get('val_note_other_charges_invoice', 0) or 0
-    other_charges_bol = extracted_data.get('val_note_other_charges_bol', 0) or 0
-    
-    # Use the higher freight amount or sum if both exist
-    total_freight = max(freight_invoice, freight_bol) if freight_invoice and freight_bol else (freight_invoice or freight_bol)
-    
-    # Use the higher insurance amount or sum if both exist
-    total_insurance = max(insurance_invoice, insurance_bol) if insurance_invoice and insurance_bol else (insurance_invoice or insurance_bol)
-    
-    # Sum other charges from both invoice and BOL
-    total_other_charges = (other_charges_invoice or 0) + (other_charges_bol or 0)
-    
-    # CIF = Cost (goods) + Insurance + Freight + Other charges
-    cif_value = goods_value + total_insurance + total_freight + total_other_charges
-    extracted_data['val_note_cif'] = round(cif_value, 2)
-    
-    # Build detailed debug message
-    debug_parts = [f"Goods: ${goods_value:,.2f}"]
-    if total_insurance > 0:
-        debug_parts.append(f"Insurance: ${total_insurance:,.2f}")
-    if total_freight > 0:
-        debug_parts.append(f"Freight: ${total_freight:,.2f}")
-    if total_other_charges > 0:
-        debug_parts.append(f"Other: ${total_other_charges:,.2f}")
-    
-    extracted_data['_cif_debug'] = f"🌍 CIF calculation: {' + '.join(debug_parts)} = ${cif_value:,.2f}"
-    
-    return extracted_data
-
-class CIFProcessor:
-    """CIF processor that uses LLM to analyze documents and extract CIF components."""
-    
-    def __init__(self, config: Dict = None):
-        """Initialize the CIFProcessor."""
-        self.config = config or {}
-    
-    def process(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Process input data to determine CIF components using LLM analysis.
+    try:
+        # Use LLM to analyze and extract CIF components
+        cif_result = ask_llm_for_cif_components(invoice_data, bol_data)
         
-        Args:
-            input_data: Dictionary containing invoice_data, bol_data, fields, and existing_fields
+        if cif_result and not cif_result.get('error'):
+            if verbose:
+                print(f"✅ CIF extraction successful using model: {cif_result.get('_model_used', 'Unknown')}")
             
-        Returns:
-            Dictionary with processing results
-        """
-        try:
-            # Extract invoice and BOL data
-            invoice_data = input_data.get('invoice_data', {})
-            bol_data = input_data.get('bol_data', {})
+            # Generate clean CIF summary
+            summary = aggregate_cif_summary(cif_result)
             
-            if not invoice_data and not bol_data:
+            if summary.get('success') == False:
+                if verbose:
+                    print(f"❌ CIF aggregation failed: {summary.get('error', 'Unknown error')}")
                 return {
                     'success': False,
-                    'error': 'No invoice or BOL data provided',
-                    'val_note_invoice_total_including_freight': None,
-                    'val_note_invoice_value_goods_only': None,
-                    'val_note_freight_charges_invoice': None,
-                    'val_note_insurance_charges_invoice': None,
-                    'val_note_other_charges_invoice': None,
-                    'val_note_freight_charges_bol': None,
-                    'val_note_insurance_charges_bol': None,
-                    'val_note_other_charges_bol': None
+                    'error': summary.get('error', 'Aggregation failed'),
+                    'cif_data': cif_result
                 }
             
-            # Processing with LLM (debug info captured in result)
+            # Ensure cost_and_freight is present before insurance calc
+            if summary.get('cost_and_freight') is None:
+                try:
+                    cof = float(summary.get('cost_of_goods') or 0)
+                    frt = float(summary.get('freight_charges') or 0)
+                    summary['cost_and_freight'] = round(cof + frt, 2)
+                except Exception:
+                    summary['cost_and_freight'] = None
+
+            # If insurance missing, compute it using transport mode BEFORE final prints
+            if summary.get('insurance_charges') in (None, 0):
+                summary = calculate_insurance_if_missing(summary, bol_data)
+
+            # Build final summary with ONLY required fields in exact order
+            final_summary = {
+                "cost_of_goods": summary.get("cost_of_goods"),
+                "freight_charges": summary.get("freight_charges"),
+                "cost_and_freight": summary.get("cost_and_freight"),
+                "insurance_charges": summary.get("insurance_charges"),
+                "total_cif_value": summary.get("total_cif_value"),
+                "currency": summary.get("currency") or "USD",
+            }
+
+            # Only insurance_charges may be null; coerce others to numbers
+            try:
+                final_summary["cost_of_goods"] = float(final_summary["cost_of_goods"] or 0)
+                final_summary["freight_charges"] = float(final_summary["freight_charges"] or 0)
+                final_summary["cost_and_freight"] = float(final_summary["cost_and_freight"] or 0)
+                final_summary["total_cif_value"] = float(final_summary["total_cif_value"] or 0)
+            except Exception:
+                pass
+
+            if verbose:
+                # Print a single concise JSON summary from the module
+                print(json.dumps(final_summary, indent=2, ensure_ascii=False))
             
-            # Use LLM to analyze and extract CIF components
-            cif_result = ask_llm_for_cif_components(invoice_data, bol_data)
+            return final_summary
+        else:
+            if verbose:
+                print("❌ CIF extraction failed")
             
-            if cif_result and not cif_result.get('error'):
-                # Extract transport mode for insurance calculation
-                transport_mode = self._extract_transport_mode(input_data)
-                
-                # Apply computation functions
-                extracted_data = cif_result.copy()
-                extracted_data = compute_insurance_if_none(extracted_data, transport_mode)
-                extracted_data = compute_cost_and_freight(extracted_data)
-                extracted_data = compute_cif(extracted_data)
-                
-                return {
-                    'success': True,
-                    'val_note_invoice_total_including_freight': extracted_data.get('val_note_invoice_total_including_freight'),
-                    'val_note_invoice_value_goods_only': extracted_data.get('val_note_invoice_value_goods_only'),
-                    'val_note_freight_charges_invoice': extracted_data.get('val_note_freight_charges_invoice'),
-                    'val_note_insurance_charges_invoice': extracted_data.get('val_note_insurance_charges_invoice'),
-                    'val_note_other_charges_invoice': extracted_data.get('val_note_other_charges_invoice'),
-                    'val_note_freight_charges_bol': extracted_data.get('val_note_freight_charges_bol'),
-                    'val_note_insurance_charges_bol': extracted_data.get('val_note_insurance_charges_bol'),
-                    'val_note_other_charges_bol': extracted_data.get('val_note_other_charges_bol'),
-                    'val_note_cost_and_freight': extracted_data.get('val_note_cost_and_freight'),
-                    'val_note_cif': extracted_data.get('val_note_cif'),
-                    'invoice_currency': extracted_data.get('invoice_currency'),
-                    'bol_foreign_currency': extracted_data.get('bol_foreign_currency'),
-                    'incoterms': extracted_data.get('incoterms'),
-                    'model_used': extracted_data.get('_model_used', 'Unknown'),
-                    'extracted_data': extracted_data
-                }
-            else:
-                return {
-                    'success': False,
-                    'error': cif_result.get('error', 'LLM processing failed'),
-                    'val_note_invoice_total_including_freight': None,
-                    'val_note_invoice_value_goods_only': None,
-                    'val_note_freight_charges_invoice': None,
-                    'val_note_insurance_charges_invoice': None,
-                    'val_note_other_charges_invoice': None,
-                    'val_note_freight_charges_bol': None,
-                    'val_note_insurance_charges_bol': None,
-                    'val_note_other_charges_bol': None,
-                    'val_note_cif': None
-                }
-                
-        except Exception as e:
             return {
                 'success': False,
-                'error': str(e),
-                'val_note_invoice_total_including_freight': None,
-                'val_note_invoice_value_goods_only': None,
-                'val_note_freight_charges_invoice': None,
-                'val_note_insurance_charges_invoice': None,
-                'val_note_other_charges_invoice': None,
-                'val_note_freight_charges_bol': None,
-                'val_note_insurance_charges_bol': None,
-                'val_note_other_charges_bol': None,
-                'val_note_cif': None
+                'error': cif_result.get('error', 'Unknown error'),
+                'cif_data': cif_result
             }
-    
-    def _extract_transport_mode(self, input_data: Dict[str, Any]) -> str:
-        """Extract transport mode from input data."""
-        # Try to get from existing fields first
-        existing_fields = input_data.get('existing_fields', {})
-        bol_data = input_data.get('bol_data', {})
         
-        # Look for transport mode in various field keys
-        transport_keys = [
-            'transport_mode',
-            'mode_of_transport',
-            '25_mode_of_transport',
-            'transport_method',
-            'shipping_method'
-        ]
-        
-        for key in transport_keys:
-            if key in existing_fields and existing_fields[key]:
-                transport_mode = str(existing_fields[key]).strip()
-                if transport_mode and transport_mode.lower() not in ['null', 'none', 'n/a', '']:
-                    return self._parse_transport_mode(transport_mode)
-        
-        # Check BOL data for vessel/flight indicators
-        vessel_voyage = bol_data.get('vessel_and_voyage', '')
-        if vessel_voyage:
-            return self._parse_transport_mode(vessel_voyage)
-        
-        return ""
-    
-    def _parse_transport_mode(self, transport_text: str) -> str:
-        """Parse transport mode from text that might contain vessel names or other details."""
-        if not transport_text:
-            return ""
-        
-        text_upper = transport_text.upper()
-        
-        # Check for explicit transport mode keywords
-        if any(keyword in text_upper for keyword in ['SEA', 'OCEAN', 'MARITIME', 'VESSEL', 'SHIP']):
-            return 'SEA'
-        elif any(keyword in text_upper for keyword in ['AIR', 'AIRFREIGHT', 'AIRWAY', 'FLIGHT', 'PLANE']):
-            return 'AIR'
-        elif any(keyword in text_upper for keyword in ['ROAD', 'TRUCK', 'VEHICLE', 'HIGHWAY']):
-            return 'ROAD'
-        elif any(keyword in text_upper for keyword in ['RAIL', 'TRAIN', 'RAILWAY']):
-            return 'RAIL'
-        
-        # Check for vessel name patterns (e.g., "MSC Patnaree III, Voyage JX351R")
-        vessel_indicators = ['MSC', 'MAERSK', 'COSCO', 'EVERGREEN', 'HAPAG', 'VOYAGE', 'VESSEL', 'SHIP']
-        if any(indicator in text_upper for indicator in vessel_indicators):
-            return 'SEA'
-        
-        # Check for flight number patterns (e.g., "AA123", "BA456")
-        flight_pattern = r'[A-Z]{2,3}\d{3,4}'
-        if re.search(flight_pattern, text_upper):
-            return 'AIR'
-        
-        # If we can't determine, return the original text (might be a valid mode)
-        return transport_text.strip()
-    
-def get_cif_data_from_json(json_path: str) -> Dict[str, Any]:
-    """Extract invoice and BOL data from eSAD results JSON."""
-    try:
-        with open(json_path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-        
-        # Extract data from the JSON structure
-        invoice_data = data.get('invoice_data', {})
-        bol_data = data.get('bol_data', {})
+    except Exception as e:
+        if verbose:
+            print(f"❌ Exception during CIF processing: {e}")
         
         return {
-            'invoice_data': invoice_data,
-            'bol_data': bol_data
+            'success': False,
+            'error': str(e),
+            'cif_data': None
         }
-    except (FileNotFoundError, json.JSONDecodeError, KeyError) as e:
-        print(f"Error reading JSON file: {e}")
-        return {'invoice_data': {}, 'bol_data': {}}
+
 
 def main():
-    """Main function to process CIF components from JSON data."""
-    if len(sys.argv) < 2:
-        print("Usage: python -m modules.esad_cif <json_path>")
-        print("Example: python -m modules.esad_cif path/to/esad_results.json")
-        sys.exit(1)
+    """Main function for testing CIF extraction."""
+    print("🧪 Testing CIF Extraction Module...")
     
-    json_path = sys.argv[1]
-    
-    try:
-        print(f"📋 Processing CIF components from: {json_path}")
-        
-        # Get data from JSON file
-        data = get_cif_data_from_json(json_path)
-        invoice_data = data['invoice_data']
-        bol_data = data['bol_data']
-        
-        if not invoice_data and not bol_data:
-            print("❌ No invoice or BOL data found in the JSON file.")
-            sys.exit(1)
-        
-        # Initialize processor
-        processor = CIFProcessor()
-        
-        # Process CIF components
-        input_data = {
-            'invoice_data': invoice_data,
-            'bol_data': bol_data,
-            'existing_fields': {}
+    # Sample test data
+    test_invoice_data = {
+        "items": [
+            {
+                "description": "14.3 KW 51.2V 280Ah Rack mounted type lithium battery pack",
+                "quantity": 2,
+                "unit_price": 830.00,
+                "total_price": 1660.00
+            }
+        ],
+        "totals": {
+            "subtotal": 1660.00,
+            "total": 1660.00
+        },
+        "currency": "USD",
+        "invoice_details": {
+            "terms_of_sale": "FOB"
         }
-        
-        result = processor.process(input_data)
-        
-        # Display results
-        if result.get('success'):
-            print(f"\n🏆 Extracted Valuation Data:")
-            print("=" * 60)
-            print(f"   Invoice Total (Including Freight): ${result.get('val_note_invoice_total_including_freight', 0):,.2f}" if result.get('val_note_invoice_total_including_freight') else "   Invoice Total (Including Freight): Not found")
-            print(f"   Invoice Value (Goods Only): ${result.get('val_note_invoice_value_goods_only', 0):,.2f}" if result.get('val_note_invoice_value_goods_only') else "   Invoice Value (Goods Only): Not found")
-            print(f"   Freight Charges (Invoice): ${result.get('val_note_freight_charges_invoice', 0):,.2f}" if result.get('val_note_freight_charges_invoice') else "   Freight Charges (Invoice): Not found")
-            print(f"   Insurance Charges (Invoice): ${result.get('val_note_insurance_charges_invoice', 0):,.2f}" if result.get('val_note_insurance_charges_invoice') else "   Insurance Charges (Invoice): Not found")
-            print(f"   Other Charges (Invoice): ${result.get('val_note_other_charges_invoice', 0):,.2f}" if result.get('val_note_other_charges_invoice') else "   Other Charges (Invoice): Not found")
-            print(f"   Freight Charges (BOL - Foreign Currency): ${result.get('val_note_freight_charges_bol', 0):,.2f}" if result.get('val_note_freight_charges_bol') else "   Freight Charges (BOL - Foreign Currency): Not found")
-            print(f"   Insurance Charges (BOL - Foreign Currency): ${result.get('val_note_insurance_charges_bol', 0):,.2f}" if result.get('val_note_insurance_charges_bol') else "   Insurance Charges (BOL - Foreign Currency): Not found")
-            print(f"   Other Charges (BOL - Foreign Currency): ${result.get('val_note_other_charges_bol', 0):,.2f}" if result.get('val_note_other_charges_bol') else "   Other Charges (BOL - Foreign Currency): Not found")
-            print(f"   Cost & Freight: ${result.get('val_note_cost_and_freight', 0):,.2f}" if result.get('val_note_cost_and_freight') else "   Cost & Freight: Not calculated")
-            print(f"   Invoice Currency: {result.get('invoice_currency', 'Not found')}")
-            print(f"   BOL Foreign Currency: {result.get('bol_foreign_currency', 'Not found')}")
-            print(f"   Incoterms: {result.get('incoterms', 'Not found')}")
-            
-            print(f"\n✅ Successfully extracted valuation data")
-        else:
-            print(f"❌ CIF processing failed: {result.get('error')}")
-            sys.exit(1)
-            
-    except FileNotFoundError:
-        print(f"❌ Error: File '{json_path}' not found.")
-        sys.exit(1)
-    except json.JSONDecodeError:
-        print(f"❌ Error: Invalid JSON in file '{json_path}'.")
-        sys.exit(1)
-    except Exception as e:
-        print(f"❌ Unexpected error: {e}")
-        sys.exit(1)
+    }
+    
+    test_bol_data = {
+        "bill_of_lading": "PSHFHKIN25072146",
+        "shipping_method": "Sea freight",
+        "vessel_name": "EVER GIVEN",
+        "voyage_number": "001W"
+    }
+    
+    # Process CIF fields
+    result = process_cif_fields(test_invoice_data, test_bol_data, verbose=True)
+    
+    # Display clean JSON result
+    if result.get('success') != False:
+        print(f"\n📋 Final Result: {json.dumps(result, indent=2, ensure_ascii=False)}")
+    else:
+        print(f"❌ Error: {result.get('error', 'Unknown error')}")
+
 
 if __name__ == "__main__":
     main()

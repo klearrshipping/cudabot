@@ -37,6 +37,24 @@ except ImportError:
     get_all_orders = None
     get_documents_by_order = None
 
+# Import log formatter
+try:
+    from modules.utils.log_formatter import LogFormatter
+except ImportError:
+    # Fallback if log_formatter not available
+    class LogFormatter:
+        @staticmethod
+        def print_section_header(num, title):
+            print(f"\n{'=' * 80}\n## {num}. {title}\n{'=' * 80}")
+        @staticmethod
+        def print_json(data, indent=2):
+            import json
+            print(json.dumps(data, indent=indent))
+        @staticmethod
+        def print_status(msg, status="info"):
+            emoji = {"success": "✅", "error": "❌", "warning": "⚠️"}.get(status, "•")
+            print(f"{emoji} {msg}")
+
 
 class OrderProcessor:
     """
@@ -179,7 +197,18 @@ class OrderProcessor:
             except Exception as e:
                 print(f"   ⚠️ Database save failed: {e}")
         
-        print(f"✅ Order {order_number} created successfully!")
+        # Log order creation with structured format
+        LogFormatter.print_section_header(2, "ORDER CREATION")
+        order_creation_data = {
+            "event": "order_created",
+            "order_id": order_number,
+            "status": "success",
+            "created_at": order_metadata['created_at'],
+            "order_directory": str(order_dir),
+            "client_name": client_name or "Unknown"
+        }
+        LogFormatter.print_json(order_creation_data)
+        LogFormatter.print_status(f"Order {order_number} created successfully", "success")
         
         return {
             'status': 'success',

@@ -27,11 +27,38 @@ sys.path.insert(0, str(root_dir))
 
 # No database imports - this is a pure extraction tool
 
+# Import log formatter
+try:
+    from modules.utils.log_formatter import LogFormatter
+except ImportError:
+    # Fallback if log_formatter not available
+    class LogFormatter:
+        @staticmethod
+        def print_section_header(num, title):
+            print(f"\n{'=' * 80}\n## {num}. {title}\n{'=' * 80}")
+        @staticmethod
+        def print_subsection_header(num, title):
+            print(f"\n### {num} {title}\n{'-' * 60}")
+        @staticmethod
+        def print_json(data, indent=2):
+            import json
+            print(json.dumps(data, indent=indent))
+        @staticmethod
+        def print_status(msg, status="info"):
+            emoji = {"success": "✅", "error": "❌", "warning": "⚠️"}.get(status, "•")
+            print(f"{emoji} {msg}")
+
 # Configuration print for OpenRouter-based processing
-print(f"📋 Document Extraction Processor Configuration:")
-print(f"   🤖 Processor: Claude Sonnet 4 via OpenRouter")
-print(f"   📄 Invoice Processing: OpenRouter API")
-print(f"   📋 BOL Processing: OpenRouter API")
+LogFormatter.print_section_header(3, "EXTRACTION CONFIGURATION")
+config_data = {
+    "event": "extraction_config",
+    "processor": "Claude Sonnet 4 via OpenRouter",
+    "services": {
+        "invoice_processing": "OpenRouter API",
+        "bol_processing": "OpenRouter API"
+    }
+}
+LogFormatter.print_json(config_data)
 
 
 class DocumentProcessor:
@@ -58,7 +85,14 @@ class DocumentProcessor:
         Returns:
             dict: Processing results for all documents
         """
-        print(f"🔄 Starting document processing for order: {order_number}")
+        # Log document extraction start
+        start_data = {
+            "event": "document_extraction_start",
+            "order_id": order_number,
+            "status": "starting"
+        }
+        LogFormatter.print_json(start_data)
+        LogFormatter.print_status(f"Starting document processing for order: {order_number}", "processing")
         
         # Get the order directory
         order_dir = self.base_dir / order_number
@@ -123,9 +157,19 @@ class DocumentProcessor:
         total_invoices = len(invoice_results)
         bol_success = bol_result.get('status') == 'success'
         
-        print(f"✅ Processing completed:")
-        print(f"   BOL: {'Success' if bol_success else 'Failed'}")
-        print(f"   Invoices: {successful_invoices}/{total_invoices} successful")
+        # Log extraction completion
+        completion_data = {
+            "event": "document_extraction_complete",
+            "order_id": order_number,
+            "status": "completed",
+            "results": {
+                "bol_success": bol_success,
+                "invoices_processed": total_invoices,
+                "invoices_successful": successful_invoices
+            }
+        }
+        LogFormatter.print_json(completion_data)
+        LogFormatter.print_status(f"Processing completed: BOL {'Success' if bol_success else 'Failed'}, Invoices: {successful_invoices}/{total_invoices}", "success")
         
         return all_results
     

@@ -61,58 +61,117 @@ class FlexibleFormExtractor:
 
     def process_document(self, file_path: Path, save_to_file: bool = True, 
                         order_number: str = None, save_to_db: bool = True) -> Dict[str, Any]:
-        """Process bill of lading or arrival notice using Claude Sonnet 4 via OpenRouter"""
+        """Process bill of lading or arrival notice using Claude Sonnet 4 via OpenRouter with retry logic"""
         # Processing document
 
-        try:
-            # Convert PDF to image for OpenRouter compatibility
-            image_data_url = self._convert_pdf_to_image(file_path)
-            print(f"📸 PDF converted to image successfully")
+        # Quality levels to try (DPI, JPEG quality)
+        quality_levels = [
+            (200, 85, "normal"),
+            (150, 75, "reduced"),
+            (120, 65, "low"),
+            (100, 55, "minimal")
+        ]
+        
+        last_error = None
+        
+        for attempt, (dpi, jpeg_quality, quality_label) in enumerate(quality_levels, 1):
+            try:
+                print(f"🔄 Attempt {attempt}/{len(quality_levels)}: Processing with {quality_label} quality (DPI={dpi}, Q={jpeg_quality})")
+                
+                # Convert PDF to image with specific quality settings
+                image_data_url = self._convert_pdf_to_image_with_quality(file_path, dpi, jpeg_quality)
+                print(f"📸 PDF converted to image successfully ({quality_label} quality)")
 
-            # Create the extraction prompt
-            extraction_prompt = self._create_extraction_prompt()
-            
-            # Send request to OpenRouter with image
-            response = self._send_to_openrouter_with_image(extraction_prompt, image_data_url)
-            extracted_data = self._parse_openrouter_response(response)
-            
-            # Add metadata
-            metadata = {
-                "extraction_timestamp": datetime.now().isoformat(),
-                "source_file": str(file_path),
-                "processor": "claude_sonnet_4_via_openrouter",
-                "model": self.model,
-                "document_type": self._detect_document_type(extracted_data),
-                "processing_method": "pdf_to_image_conversion"
-            }
-            
-            extracted_data["_metadata"] = metadata
-            
-            # BOL Number Validation and Recheck
-            extracted_data = self._validate_and_fix_bol_number(extracted_data, image_data_url)
-            
-            # Save to database if available and requested
-            if save_to_db and DB_AVAILABLE and order_number:
-                try:
-                    self._save_to_database(extracted_data, file_path, order_number, metadata)
-                except Exception as e:
-                    print(f"⚠️ Failed to save to database: {e}")
-                    print("   Falling back to file-based storage")
-                    save_to_file = True
-            
-            # Save to file if requested or if database save failed
-            if save_to_file:
-                self.save_results(extracted_data)
-            
-            return extracted_data
-            
-        except Exception as e:
-            print(f"❌ Error processing with OpenRouter: {e}")
-            return {
-                'status': 'failed',
-                'error': str(e),
-                'timestamp': datetime.now().isoformat()
-            }
+                # Create the extraction prompt
+                extraction_prompt = self._create_extraction_prompt()
+                
+                # Send request to OpenRouter with image
+                response = self._send_to_openrouter_with_image(extraction_prompt, image_data_url)
+                extracted_data = self._parse_openrouter_response(response)
+                
+                # Add metadata
+                metadata = {
+                    "extraction_timestamp": datetime.now().isoformat(),
+                    "source_file": str(file_path),
+                    "processor": "claude_sonnet_4_via_openrouter",
+                    "model": self.model,
+                    "document_type": self._detect_document_type(extracted_data),
+                    "processing_method": "pdf_to_image_conversion",
+                    "quality_used": quality_label,
+                    "dpi": dpi,
+                    "jpeg_quality": jpeg_quality,
+                    "attempts": attempt
+                }
+                
+                extracted_data["_metadata"] = metadata
+                
+                # BOL Number Validation and Recheck (skip on retry attempts to save time)
+                if attempt == 1:
+                    extracted_data = self._validate_and_fix_bol_number(extracted_data, image_data_url)
+                
+                # Save to database if available and requested
+                if save_to_db and DB_AVAILABLE and order_number:
+                    try:
+                        self._save_to_database(extracted_data, file_path, order_number, metadata)
+                    except Exception as e:
+                        print(f"⚠️ Failed to save to database: {e}")
+                        print("   Falling back to file-based storage")
+                        save_to_file = True
+                
+                # Save to file if requested or if database save failed
+                if save_to_file:
+                    self.save_results(extracted_data)
+                
+                print(f"✅ BOL extraction succeeded on attempt {attempt} with {quality_label} quality")
+                return extracted_data
+                
+            except ValueError as e:
+                # Payload too large or JSON parsing error - try lower quality
+                last_error = e
+                error_msg = str(e)
+                print(f"⚠️ Attempt {attempt} failed with {quality_label} quality: {error_msg}")
+                
+                if "Payload size" in error_msg or "exceeds" in error_msg:
+                    print(f"   → Image too large, trying lower quality...")
+                elif "JSON" in error_msg or "Expecting value" in error_msg:
+                    print(f"   → Response parsing failed, trying lower quality...")
+                else:
+                    print(f"   → Unexpected error, trying lower quality...")
+                
+                if attempt < len(quality_levels):
+                    continue
+                else:
+                    print(f"❌ All {len(quality_levels)} quality levels failed")
+                    break
+                    
+            except requests.exceptions.Timeout as e:
+                last_error = e
+                print(f"⚠️ Attempt {attempt} timed out after 60 seconds")
+                if attempt < len(quality_levels):
+                    print(f"   → Trying with lower quality to reduce processing time...")
+                    continue
+                else:
+                    print(f"❌ All {len(quality_levels)} attempts timed out")
+                    break
+                    
+            except Exception as e:
+                last_error = e
+                print(f"⚠️ Attempt {attempt} failed: {e}")
+                if attempt < len(quality_levels):
+                    print(f"   → Retrying with lower quality...")
+                    continue
+                else:
+                    print(f"❌ All {len(quality_levels)} attempts failed")
+                    break
+        
+        # All attempts failed
+        print(f"❌ Error processing with OpenRouter: {last_error}")
+        return {
+            'status': 'failed',
+            'error': str(last_error),
+            'attempts': len(quality_levels),
+            'timestamp': datetime.now().isoformat()
+        }
 
     def _create_extraction_prompt(self) -> str:
         """Create extraction prompt for comprehensive data extraction"""
@@ -193,6 +252,69 @@ Other extraction guidelines:
 - Ensure the JSON is valid and complete
 
 Be comprehensive in extracting ALL charges from any charges/fees table found in the document."""
+
+    def _convert_pdf_to_image_with_quality(self, file_path: Path, target_dpi: int, jpeg_quality: int) -> str:
+        """Convert PDF to image with specified quality parameters"""
+        try:
+            import fitz  # PyMuPDF
+            
+            # Open PDF
+            pdf_document = fitz.open(file_path)
+            
+            # Convert first page to image
+            page = pdf_document[0]
+            
+            # Use specified DPI
+            mat = fitz.Matrix(target_dpi/72, target_dpi/72)
+            pix = page.get_pixmap(matrix=mat)
+            
+            # Convert to JPEG with specified quality
+            img_data = pix.tobytes("jpeg", jpg_quality=jpeg_quality)
+            pdf_document.close()
+            
+            # Encode as base64
+            img_base64 = base64.b64encode(img_data).decode('utf-8')
+            
+            # Log image size for diagnostics
+            img_size_mb = len(img_data) / (1024 * 1024)
+            print(f"   Image size: {img_size_mb:.2f}MB")
+            
+            # Return as data URL with JPEG format
+            return f"data:image/jpeg;base64,{img_base64}"
+            
+        except ImportError:
+            # Fallback: Try with pdf2image if PyMuPDF not available
+            try:
+                from pdf2image import convert_from_path
+                import io
+                from PIL import Image
+                
+                # Convert PDF to images with specified DPI
+                images = convert_from_path(file_path, dpi=target_dpi, first_page=1, last_page=1)
+                
+                if not images:
+                    raise Exception("No images generated from PDF")
+                
+                # Get first page image
+                image = images[0]
+                
+                # Convert to JPEG bytes with specified quality
+                img_buffer = io.BytesIO()
+                image.save(img_buffer, format='JPEG', quality=jpeg_quality, optimize=True)
+                img_data = img_buffer.getvalue()
+                
+                # Encode as base64
+                img_base64 = base64.b64encode(img_data).decode('utf-8')
+                
+                # Log image size
+                img_size_mb = len(img_data) / (1024 * 1024)
+                print(f"   Image size: {img_size_mb:.2f}MB")
+                
+                # Return as data URL
+                return f"data:image/jpeg;base64,{img_base64}"
+                
+            except ImportError:
+                raise Exception("PDF conversion requires PyMuPDF (pip install PyMuPDF) or pdf2image (pip install pdf2image)")
 
     def _convert_pdf_to_image(self, file_path: Path) -> str:
         """Convert PDF to optimized image data URL for OpenRouter"""
@@ -301,21 +423,62 @@ Be comprehensive in extracting ALL charges from any charges/fees table found in 
             "temperature": 0.1
         }
         
-        # Sending BOL request to OpenRouter
+        # Calculate and validate payload size
+        import json as json_module
+        payload_str = json_module.dumps(payload)
+        payload_size_mb = len(payload_str) / (1024 * 1024)
+        
+        if payload_size_mb > 4.5:
+            print(f"⚠️ Payload size too large: {payload_size_mb:.2f}MB")
+            raise ValueError(f"Payload size ({payload_size_mb:.2f}MB) exceeds safe limit (4.5MB)")
         
         try:
-            response = requests.post(self.base_url, headers=self.headers, json=payload)
-            response.raise_for_status()
-            response_data = response.json()
+            response = requests.post(
+                self.base_url, 
+                headers=self.headers, 
+                json=payload,
+                timeout=60  # 60 second timeout
+            )
             
-            return response_data
-        except requests.exceptions.HTTPError as e:
-            print(f"HTTP Error: {e}")
-            print(f"Response status: {e.response.status_code}")
-            print(f"Response content: {e.response.text if hasattr(e, 'response') else 'No response content'}")
+            # Check response before parsing
+            if response.status_code != 200:
+                error_text = response.text[:500] if response.text else "No response text"
+                print(f"❌ OpenRouter API Error:")
+                print(f"   Status Code: {response.status_code}")
+                print(f"   Response: {error_text}")
+                raise requests.exceptions.HTTPError(
+                    f"HTTP {response.status_code}: {error_text}",
+                    response=response
+                )
+            
+            # Validate response is JSON before parsing
+            content_type = response.headers.get('Content-Type', '')
+            if 'application/json' not in content_type:
+                print(f"❌ Unexpected response type: {content_type}")
+                print(f"   Response text: {response.text[:500]}")
+                raise ValueError(f"Expected JSON response, got {content_type}")
+            
+            # Parse JSON response
+            try:
+                response_data = response.json()
+                return response_data
+            except json_module.JSONDecodeError as e:
+                print(f"❌ JSON Parsing Error: {e}")
+                print(f"   Response status: {response.status_code}")
+                print(f"   Response text: {response.text[:500]}")
+                raise ValueError(f"Failed to parse JSON response: {e}")
+            
+        except requests.exceptions.Timeout:
+            print(f"❌ Request timeout after 60 seconds")
+            raise
+        except requests.exceptions.RequestException as e:
+            print(f"❌ Request failed: {e}")
+            if hasattr(e, 'response') and e.response is not None:
+                print(f"   Status: {e.response.status_code}")
+                print(f"   Response: {e.response.text[:500]}")
             raise
         except Exception as e:
-            print(f"Request Error: {e}")
+            print(f"❌ Unexpected error: {e}")
             raise
 
     def _parse_openrouter_response(self, response: Dict[str, Any]) -> Dict[str, Any]:
@@ -551,8 +714,18 @@ Be comprehensive in extracting ALL charges from any charges/fees table found in 
         bol_number = extracted_data.get('bill_of_lading')
         master_bol = extracted_data.get('master_bill_of_lading')
         
+        # Helper function to check if a value is empty or invalid
+        def is_empty_or_invalid(value):
+            if not value:
+                return True
+            if isinstance(value, dict):
+                return True  # Treat dict as invalid BOL number
+            if not isinstance(value, str):
+                value = str(value)
+            return value.strip() == '' or value.lower() == 'null'
+        
         # If bill_of_lading is empty but master_bill_of_lading has a value, move it
-        if (not bol_number or bol_number.strip() == '' or bol_number.lower() == 'null') and master_bol:
+        if is_empty_or_invalid(bol_number) and not is_empty_or_invalid(master_bol):
             print(f"⚠️ BOL number missing in 'bill_of_lading' field, found in 'master_bill_of_lading': {master_bol}")
             print(f"🔄 Moving BOL number from master_bill_of_lading to bill_of_lading")
             extracted_data['bill_of_lading'] = master_bol
@@ -561,13 +734,12 @@ Be comprehensive in extracting ALL charges from any charges/fees table found in 
             return extracted_data
         
         # If both fields are empty, try to re-extract with a focused prompt
-        if (not bol_number or bol_number.strip() == '' or bol_number.lower() == 'null') and \
-           (not master_bol or master_bol.strip() == '' or master_bol.lower() == 'null'):
+        if is_empty_or_invalid(bol_number) and is_empty_or_invalid(master_bol):
             # No BOL number found - attempting re-extraction
             return self._recheck_bol_number(extracted_data, image_data_url)
         
         # If we have a valid BOL number, validate it
-        if bol_number and bol_number.strip() and bol_number.lower() != 'null':
+        if not is_empty_or_invalid(bol_number):
             print(f"✅ BOL number validation passed: {bol_number}")
             return extracted_data
         
@@ -614,7 +786,8 @@ Return ONLY the JSON object, no additional text."""
             
             # Check if we found a BOL number
             found_bol = bol_data.get('bill_of_lading')
-            if found_bol and found_bol.strip() and found_bol.lower() != 'null':
+            # Validate found_bol is a string and not empty
+            if found_bol and isinstance(found_bol, str) and found_bol.strip() and found_bol.lower() != 'null':
                 # BOL number found during recheck
                 extracted_data['bill_of_lading'] = found_bol
                 extracted_data['master_bill_of_lading'] = bol_data.get('master_bill_of_lading')
