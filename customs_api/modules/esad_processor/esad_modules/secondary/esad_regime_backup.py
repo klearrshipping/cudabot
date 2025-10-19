@@ -464,8 +464,8 @@ class RegimeTypeProcessor:
                 }
             }
             
-            # Save results to JSON file
-            self._save_regime_results(result_data)
+            # Prepare results for consolidation
+            result_data = self._save_regime_results(result_data)
             
             return result_data
             
@@ -477,8 +477,8 @@ class RegimeTypeProcessor:
                 'error': str(e)
             }
             
-            # Save error results to JSON file
-            self._save_regime_results(error_data)
+            # Prepare error results for consolidation
+            error_data = self._save_regime_results(error_data)
             
             return error_data
     
@@ -865,21 +865,14 @@ OUTPUT FORMAT:
                 print(f"❌ Backup model failed: {backup_error}")
                 raise Exception(f"Both models failed: {e}, {backup_error}")
     
-    def _save_regime_results(self, result_data: Dict[str, Any]) -> None:
-        """Save regime results to JSON file"""
+    def _save_regime_results(self, result_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Return regime results as dictionary for consolidation (no longer saves separate files)"""
         
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        # Add timestamp to result data
+        result_data['timestamp'] = datetime.now().isoformat()
         
-        # Create output directory if it doesn't exist
-        output_dir = Path("regime_results")
-        output_dir.mkdir(exist_ok=True)
-        
-        output_file = output_dir / f"regime_{timestamp}.json"
-        
-        with open(output_file, 'w', encoding='utf-8') as f:
-            json.dump(result_data, f, indent=2, ensure_ascii=False)
-        
-        print(f"💾 Regime results saved to: {output_file}")
+        print(f"💾 Regime results prepared for consolidation")
+        return result_data
     
     def _classify_product_commercial_vs_household(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """

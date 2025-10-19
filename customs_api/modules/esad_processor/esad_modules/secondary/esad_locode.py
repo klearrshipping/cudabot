@@ -1,18 +1,38 @@
 #!/usr/bin/env python3
 """
 ESAD Locode Processor
-Processes the "Place of Loading/Unloading" field using locode_JM.csv
+Extracts Jamaican port locations from BOL/Arrival Notice and matches them to locode_JM.csv
 """
 
-import pandas as pd
-from typing import Dict, Any, Optional
-import sys
+import json
 import os
+import re
+import csv
+import requests
+import pandas as pd
+from typing import Dict, Any, Optional, List
+from pathlib import Path
+import sys
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+
+# Import OpenRouter configuration
+try:
+    from config import OPENROUTER_API_KEY, OPENROUTER_URL, OPENROUTER_HEADERS
+except ImportError:
+    # Fallback configuration if config import fails
+    OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY', '')
+    OPENROUTER_URL = os.getenv('OPENROUTER_URL', 'https://openrouter.ai/api/v1/chat/completions')
+    OPENROUTER_HEADERS = {
+        'Authorization': f'Bearer {OPENROUTER_API_KEY}',
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'http://localhost:3000',
+        'X-Title': 'eSAD LOCODE Extractor'
+    }
 
 class LocodeProcessor:
     """
-    Processes loading/unloading locations using Jamaican locode data
+    Extracts Jamaican port locations from BOL/Arrival Notice and matches them to locode_JM.csv
     """
     
     def __init__(self):
@@ -23,13 +43,216 @@ class LocodeProcessor:
     def _load_reference_data(self):
         """Load Jamaican locode data from CSV file"""
         try:
-            # Load locode data (Jamaican locations) - for loading/unloading locations
-            self.locode_data = pd.read_csv("data/locode_JM.csv")
-            print(f"✅ Loaded {len(self.locode_data)} Jamaican locodes for loading/unloading locations")
+            csv_path = Path(__file__).parent.parent.parent.parent.parent / "data" / "locode_JM.csv"
+            self.locode_data = pd.read_csv(csv_path)
             
         except Exception as e:
             print(f"⚠️ Warning: Could not load locode data: {e}")
             self.locode_data = pd.DataFrame()
+    
+    def extract_jamaican_port(self, bol_data: Dict[str, Any], verbose: bool = False) -> Dict[str, Any]:
+        """Extract Jamaican port location from BOL/Arrival Notice using LLM
+        
+        Args:
+            bol_data: Bill of Lading or Arrival Notice data
+            verbose: If True, print extraction results to console (default: False)
+        
+        Returns:
+            Dictionary containing extracted port name and matched LOCODE information
+        """
+        
+        # Safely serialize BOL data
+        def safe_json_dumps(obj, max_depth=3, current_depth=0):
+            if current_depth >= max_depth:
+                return "[Max depth reached]"
+            
+            if isinstance(obj, dict):
+                result = {}
+                for key, value in obj.items():
+                    try:
+                        result[key] = safe_json_dumps(value, max_depth, current_depth + 1)
+                    except:
+                        result[key] = str(value)[:100] + "..." if len(str(value)) > 100 else str(value)
+                return result
+            elif isinstance(obj, list):
+                result = []
+                for item in obj:
+                    try:
+                        result.append(safe_json_dumps(item, max_depth, current_depth + 1))
+                    except:
+                        result.append(str(item)[:100] + "..." if len(str(item)) > 100 else str(item))
+                return result
+            else:
+                return obj
+        
+        safe_bol_data = safe_json_dumps(bol_data)
+        
+        prompt = f"""
+You are analyzing a Bill of Lading (BOL) or Arrival Notice for goods being shipped to/from Jamaica.
+
+Extract and identify the JAMAICAN PORT location mentioned in the document.
+
+Look for the Jamaican port in these fields:
+- Port of Discharge (POD) - if shipping TO Jamaica
+- Port of Destination - if shipping TO Jamaica
+- Port of Loading - if shipping FROM Jamaica
+- Place of Delivery
+- Destination Port
+- Jamaica port names
+
+Common Jamaican ports include:
+- Kingston (most common)
+- Montego Bay
+- Norman Manley International Airport
+- Sangster International Airport
+- Ocho Rios
+- Falmouth
+- Port Antonio
+- Black River
+- Port Esquivel
+- Port Kaiser
+- Rocky Point
+
+BOL/ARRIVAL NOTICE DATA:
+{json.dumps(safe_bol_data, indent=2)}
+
+Return your response in the following JSON format:
+{{
+  "jamaican_port": "port name"
+}}
+
+Return ONLY the Jamaican port name (e.g., "Kingston", "Montego Bay", "Norman Manley International").
+If no Jamaican port is found, use "Not specified" as the value.
+"""
+        
+        payload = {
+            "model": "openai/gpt-4o-mini",
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0.1,
+            "max_tokens": 200
+        }
+        
+        try:
+            if verbose:
+                print("\n🔍 Extracting Jamaican port from BOL/Arrival Notice...")
+            
+            response = requests.post(OPENROUTER_URL, headers=OPENROUTER_HEADERS, json=payload, timeout=30)
+            response_data = response.json()
+            content = response_data['choices'][0]['message']['content']
+            
+            json_match = re.search(r'\{.*\}', content, re.DOTALL)
+            result = json.loads(json_match.group())
+            
+            jamaican_port = result.get('jamaican_port', 'Not specified')
+            
+            # Match against locode_JM.csv
+            locode_match = self._find_matching_locode(jamaican_port)
+            
+            if verbose and jamaican_port != 'Not specified':
+                print(f"\n🚢 JAMAICAN PORT EXTRACTION:")
+                print("=" * 60)
+                print(f"Extracted Port: {jamaican_port}")
+                if locode_match:
+                    print(f"Matched LOCODE: {locode_match['locode']}")
+                    print(f"Location Name: {locode_match['name']}")
+                    print(f"Subdivision: {locode_match.get('subdivision', 'N/A')}")
+                else:
+                    print(f"⚠️  No LOCODE match found for '{jamaican_port}'")
+                print("=" * 60)
+            
+            return {
+                'success': True if jamaican_port != 'Not specified' else False,
+                'jamaican_port': jamaican_port,
+                'locode': locode_match['locode'] if locode_match else None,
+                'location_name': locode_match['name'] if locode_match else None,
+                'subdivision': locode_match.get('subdivision') if locode_match else None,
+                'extraction_metadata': {
+                    'status': 'success',
+                    'message': 'Jamaican port extracted and matched',
+                    'locode_matched': locode_match is not None
+                }
+            }
+            
+        except Exception as e:
+            if verbose:
+                print(f"\n❌ Port extraction failed: {e}")
+            
+            return {
+                'success': False,
+                'jamaican_port': 'Not specified',
+                'locode': None,
+                'location_name': None,
+                'subdivision': None,
+                'extraction_metadata': {
+                    'status': 'error',
+                    'message': f"Port extraction failed: {str(e)}",
+                    'locode_matched': False
+                }
+            }
+    
+    def _find_matching_locode(self, port_name: str) -> Optional[Dict[str, Any]]:
+        """Find matching LOCODE for a Jamaican port name
+        
+        Args:
+            port_name: Port name to search for
+            
+        Returns:
+            Dict with LOCODE information or None if not found
+        """
+        if self.locode_data.empty or not port_name or port_name == 'Not specified':
+            return None
+        
+        try:
+            port_name_clean = port_name.strip().lower()
+            
+            # Try exact match first
+            exact_match = self.locode_data[
+                self.locode_data['name'].str.lower() == port_name_clean
+            ]
+            
+            if not exact_match.empty:
+                match = exact_match.iloc[0]
+                return {
+                    'locode': match['locode'],
+                    'name': match['name'],
+                    'subdivision': match['subdiv'] if pd.notna(match['subdiv']) else None
+                }
+            
+            # Try partial match
+            partial_match = self.locode_data[
+                self.locode_data['name'].str.contains(port_name_clean, case=False, na=False, regex=False)
+            ]
+            
+            if not partial_match.empty:
+                match = partial_match.iloc[0]
+                return {
+                    'locode': match['locode'],
+                    'name': match['name'],
+                    'subdivision': match['subdiv'] if pd.notna(match['subdiv']) else None
+                }
+            
+            # Try cleaning port name (remove "port", "airport", etc.)
+            port_name_cleaned = re.sub(r'\b(port|airport|international|pier|terminal|harbor|harbour)\b', '', port_name_clean, flags=re.IGNORECASE)
+            port_name_cleaned = re.sub(r'\s+', ' ', port_name_cleaned).strip()
+            
+            if port_name_cleaned:
+                cleaned_match = self.locode_data[
+                    self.locode_data['name'].str.contains(port_name_cleaned, case=False, na=False, regex=False)
+                ]
+                
+                if not cleaned_match.empty:
+                    match = cleaned_match.iloc[0]
+                    return {
+                        'locode': match['locode'],
+                        'name': match['name'],
+                        'subdivision': match['subdiv'] if pd.notna(match['subdiv']) else None
+                    }
+            
+            return None
+            
+        except Exception as e:
+            print(f"Error in LOCODE lookup: {e}")
+            return None
     
     def process_loading_location(self, location_text: str) -> Dict[str, Any]:
         """
@@ -164,130 +387,76 @@ class LocodeProcessor:
     
     def process(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Process input data to determine LOCODE information.
+        Process input data to extract Jamaican port and match to LOCODE.
         
         Args:
-            input_data: Dictionary containing invoice_data, bol_data, fields, and existing_fields
+            input_data: Dictionary containing bol_data
             
         Returns:
-            Dictionary with processing results
+            Dictionary with processing results including LOCODE and location information
         """
         try:
-            # Extract location data from various sources
-            location_data = self._extract_location_data(input_data)
+            bol_data = input_data.get('bol_data', {})
             
-            if not location_data:
+            if not bol_data:
                 return {
                     'success': False,
-                    'error': 'No location data found',
-                    'locode': None
+                    'error': 'No BOL data found',
+                    'locode': None,
+                    'jamaican_port': None,
+                    'location_name': None
                 }
             
-            # Process loading location
-            result = self.process_loading_location(location_data)
+            # Extract Jamaican port and match to LOCODE
+            result = self.extract_jamaican_port(bol_data, verbose=False)
             
-            if result['processed']:
-                return {
-                    'success': True,
-                    'locode': result['locode'],
-                    'standardized_name': result['standardized_name'],
-                    'city_name': result['city_name'],
-                    'country_code': result['country_code'],
-                    'country_name': result['country_name'],
-                    'subdivision': result['subdivision']
-                }
-            else:
-                return {
-                    'success': False,
-                    'error': result['error'],
-                    'locode': None
-                }
+            return result
             
         except Exception as e:
             return {
                 'success': False,
                 'error': str(e),
-                'locode': None
+                'locode': None,
+                'jamaican_port': None,
+                'location_name': None
             }
-    
-    def _extract_location_data(self, input_data: Dict[str, Any]) -> str:
-        """Extract location data from input data."""
-        # Try to get from existing fields first
-        existing_fields = input_data.get('existing_fields', {})
-        
-        # Look for location data in various field keys
-        location_keys = [
-            'location',
-            '27_location',
-            'place_of_loading',
-            'place_of_unloading',
-            'port_of_loading',
-            'port_of_destination',
-            'loading_location',
-            'unloading_location'
-        ]
-        
-        for key in location_keys:
-            if key in existing_fields and existing_fields[key]:
-                return str(existing_fields[key])
-        
-        # Try to extract from BOL data
-        bol_data = input_data.get('bol_data', {})
-        if bol_data:
-            # Check for location-related fields
-            for field in ['port_of_loading', 'port_of_destination', 'place_of_loading', 'place_of_delivery']:
-                if field in bol_data and bol_data[field]:
-                    return str(bol_data[field])
-        
-        # Try to extract from invoice data
-        invoice_data = input_data.get('invoice_data', {})
-        if invoice_data:
-            # Check for location-related fields
-            for field in ['origin', 'destination', 'shipping_from', 'shipping_to']:
-                if field in invoice_data and invoice_data[field]:
-                    return str(invoice_data[field])
-        
-        return ""
-
-
-def process_loading_location(location_text: str) -> Dict[str, Any]:
-    """
-    Convenience function to process loading location
-    
-    Args:
-        location_text: Location text from esad_fields
-        
-    Returns:
-        Dict with processed location information
-    """
-    processor = LocodeProcessor()
-    return processor.process_loading_location(location_text)
 
 
 def main():
-    """Test the locode processor"""
+    """Test the locode processor with real BOL data"""
+    import json
     
     processor = LocodeProcessor()
     
-    print("Testing Locode Processor")
-    print("=" * 50)
+    print("🧪 Testing LOCODE Processor")
+    print("=" * 80)
     
-    # Test Loading/Unloading Locations (using locode_JM.csv)
-    print("\n🔍 TESTING LOADING/UNLOADING LOCATIONS (locode_JM.csv)")
-    print("=" * 60)
-    
-    test_locations = [
-        "Kingston, Jamaica",
-        "Miami, United States", 
-        "Black River, Jamaica",
-        "Montego Bay, Jamaica"
-    ]
-    
-    for location in test_locations:
-        print(f"\nInput: {location}")
-        result = processor.process_loading_location(location)
-        print(f"Result: {result}")
-        print("-" * 40)
+    # Load test BOL data
+    try:
+        bol_path = "../../processed_orders/ORD-20251009-002/bills_of_lading/bill_of_lading_ORD-20251009-002_primary_extract.json"
+        with open(bol_path, 'r', encoding='utf-8') as f:
+            bol_data = json.load(f)
+        
+        print(f"\n📁 Loaded test BOL: {bol_data.get('bill_of_lading', 'N/A')}")
+        print(f"Document Type: {bol_data.get('document_type', 'N/A')}")
+        
+        # Extract Jamaican port and match to LOCODE
+        result = processor.extract_jamaican_port(bol_data, verbose=True)
+        
+        print("\n📊 Final Result:")
+        print(json.dumps(result, indent=2))
+        
+    except FileNotFoundError:
+        print("\n❌ Test BOL file not found, testing with sample data...")
+        
+        sample_bol = {
+            "port_of_destination": "Kingston",
+            "port_of_discharge": "Kingston Port"
+        }
+        
+        result = processor.extract_jamaican_port(sample_bol, verbose=True)
+        print("\n📊 Sample Result:")
+        print(json.dumps(result, indent=2))
 
 
 if __name__ == "__main__":

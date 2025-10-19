@@ -1,79 +1,81 @@
-import sys
-import json
-import difflib
-import os
-from typing import Optional, Dict, List, Any
+#!/usr/bin/env python3
+"""
+eSAD Package Processing Module
+Handles package type classification and matching
+"""
 
-# Add the customs_api directory to the path
+import json
+import re
+import os
+import sys
+from typing import Dict, List, Any, Optional
+from difflib import SequenceMatcher
+
+# Add parent directory to path for imports
 current_dir = os.path.dirname(os.path.abspath(__file__))
 customs_api_dir = os.path.join(current_dir, '..', '..', '..', '..')
 sys.path.insert(0, customs_api_dir)
 
-from modules.core.csv_data_client import fetch_package_types
 from modules.core.llm_client import LLMClient
+from modules.core.csv_data_client import fetch_package_types
 
-# Cache for package types to avoid repeated database calls
-_package_types_cache = None
+# Module-level initialization
+llm = LLMClient()
 
-def get_kind_of_packages_from_json(json_path: str) -> Optional[str]:
-    """Extract kind_of_packages from JSON file."""
-    with open(json_path, 'r', encoding='utf-8') as f:
-        data = json.load(f)
-    return data['result']['extracted_fields'].get('kind_of_packages', None)
+# Model configuration
+try:
+    from config import OPENROUTER_GENERAL_MODELS
+except ImportError:
+    from customs_api.config import OPENROUTER_GENERAL_MODELS
 
-def get_package_types() -> List[Dict]:
-    """Get package types with caching to avoid repeated database calls."""
-    global _package_types_cache
-    if _package_types_cache is None:
-        _package_types_cache = fetch_package_types()
-    return _package_types_cache
+# Priority models for package processing
+PRIORITY_MODELS = []
+if "gpt_4o" in OPENROUTER_GENERAL_MODELS:
+    PRIORITY_MODELS.append(OPENROUTER_GENERAL_MODELS["gpt_4o"])
+elif "gpt_5_nano" in OPENROUTER_MODELS:
+    PRIORITY_MODELS.append(OPENROUTER_GENERAL_MODELS["gpt_5_nano"])
 
-def parse_llm_response(raw_response: str) -> Optional[str]:
-    """Parse LLM response and extract package code."""
-    if not raw_response:
-        return None
-    
-    try:
-        # Try to parse as JSON
-        code_obj = json.loads(raw_response.strip())
-        code = code_obj.get('code', '').strip()
-        return code if code else None
-    except (json.JSONDecodeError, AttributeError):
-        # If JSON parsing fails, try to extract code pattern
-        import re
-        code_match = re.search(r'"code"\s*:\s*"([^"]+)"', raw_response)
-        if code_match:
-            return code_match.group(1).strip()
-        return None
+if "kimi_standard" in OPENROUTER_GENERAL_MODELS:
+    PRIORITY_MODELS.append(OPENROUTER_GENERAL_MODELS["kimi_standard"])
+elif "kimi" in OPENROUTER_GENERAL_MODELS:
+    PRIORITY_MODELS.append(OPENROUTER_GENERAL_MODELS["kimi"])
+
+# Fallback to any available model
+if not PRIORITY_MODELS and OPENROUTER_GENERAL_MODELS:
+    PRIORITY_MODELS.append(list(OPENROUTER_GENERAL_MODELS.values())[0])
+
 
 def string_similarity_fallback(kind_of_packages: str, package_types: List[Dict]) -> Optional[str]:
     """Fallback method using string similarity matching."""
-    extracted = kind_of_packages.strip().lower()
-    choices = [(pt['code'], pt['package_type']) for pt in package_types]
     
-    # Try matching against codes first
-    best = difflib.get_close_matches(extracted, [c[0].lower() for c in choices], n=1, cutoff=0.6)
-    if best:
-        return best[0].upper()
+    if not kind_of_packages:
+        return None
     
-    # Try matching against package_type names
-    best_name = difflib.get_close_matches(extracted, [c[1].lower() for c in choices], n=1, cutoff=0.6)
-    if best_name:
-        idx = [c[1].lower() for c in choices].index(best_name[0])
-        return choices[idx][0]
+    best_match = None
+    best_score = 0.0
     
-    return None
+    for package_type in package_types:
+        package_name = package_type.get('package_type', '').lower()
+        input_name = kind_of_packages.lower()
+        
+        # Check exact match first
+        if input_name == package_name:
+            return package_type['code']
+        
+        # Check similarity
+        similarity = SequenceMatcher(None, input_name, package_name).ratio()
+        if similarity > best_score and similarity > 0.6:  # Minimum threshold
+            best_score = similarity
+            best_match = package_type['code']
+    
+    return best_match
+
 
 def ask_llm_for_best_package_type(kind_of_packages: str, package_types: List[Dict]) -> Optional[str]:
     """Get the best package type using LLM with early termination."""
-    # Optimized model selection: Use general models for secondary processing
-    from config import OPENROUTER_GENERAL_MODELS
-    priority_models = [
-        OPENROUTER_GENERAL_MODELS["gpt_5"],        # Primary - Best for text analysis
-        OPENROUTER_GENERAL_MODELS["kimi_standard"]         # Backup - Reliable fallback
-    ]
     
-    llm = LLMClient()
+    if not kind_of_packages or kind_of_packages.lower() in ['not specified', 'none', '']:
+        return None
     
     # Create package types list for prompt
     package_list = [f"{pt['code']}: {pt['package_type']}" for pt in package_types]
@@ -87,171 +89,133 @@ Return ONLY a valid JSON object with a single field 'code', e.g. {{"code": "BX"}
 """
     
     # Try priority models with early termination
-    for model in priority_models:
-        print(f"Testing model: {model.split('/')[-1].split(':')[0]}")
+    for model in PRIORITY_MODELS:
         try:
             raw_response = llm.send_prompt(prompt, model=model)
             code = parse_llm_response(raw_response)
             
             if code:
-                print(f"✅ Model returned code: {code}")
                 return code
-            else:
-                print(f"❌ Model did not return a valid code.")
                 
         except Exception as e:
-            print(f"❌ Exception for model: {e}")
+            continue
     
     # If both models fail, try fallback
-    print("🔄 Both models failed, using string similarity fallback.")
     return string_similarity_fallback(kind_of_packages, package_types)
+
+
+def parse_llm_response(response) -> Optional[str]:
+    """Parse LLM response to extract package code."""
+    try:
+        # Handle different response types
+        if isinstance(response, tuple):
+            response = response[0] if response else ""
+        elif not isinstance(response, str):
+            response = str(response)
+        
+        response = response.strip()
+        
+        # Try to extract JSON from markdown code blocks
+        json_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', response, re.DOTALL)
+        if json_match:
+            response = json_match.group(1)
+        else:
+            # Find JSON object anywhere in the response
+            json_match = re.search(r'\{.*\}', response, re.DOTALL)
+            if json_match:
+                response = json_match.group(0)
+        
+        # Parse JSON
+        result = json.loads(response)
+        code = result.get('code')
+        
+        # Validate code (should be 2-3 characters)
+        if code and isinstance(code, str) and 2 <= len(code) <= 3:
+            return code.upper()
+        
+        return None
+        
+    except Exception as e:
+        print(f"❌ Failed to parse LLM response: {e}")
+        return None
+
 
 class PackageProcessor:
     """Processor class for eSAD package types (Box 31 - Kind of packages)."""
     
-    def __init__(self, config: Dict = None):
-        """Initialize the PackageProcessor."""
-        self.config = config or {}
+    def __init__(self):
+        self.package_types = []
+        self._load_package_types()
     
-    def process(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Process input data to determine package type.
-        
-        Args:
-            input_data: Dictionary containing invoice_data, bol_data, fields, and existing_fields
-            
-        Returns:
-            Dictionary with processing results
-        """
+    def _load_package_types(self):
+        """Load package types from database."""
         try:
-            # Extract kind of packages from various sources
-            kind_of_packages = self._extract_kind_of_packages(input_data)
-            
-            if not kind_of_packages:
-                return {
-                    'success': False,
-                    'error': 'No kind of packages found',
-                    'package_code': None
-                }
-            
-            # Get package types from database
-            package_types = get_package_types()
-            if not package_types:
-                return {
-                    'success': False,
-                    'error': 'No package types found in database',
-                    'package_code': None
-                }
-            
+            self.package_types = fetch_package_types()
+        except Exception as e:
+            print(f"❌ Failed to load package types: {e}")
+            self.package_types = []
+    
+    def process_package_type(self, kind_of_packages: str, verbose: bool = False) -> Dict[str, Any]:
+        """Process package type classification."""
+        
+        if not self.package_types:
+            return {
+                'success': False,
+                'error': 'No package types available',
+                'package_code': None
+            }
+        
+        if verbose:
+            print(f"📦 Processing package type: {kind_of_packages}")
+        
+        try:
             # Find best matching package type
-            best_code = ask_llm_for_best_package_type(kind_of_packages, package_types)
+            best_code = ask_llm_for_best_package_type(kind_of_packages, self.package_types)
             
             if best_code:
+                # Find the package type details
+                package_details = next((pt for pt in self.package_types if pt['code'] == best_code), None)
+                
+                if verbose:
+                    print(f"✅ Package type matched: {best_code} - {package_details['package_type'] if package_details else 'Unknown'}")
+                
                 return {
                     'success': True,
                     'package_code': best_code,
-                    'kind_of_packages': kind_of_packages,
-                    'package_types_available': len(package_types)
+                    'package_type': package_details['package_type'] if package_details else 'Unknown',
+                    'processing_method': 'llm_extraction'
                 }
             else:
+                if verbose:
+                    print("❌ No suitable package type found")
+                
                 return {
                     'success': False,
                     'error': 'No suitable package type found',
-                    'kind_of_packages': kind_of_packages,
                     'package_code': None
                 }
-            
+                
         except Exception as e:
+            if verbose:
+                print(f"❌ Error processing package type: {e}")
+            
             return {
                 'success': False,
                 'error': str(e),
                 'package_code': None
             }
-    
-    def _extract_kind_of_packages(self, input_data: Dict[str, Any]) -> str:
-        """Extract kind of packages from input data."""
-        # Try to get from existing fields first
-        existing_fields = input_data.get('existing_fields', {})
-        
-        # Look for kind of packages in various field keys
-        package_keys = [
-            'kind_of_packages',
-            '31_kind_of_packages',
-            'package_type',
-            'package_description',
-            'packaging'
-        ]
-        
-        for key in package_keys:
-            if key in existing_fields and existing_fields[key]:
-                return str(existing_fields[key])
-        
-        # Try to extract from invoice data
-        invoice_data = input_data.get('invoice_data', {})
-        if invoice_data:
-            # Check items for packaging info
-            items = invoice_data.get('items', [])
-            if items and len(items) > 0:
-                first_item = items[0]
-                if isinstance(first_item, dict):
-                    # Look for packaging-related fields
-                    for field in ['packaging', 'package_type', 'container_type']:
-                        if field in first_item and first_item[field]:
-                            return str(first_item[field])
-        
-        # Try to extract from BOL data
-        bol_data = input_data.get('bol_data', {})
-        if bol_data:
-            # Check cargo for packaging info
-            cargo = bol_data.get('cargo', {})
-            if isinstance(cargo, list) and len(cargo) > 0:
-                # If cargo is a list, use the first item
-                cargo_item = cargo[0]
-                for field in ['packaging', 'package_type', 'container_type']:
-                    if field in cargo_item and cargo_item[field]:
-                        return str(cargo_item[field])
-            elif isinstance(cargo, dict):
-                for field in ['packaging', 'package_type', 'container_type']:
-                    if field in cargo and cargo[field]:
-                        return str(cargo[field])
-        
-        return ""
+
 
 def main():
-    """Main function with improved error handling."""
-    if len(sys.argv) < 2:
-        print("Usage: python -m modules.esad_pkg <esad_json_path>")
-        sys.exit(1)
+    """Test function for the package module."""
+    # Test data
+    test_package = "Wooden Box"
     
-    json_path = sys.argv[1]
-    
-    try:
-        kind_of_packages = get_kind_of_packages_from_json(json_path)
-        if not kind_of_packages:
-            print("No kind_of_packages value found in the JSON file.")
-            sys.exit(1)
-        
-        package_types = get_package_types()
-        if not package_types:
-            print("No package types found in database.")
-            sys.exit(1)
-        
-        best_code = ask_llm_for_best_package_type(kind_of_packages, package_types)
-        
-        if best_code:
-            print(f"Best matching package_type code: {best_code}")
-        else:
-            print("No suitable package type found.")
-            
-    except FileNotFoundError:
-        print(f"Error: File '{json_path}' not found.")
-        sys.exit(1)
-    except json.JSONDecodeError:
-        print(f"Error: Invalid JSON in file '{json_path}'.")
-        sys.exit(1)
-    except Exception as e:
-        print(f"Unexpected error: {e}")
-        sys.exit(1)
+    print("🧪 Testing Package Module...")
+    processor = PackageProcessor()
+    result = processor.process_package_type(test_package, verbose=True)
+    print(f"📋 Result: {json.dumps(result, indent=2, ensure_ascii=False)}")
+
 
 if __name__ == "__main__":
     main()

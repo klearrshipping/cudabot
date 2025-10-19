@@ -427,27 +427,58 @@ class LocationProcessor:
     
     def process(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Process input data to determine location information.
+        Process input data to determine location information from office_code_result.
+        
+        BOX 30 (Location of goods) should use the warehouse code from esad_office_code.
         
         Args:
-            input_data: Dictionary containing invoice_data, bol_data, fields, and existing_fields
+            input_data: Dictionary containing office_code_result with warehouse data
             
         Returns:
-            Dictionary with processing results
+            Dictionary with processing results including warehouse code and information
         """
         try:
-            # Extract BOL data and determine ESAD type
+            # Check if we have office_code_result with warehouse data
+            office_code_result = input_data.get('office_code_result')
+            
+            if office_code_result and office_code_result.get('success'):
+                matched_warehouse = office_code_result.get('matched_warehouse')
+                
+                if matched_warehouse:
+                    return {
+                        'success': True,
+                        'location_code': matched_warehouse.get('code'),
+                        'warehouse_name': matched_warehouse.get('warehouse'),
+                        'office_id': matched_warehouse.get('office_id'),
+                        'box_30_value': matched_warehouse.get('code'),
+                        'processing_notes': [
+                            f"Location (BOX 30) extracted from warehouse data",
+                            f"Warehouse Code: {matched_warehouse.get('code')}",
+                            f"Warehouse: {matched_warehouse.get('warehouse')}",
+                            f"Office ID: {matched_warehouse.get('office_id')}"
+                        ]
+                    }
+                else:
+                    return {
+                        'success': False,
+                        'error': 'No warehouse match found in office_code_result',
+                        'location_code': None,
+                        'box_30_value': None
+                    }
+            
+            # Fallback to original BOL-based processing if no office_code_result
             bol_data = input_data.get('bol_data', {})
-            esad_type = input_data.get('esad_type', 'import')  # Default to import
+            esad_type = input_data.get('esad_type', 'import')
             
             if not bol_data:
                 return {
                     'success': False,
-                    'error': 'No BOL data found',
-                    'location_code': None
+                    'error': 'No office_code_result or BOL data found',
+                    'location_code': None,
+                    'box_30_value': None
                 }
             
-            # Process loading/unloading location
+            # Process loading/unloading location as fallback
             result = self.process_loading_unloading_location(bol_data, esad_type)
             
             if result['success']:
@@ -456,21 +487,24 @@ class LocationProcessor:
                     'location_code': result['locode'],
                     'extracted_port': result['extracted_port'],
                     'box_27_value': result['box_27_value'],
+                    'box_30_value': result['locode'],
                     'source_field': result.get('source_field'),
-                    'processing_notes': result.get('processing_notes', [])
+                    'processing_notes': result.get('processing_notes', []) + ['Fallback: Used BOL port data']
                 }
             else:
                 return {
                     'success': False,
                     'error': result['error'],
-                    'location_code': None
+                    'location_code': None,
+                    'box_30_value': None
                 }
             
         except Exception as e:
             return {
                 'success': False,
                 'error': str(e),
-                'location_code': None
+                'location_code': None,
+                'box_30_value': None
             }
 
 

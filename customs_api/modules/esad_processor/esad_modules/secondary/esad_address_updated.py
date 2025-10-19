@@ -457,7 +457,7 @@ def extract_consignor_consignee(document: dict) -> dict:
         {"role": "user", "content": f"Document JSON:\n{_json.dumps(doc_snippet, ensure_ascii=False)}\n\nExample Output:\n{_json.dumps(example_json, ensure_ascii=False)}"}
     ]
 
-    model = OPENROUTER_GENERAL_MODELS.get("gpt_5")
+    model = OPENROUTER_GENERAL_MODELS.get("gpt_4o")
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
         "Content-Type": "application/json",

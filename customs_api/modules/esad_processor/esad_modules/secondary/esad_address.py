@@ -7,8 +7,10 @@ import json
 from datetime import datetime
 import requests
 import os
-from config import OPENROUTER_API_KEY
-from config import OPENROUTER_GENERAL_MODELS
+try:
+    from config import OPENROUTER_API_KEY, OPENROUTER_GENERAL_MODELS
+except ImportError:
+    from customs_api.config import OPENROUTER_API_KEY, OPENROUTER_GENERAL_MODELS
 
 # Comprehensive country code mappings
 ISO2_TO_COUNTRY = {
@@ -304,10 +306,12 @@ class AddressFormatter:
     def extract_consignor_consignee(self, document: dict) -> dict:
         """
         Using the preferred LLM model, extract consignor (shipper) and consignee
-        name, street, city, and combined address from a shipping document (AWB/BOL).
+        name, street, city, and country from a shipping document (AWB/BOL).
 
-        Returns a dict with keys: {"consignor": {"name": str|None, "street": str|None, "city": str|None, "address": str|None, "country": str|None},
-        "consignee": {"name": str|None, "street": str|None, "city": str|None, "address": str|None, "country": str|None}}
+        Returns a dict with keys: {"consignor": {"name": str|None, "street": str|None, "city": str|None, "country": str|None},
+        "consignee": {"name": str|None, "street": str|None, "city": str|None, "country": str|None}}
+        
+        Note: Country is returned as full name (e.g., "Jamaica" not "JM")
         """
         import json as _json
         import requests as _requests
@@ -408,9 +412,15 @@ class AddressFormatter:
                 if not consignee_country and airport_consignee:
                     consignee_country = airport_consignee
             
+            # Convert ISO codes to full country names
+            if consignor_country and len(consignor_country) == 2:
+                consignor_country = ISO2_TO_COUNTRY.get(consignor_country.upper(), consignor_country)
+            if consignee_country and len(consignee_country) == 2:
+                consignee_country = ISO2_TO_COUNTRY.get(consignee_country.upper(), consignee_country)
+                
             return {
-                'consignor': {'name': consignor_name, 'street': consignor_street, 'city': consignor_city, 'address': consignor_addr, 'country': consignor_country},
-                'consignee': {'name': consignee_name, 'street': consignee_street, 'city': consignee_city, 'address': consignee_addr, 'country': consignee_country},
+                'consignor': {'name': consignor_name, 'street': consignor_street, 'city': consignor_city, 'country': consignor_country},
+                'consignee': {'name': consignee_name, 'street': consignee_street, 'city': consignee_city, 'country': consignee_country},
             }
 
         # Prepare prompt (truncate large docs)
@@ -427,15 +437,15 @@ class AddressFormatter:
         system_instructions = (
             "You are given a shipping document (Air Waybill or Bill of Lading).\n"
             "Extract and return only the following information in JSON format:\n\n"
-            "* Consignor (Shipper)\n  - Name\n  - Street (street address, building number, street name)\n  - City (city, town, or region name)\n  - Address (combine all address fields into one string if multiple are present)\n  - Country (establish from explicit text, 2-digit or 3-digit ISO country codes, or infer from any listed ports/airports if not explicitly stated)\n\n"
-            "* Consignee\n  - Name\n  - Street (street address, building number, street name)\n  - City (city, town, or region name)\n  - Address (combine all address fields into one string if multiple are present)\n  - Country (establish from explicit text, 2-digit or 3-digit ISO country codes, or infer from any listed ports/airports if not explicitly stated)\n\n"
+            "* Consignor (Shipper)\n  - Name\n  - Street (street address, building number, street name)\n  - City (city, town, or region name)\n  - Country (MUST be full country name like 'China', 'Jamaica', 'United States', NOT ISO codes)\n\n"
+            "* Consignee\n  - Name\n  - Street (street address, building number, street name)\n  - City (city, town, or region name)\n  - Country (MUST be full country name like 'China', 'Jamaica', 'United States', NOT ISO codes)\n\n"
             "For country inference, use this priority:\n"
             "1. Explicit country names in address fields\n"
-            "2. ISO country codes (2-letter like 'US', 'HK', 'JM' or 3-letter like 'USA', 'HKG', 'JAM')\n"
-            "3. Airport codes (like 'MIA' for Miami/US, 'KIN' for Kingston/Jamaica, 'HKG' for Hong Kong)\n"
-            "4. Seaport codes (like 'LAX' for Los Angeles/US, 'KIN' for Kingston/Jamaica)\n"
-            "5. City names that clearly indicate country (like 'Kingston' likely Jamaica, 'Miami' likely US)\n\n"
-            "If any field is missing, set its value to null. Return ONLY valid JSON without commentary."
+            "2. Convert ISO codes to full names (2-letter like 'CN'→'China', 'JM'→'Jamaica', 'US'→'United States')\n"
+            "3. Airport codes (like 'MIA' for Miami→'United States', 'KIN' for Kingston→'Jamaica', 'HKG'→'Hong Kong')\n"
+            "4. Seaport codes (like 'LAX' for Los Angeles→'United States', 'KIN' for Kingston→'Jamaica')\n"
+            "5. City names that clearly indicate country (like 'Kingston'→'Jamaica', 'Miami'→'United States')\n\n"
+            "IMPORTANT: Always return full country names, never ISO codes. If any field is missing, set its value to null. Return ONLY valid JSON without commentary."
         )
 
         example_json = {
@@ -443,14 +453,12 @@ class AddressFormatter:
                 "name": "QI TAN",
                 "street": "RM 808 BLOCK B 13/F TEXACO ROAD, INDUSTRIAL CENTRE 256-264 TEXACO RD",
                 "city": "TSUEN WAN",
-                "address": "RM 808 BLOCK B 13/F TEXACO ROAD, INDUSTRIAL CENTRE 256-264 TEXACO RD TSUEN WAN 76900, TSUEN WAN, HK",
                 "country": "Hong Kong"
             },
             "consignee": {
                 "name": "RAFER JOHNSON",
                 "street": "34 ROEHAMPTON CLOSE",
                 "city": "KINGSTON",
-                "address": "34 ROEHAMPTON CLOSE, KINGSTON",
                 "country": "Jamaica"
             }
         }
@@ -489,20 +497,28 @@ class AddressFormatter:
             # Normalize and ensure required keys
             consignor = result.get('consignor') or {}
             consignee = result.get('consignee') or {}
+            
+            # Convert ISO codes to full country names if needed
+            consignor_country = consignor.get('country')
+            if consignor_country and len(consignor_country) == 2:
+                consignor_country = ISO2_TO_COUNTRY.get(consignor_country.upper(), consignor_country)
+            
+            consignee_country = consignee.get('country')
+            if consignee_country and len(consignee_country) == 2:
+                consignee_country = ISO2_TO_COUNTRY.get(consignee_country.upper(), consignee_country)
+            
             out = {
                 'consignor': {
                     'name': consignor.get('name') if consignor.get('name') not in ("", None) else None,
                     'street': consignor.get('street') if consignor.get('street') not in ("", None) else None,
                     'city': consignor.get('city') if consignor.get('city') not in ("", None) else None,
-                    'address': consignor.get('address') if consignor.get('address') not in ("", None) else None,
-                    'country': consignor.get('country') if consignor.get('country') not in ("", None) else None,
+                    'country': consignor_country if consignor_country not in ("", None) else None,
                 },
                 'consignee': {
                     'name': consignee.get('name') if consignee.get('name') not in ("", None) else None,
                     'street': consignee.get('street') if consignee.get('street') not in ("", None) else None,
                     'city': consignee.get('city') if consignee.get('city') not in ("", None) else None,
-                    'address': consignee.get('address') if consignee.get('address') not in ("", None) else None,
-                    'country': consignee.get('country') if consignee.get('country') not in ("", None) else None,
+                    'country': consignee_country if consignee_country not in ("", None) else None,
                 },
             }
             # If LLM missed data, patch with fallback fields
@@ -513,20 +529,24 @@ class AddressFormatter:
                 out['consignor']['street'] = fb['consignor']['street']
             if out['consignor']['city'] is None:
                 out['consignor']['city'] = fb['consignor']['city']
-            if out['consignor']['address'] is None:
-                out['consignor']['address'] = fb['consignor']['address']
             if out['consignor']['country'] is None:
-                out['consignor']['country'] = fb['consignor']['country']
+                # Convert ISO to full name if needed
+                fb_country = fb['consignor']['country']
+                if fb_country and len(fb_country) == 2:
+                    fb_country = ISO2_TO_COUNTRY.get(fb_country.upper(), fb_country)
+                out['consignor']['country'] = fb_country
             if out['consignee']['name'] is None:
                 out['consignee']['name'] = fb['consignee']['name']
             if out['consignee']['street'] is None:
                 out['consignee']['street'] = fb['consignee']['street']
             if out['consignee']['city'] is None:
                 out['consignee']['city'] = fb['consignee']['city']
-            if out['consignee']['address'] is None:
-                out['consignee']['address'] = fb['consignee']['address']
             if out['consignee']['country'] is None:
-                out['consignee']['country'] = fb['consignee']['country']
+                # Convert ISO to full name if needed
+                fb_country = fb['consignee']['country']
+                if fb_country and len(fb_country) == 2:
+                    fb_country = ISO2_TO_COUNTRY.get(fb_country.upper(), fb_country)
+                out['consignee']['country'] = fb_country
             
             # Final country inference attempt for any remaining null countries
             if not out['consignor']['country'] or not out['consignee']['country']:
@@ -683,7 +703,7 @@ class AddressFormatter:
             )
 
 def main():
-    """Main function to demonstrate enhanced address processing"""
+    """Main function to demonstrate enhanced address processing with clean JSON output"""
     formatter = AddressFormatter()
 
     # Example usage
@@ -702,22 +722,29 @@ def main():
         }
     }
     
-    print("🏠 Enhanced ESAD Address Processor")
-    print("=" * 50)
+    print("🏠 Testing Address Processing Module...")
     
-    # Test new functionality
-    result = formatter.extract_consignor_consignee(sample_document)
+    # Test address formatting
+    test_addresses = [
+        "123 Main Street, Kingston, St. Andrew, Jamaica",
+        "Unit C, 15th Floor, Building A, South China Digital Valley, Huanan Road, Minzhi Street, Longhua District, Shenzhen, Guangdong, China"
+    ]
     
-    print("📍 Consignor/Consignee Extraction Results:")
-    print(f"Consignor: {result['consignor']}")
-    print(f"Consignee: {result['consignee']}")
+    results = []
+    for address in test_addresses:
+        formatted = formatter.format_address(address)
+        results.append({
+            'formatted': formatted.formatted,
+            'confidence': formatted.confidence
+        })
     
-    # Test backward compatibility
-    test_address = "123 Main Street, Kingston, St. Andrew, Jamaica"
-    formatted = formatter.format_address(test_address)
-    print(f"\n📍 Address Formatting (Backward Compatibility):")
-    print(f"Original: {formatted.original}")
-    print(f"Formatted: {formatted.formatted}")
+    # Display clean JSON result
+    clean_result = {
+        "success": True,
+        "formatted_addresses": results
+    }
+    
+    print(f"\n📋 Final Result: {json.dumps(clean_result, indent=2, ensure_ascii=False)}")
 
 if __name__ == "__main__":
     main()

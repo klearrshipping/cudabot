@@ -203,6 +203,10 @@ class WarehouseProcessor:
         """
         Process input data to determine warehouse code.
         
+        Box 49 (Warehouse) is ONLY completed when a Customs Procedure Code (CPC) 
+        for warehousing or Free Zone is entered in Box 37. 
+        In all other circumstances, it should be left blank.
+        
         Args:
             input_data: Dictionary containing invoice_data, bol_data, fields, and existing_fields
             
@@ -210,14 +214,44 @@ class WarehouseProcessor:
             Dictionary with processing results
         """
         try:
-            # Extract office code from various sources
+            # Check if Box 37 has a warehousing/Free Zone CPC code
+            existing_fields = input_data.get('existing_fields', {})
+            cpc_code = existing_fields.get('37_customs_procedure_code') or existing_fields.get('customs_procedure_code')
+            
+            # List of CPC codes that require warehouse information
+            # These are codes related to warehousing, bonded warehouses, and Free Zones
+            warehousing_cpc_codes = [
+                '71',  # Placing goods under customs warehousing procedure
+                '76',  # Entry for a free zone
+                '77',  # Placing goods under the free zone procedure
+                # Add more warehousing-related CPC codes as needed
+            ]
+            
+            # Check if CPC requires warehouse info
+            requires_warehouse = False
+            if cpc_code:
+                # Check if the CPC code starts with any warehousing codes
+                cpc_str = str(cpc_code)
+                requires_warehouse = any(cpc_str.startswith(code) for code in warehousing_cpc_codes)
+            
+            # If no warehousing CPC, return success with null warehouse (leave blank)
+            if not requires_warehouse:
+                return {
+                    'success': True,
+                    'warehouse_code': None,
+                    'message': 'Box 49 left blank - no warehousing/Free Zone CPC in Box 37',
+                    'requires_warehouse': False
+                }
+            
+            # If warehousing CPC is present, proceed with warehouse lookup
             office_code = self._extract_office_code(input_data)
             
             if not office_code:
                 return {
                     'success': False,
-                    'error': 'No office code found',
-                    'warehouse_code': None
+                    'error': 'Warehousing CPC present but no office code found',
+                    'warehouse_code': None,
+                    'requires_warehouse': True
                 }
             
             # Get warehouse data
@@ -238,14 +272,16 @@ class WarehouseProcessor:
                     'warehouse_code': results['box_30_value'],
                     'office_code': results['office_code'],
                     'warehouse_name': results['selected_warehouse']['warehouse'],
-                    'warehouses_found': results['count']
+                    'warehouses_found': results['count'],
+                    'requires_warehouse': True
                 }
             else:
                 return {
                     'success': False,
                     'error': results['error'],
                     'office_code': office_code,
-                    'warehouse_code': None
+                    'warehouse_code': None,
+                    'requires_warehouse': True
                 }
             
         except Exception as e:

@@ -231,24 +231,51 @@ class TRNLookupProcessor:
         
         return intersection / union
     
-    def lookup_trn_from_documents(self, bol_data: Dict[str, Any], invoice_data: Dict[str, Any]) -> Dict[str, TRNLookupResult]:
+    def lookup_trn_from_documents(self, bol_data: Dict[str, Any], invoice_data: Dict[str, Any], address_data: Dict[str, Any] = None) -> Dict[str, TRNLookupResult]:
         """
         Extract company names from documents and lookup TRNs
         
         Args:
             bol_data: Bill of lading data
             invoice_data: Invoice data
+            address_data: Optional address data with country information for consignor/consignee
             
         Returns:
             dict: TRN lookup results for exporter and importer
         """
         results = {}
         
-        # Extract exporter/consignor name from BOL
+        # Helper function to check if country is Jamaica
+        def is_jamaican(country: Optional[str]) -> bool:
+            if not country:
+                return False
+            country_upper = str(country).upper().strip()
+            return country_upper in ['JAMAICA', 'JM', 'JAM']
+        
+        # Extract exporter/consignor information
         exporter_name = self._extract_exporter_name(bol_data)
+        exporter_country = None
+        if address_data and 'consignor' in address_data:
+            exporter_country = address_data['consignor'].get('country')
+        
         if exporter_name:
             print(f"📋 Extracted exporter name: {exporter_name}")
-            results["exporter"] = self.lookup_trn_by_company_name(exporter_name, "exporter")
+            
+            # Check if exporter is Jamaican
+            if is_jamaican(exporter_country):
+                print(f"  🇯🇲 Exporter is Jamaican - TRN lookup required")
+                results["exporter"] = self.lookup_trn_by_company_name(exporter_name, "exporter")
+            else:
+                country_display = exporter_country if exporter_country else "Unknown"
+                print(f"  🌍 Exporter is non-Jamaican ({country_display}) - TRN not required")
+                results["exporter"] = TRNLookupResult(
+                    success=True,
+                    trn_number=None,
+                    company_name=exporter_name,
+                    match_type='not_required',
+                    confidence_score=None,
+                    error_message=None
+                )
         else:
             print("⚠️ Could not extract exporter name from BOL")
             results["exporter"] = TRNLookupResult(
@@ -256,11 +283,30 @@ class TRNLookupProcessor:
                 error_message="Could not extract exporter name from BOL"
             )
         
-        # Extract importer/consignee name from BOL
+        # Extract importer/consignee information
         importer_name = self._extract_importer_name(bol_data)
+        importer_country = None
+        if address_data and 'consignee' in address_data:
+            importer_country = address_data['consignee'].get('country')
+        
         if importer_name:
             print(f"📋 Extracted importer name: {importer_name}")
-            results["importer"] = self.lookup_trn_by_company_name(importer_name, "importer")
+            
+            # Check if importer is Jamaican
+            if is_jamaican(importer_country):
+                print(f"  🇯🇲 Importer is Jamaican - TRN lookup required")
+                results["importer"] = self.lookup_trn_by_company_name(importer_name, "importer")
+            else:
+                country_display = importer_country if importer_country else "Unknown"
+                print(f"  🌍 Importer is non-Jamaican ({country_display}) - TRN not required")
+                results["importer"] = TRNLookupResult(
+                    success=True,
+                    trn_number=None,
+                    company_name=importer_name,
+                    match_type='not_required',
+                    confidence_score=None,
+                    error_message=None
+                )
         else:
             print("⚠️ Could not extract importer name from BOL")
             results["importer"] = TRNLookupResult(
@@ -273,8 +319,14 @@ class TRNLookupProcessor:
     def _extract_exporter_name(self, bol_data: Dict[str, Any]) -> Optional[str]:
         """Extract exporter/consignor name from BOL data"""
         # Try different possible field names for exporter
+        shipper = bol_data.get("shipper", "")
+        
+        # Handle nested structure (shipper as dict with 'name' key)
+        if isinstance(shipper, dict):
+            shipper = shipper.get("name", "")
+        
         exporter_candidates = [
-            bol_data.get("shipper", ""),
+            shipper,
             bol_data.get("shipper_name", ""),
             bol_data.get("consignor", ""),
             bol_data.get("exporter", ""),
@@ -283,6 +335,8 @@ class TRNLookupProcessor:
         
         # Return the first non-empty exporter name
         for exporter in exporter_candidates:
+            if isinstance(exporter, dict):
+                exporter = exporter.get("name", "")
             if exporter and str(exporter).strip():
                 return str(exporter).strip()
         
@@ -291,16 +345,28 @@ class TRNLookupProcessor:
     def _extract_importer_name(self, bol_data: Dict[str, Any]) -> Optional[str]:
         """Extract importer/consignee name from BOL data"""
         # Try different possible field names for importer
+        consignee = bol_data.get("consignee", "")
+        
+        # Handle nested structure (consignee as dict with 'name' key)
+        if isinstance(consignee, dict):
+            consignee = consignee.get("name", "")
+        
+        notify = bol_data.get("notify_party", "")
+        if isinstance(notify, dict):
+            notify = notify.get("name", "")
+        
         importer_candidates = [
             bol_data.get("consignee_name", ""),
-            bol_data.get("consignee", ""),
+            consignee,
             bol_data.get("importer", ""),
             bol_data.get("receiver", ""),
-            bol_data.get("notify_party", "")
+            notify
         ]
         
         # Return the first non-empty importer name
         for importer in importer_candidates:
+            if isinstance(importer, dict):
+                importer = importer.get("name", "")
             if importer and str(importer).strip():
                 return str(importer).strip()
         
@@ -311,7 +377,7 @@ class TRNLookupProcessor:
         Process input data to determine TRN information.
         
         Args:
-            input_data: Dictionary containing invoice_data, bol_data, fields, and existing_fields
+            input_data: Dictionary containing invoice_data, bol_data, fields, existing_fields, and address_data
             
         Returns:
             Dictionary with processing results
@@ -321,6 +387,11 @@ class TRNLookupProcessor:
             bol_data = input_data.get('bol_data', {})
             invoice_data = input_data.get('invoice_data', {})
             
+            # Extract address data from result stages (if available)
+            address_data = None
+            if 'result' in input_data and 'stages' in input_data['result']:
+                address_data = input_data['result']['stages'].get('secondary_processing', {}).get('addresses')
+            
             if not bol_data and not invoice_data:
                 return {
                     'success': False,
@@ -328,8 +399,8 @@ class TRNLookupProcessor:
                     'trn': None
                 }
             
-            # Lookup TRN from documents
-            results = self.lookup_trn_from_documents(bol_data, invoice_data)
+            # Lookup TRN from documents with address data for country checking
+            results = self.lookup_trn_from_documents(bol_data, invoice_data, address_data)
             
             # Return the first successful result (exporter or importer)
             for entity_type, result in results.items():

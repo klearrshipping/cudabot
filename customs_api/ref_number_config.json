@@ -1,0 +1,11 @@
+{
+  "default": {
+    "prefix": "ORD",
+    "start_number": 1,
+    "padding": 6,
+    "separator": "-",
+    "description": "Default order reference configuration",
+    "created_at": "2025-10-14T07:32:10.964203",
+    "last_used": "2025-10-15T06:22:48.068811"
+  }
+}

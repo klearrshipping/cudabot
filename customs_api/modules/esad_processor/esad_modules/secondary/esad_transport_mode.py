@@ -5,6 +5,7 @@ Processes transport mode information from box field 25 and matches with transpor
 """
 
 import csv
+import json
 import os
 import re
 from typing import Dict, Any, List, Optional
@@ -28,7 +29,7 @@ class TransportModeProcessor:
         try:
             # Get the correct path to the data directory
             current_dir = os.path.dirname(os.path.abspath(__file__))
-            codes_path = os.path.join(current_dir, "..", "..", "..", "..", "customs_api", "data", "transport_mode.csv")
+            codes_path = os.path.join(current_dir, "..", "..", "..", "..", "data", "transport_mode.csv")
             if not os.path.exists(codes_path):
                 print(f"⚠️ Transport mode CSV not found: {codes_path}")
                 return []
@@ -387,3 +388,51 @@ if __name__ == "__main__":
     print("   • Box 25 'Mode of transport at the border' returns the CODE (e.g., '1')")
     print("   • NOT the description or other details")
     print("   • This code is what gets displayed in the ESAD form")
+
+
+def main():
+    """Main function for testing transport mode processing."""
+    print("🚛 Testing Transport Mode Processing Module...")
+    
+    # Initialize processor
+    processor = TransportModeProcessor()
+    
+    # Test data samples
+    test_cases = [
+        "EVER GIVEN / 001W",
+        "Ocean freight vessel",
+        "Air cargo flight",
+        "Road transport by truck",
+        "Rail freight service"
+    ]
+    
+    print(f"\n🧪 Testing with {len(test_cases)} sample transport descriptions:")
+    print("=" * 60)
+    
+    results = []
+    for i, transport_data in enumerate(test_cases, 1):
+        print(f"\n📋 Test Case {i}: {transport_data}")
+        result = process_transport_mode(transport_data)
+        results.append({
+            'input': transport_data,
+            'result': result
+        })
+        
+        # Display clean JSON result
+        if result.get('success'):
+            clean_result = {
+                "success": result['success'],
+                "transport_code": result.get('transport_code'),
+                "transport_description": result.get('transport_description'),
+                "confidence": result.get('confidence'),
+                "reasoning": result.get('reasoning')
+            }
+            print(f"   Result: {json.dumps(clean_result, indent=2, ensure_ascii=False)}")
+        else:
+            print(f"   ❌ Error: {result.get('error', 'Unknown error')}")
+    
+    print(f"\n📊 Summary: {len([r for r in results if r['result'].get('success')])}/{len(results)} successful extractions")
+
+
+if __name__ == "__main__":
+    main()
