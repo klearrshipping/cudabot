@@ -364,7 +364,8 @@ class RegimeTypeProcessor:
         """Determine the appropriate regime type based on contextual factors."""
         
         # Extract classification results
-        is_commercial = product_classification.get('is_commercial', False)
+        classification_type = product_classification.get('product_classification', 'unknown')
+        is_commercial = classification_type == 'commercial'
         
         # Load regime types from CSV
         regime_types = fetch_regime_types()
@@ -415,21 +416,293 @@ class RegimeTypeProcessor:
         }
 
 
-def main():
-    """Test function for the regime module."""
-    # Test data
-    test_invoice = {
-        "items": [{"description": "Lithium battery pack for commercial use", "total_price": 1000}],
-        "totals": {"total_amount": 1200, "subtotal": 1000, "shipping_handling": 200},
-        "currency": "USD"
+def select_cpc_for_regime_type(regime_type: str, invoice_data: Dict[str, Any], 
+                              bol_data: Dict[str, Any], arrival_notice: Dict[str, Any] = None) -> Dict[str, Any]:
+    """
+    Select appropriate CPC based on regime type using LLM analysis.
+    
+    Args:
+        regime_type: The selected regime type (e.g., "IMS4")
+        invoice_data: Invoice data for context
+        bol_data: Bill of Lading data for context
+        arrival_notice: Arrival notice data (optional)
+    
+    Returns:
+        Dict containing selected CPC and reasoning
+    """
+    
+    try:
+        # Step 1: Load CPC data and filter by regime_type_model
+        cpc_data = _load_cpc_data()
+        regime_type_model = _extract_regime_type_model(regime_type)
+        
+        if not regime_type_model:
+            return {
+                'success': False,
+                'error': f'Could not extract regime_type_model from {regime_type}',
+                'selected_cpc': None,
+                'reasoning': 'Invalid regime type format'
+            }
+        
+        # Filter CPC data by regime_type_model
+        matching_cpcs = [cpc for cpc in cpc_data if cpc.get('regime_type_model') == regime_type_model]
+        
+        if not matching_cpcs:
+            return {
+                'success': False,
+                'error': f'No CPCs found for regime_type_model: {regime_type_model}',
+                'selected_cpc': None,
+                'reasoning': 'No matching CPCs available'
+            }
+        
+        # Step 2: Call esad_product_classification to determine transaction type
+        transaction_classification = classify_product_commercial_vs_personal(invoice_data, bol_data)
+        
+        # Step 3: Use LLM to select appropriate CPC
+        selected_cpc = _select_cpc_with_llm(
+            matching_cpcs, 
+            invoice_data, 
+            bol_data, 
+            arrival_notice, 
+            transaction_classification
+        )
+        
+        return {
+            'success': True,
+            'selected_cpc': selected_cpc,
+            'regime_type_model': regime_type_model,
+            'transaction_classification': transaction_classification,
+            'available_cpcs': len(matching_cpcs),
+            'reasoning': selected_cpc.get('reasoning', 'CPC selected based on context analysis')
+        }
+        
+    except Exception as e:
+        logger.error(f"Error in CPC selection: {e}")
+        return {
+            'success': False,
+            'error': str(e),
+            'selected_cpc': None,
+            'reasoning': f'Error during CPC selection: {str(e)}'
+        }
+
+
+def _load_cpc_data() -> List[Dict[str, Any]]:
+    """Load CPC data from JSON file."""
+    
+    try:
+        # Get the path to the CPC JSON file
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        cpc_file_path = os.path.join(current_dir, '..', '..', '..', '..', 'data', 'cpc.json')
+        
+        with open(cpc_file_path, 'r', encoding='utf-8') as f:
+            cpc_data = json.load(f)
+        
+        return cpc_data
+        
+    except Exception as e:
+        logger.error(f"Error loading CPC data: {e}")
+        return []
+
+
+def _extract_regime_type_model(regime_type: str) -> str:
+    """Extract regime_type_model from regime_type."""
+    
+    # Map regime types to their models
+    regime_mapping = {
+        'IMS4': 'IMS4',
+        'IM4': 'IM4', 
+        'BG4': 'BG4',
+        'EX10': 'EX10',
+        'EX11': 'EX11',
+        # Add more mappings as needed
     }
     
-    test_bol = {
-        "vessel_info": {
-            "port_of_loading": "Hong Kong",
-            "port_of_destination": "Kingston"
-        }
+    return regime_mapping.get(regime_type, regime_type)
+
+
+def _select_cpc_with_llm(matching_cpcs: List[Dict[str, Any]], 
+                        invoice_data: Dict[str, Any], 
+                        bol_data: Dict[str, Any], 
+                        arrival_notice: Dict[str, Any], 
+                        transaction_classification: Dict[str, Any]) -> Dict[str, Any]:
+    """Use LLM to select the most appropriate CPC from matching options."""
+    
+    # Prepare context data
+    context_data = _prepare_context_for_cpc_selection(
+        invoice_data, bol_data, arrival_notice, transaction_classification
+    )
+    
+    # Format CPC options for LLM
+    cpc_options = []
+    for i, cpc in enumerate(matching_cpcs, 1):
+        cpc_options.append(f"{i}. CPC: {cpc['cpc']} - {cpc['description']}")
+        cpc_options.append(f"   Detail: {cpc['detail']}")
+        cpc_options.append("")
+    
+    cpc_options_text = "\n".join(cpc_options)
+    
+    # Create LLM prompt
+    prompt = f"""
+You are a customs expert analyzing shipment data to select the most appropriate CPC (Customs Procedure Code).
+
+CONTEXT DATA:
+{context_data}
+
+AVAILABLE CPC OPTIONS:
+{cpc_options_text}
+
+TRANSACTION CLASSIFICATION:
+- Type: {transaction_classification.get('product_classification', 'unknown')}
+- Reasoning: {transaction_classification.get('reasoning', 'No reasoning provided')}
+
+INSTRUCTIONS:
+1. Analyze the context data (invoice, BOL, arrival notice)
+2. Consider the transaction classification (commercial vs personal)
+3. Select the most appropriate CPC from the available options
+4. Provide detailed reasoning for your selection
+
+Return ONLY a JSON object:
+{{
+  "selected_cpc_number": <option_number_1_to_{len(matching_cpcs)}>,
+  "confidence": "high" | "medium" | "low",
+  "reasoning": "Detailed explanation of why this CPC was selected",
+  "key_factors": ["factor1", "factor2", "factor3"]
+}}
+
+CRITICAL: selected_cpc_number must be the OPTION NUMBER (1, 2, 3, or {len(matching_cpcs)}), NOT the CPC code (4000, 4500, etc.)
+"""
+    
+    # Try each priority model
+    for model in PRIORITY_MODELS:
+        try:
+            response_text, success, error_type = llm.send_prompt(prompt, model=model)
+            
+            if not success:
+                logger.warning(f"LLM CPC selection failed with {model}: {error_type}")
+                continue
+            
+            # Parse JSON response
+            json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
+            if json_match:
+                result = json.loads(json_match.group())
+                
+                # Validate the selected CPC number
+                selected_number = result.get('selected_cpc_number', 0)
+                
+                # Debug logging
+                logger.debug(f"LLM returned selected_cpc_number: {selected_number}, expected range: 1-{len(matching_cpcs)}")
+                
+                # Check if LLM returned CPC code instead of option number
+                if isinstance(selected_number, int) and selected_number > len(matching_cpcs):
+                    # Try to find the CPC code in matching_cpcs and convert to option number
+                    for i, cpc in enumerate(matching_cpcs):
+                        if cpc.get('cpc') == selected_number:
+                            selected_number = i + 1
+                            logger.info(f"Converted CPC code {cpc.get('cpc')} to option number {selected_number}")
+                            break
+                
+                if 1 <= selected_number <= len(matching_cpcs):
+                    selected_cpc = matching_cpcs[selected_number - 1]
+                    result['selected_cpc'] = selected_cpc
+                    result['model_used'] = model
+                    return result
+                else:
+                    logger.warning(f"Invalid CPC number selected: {selected_number} (expected 1-{len(matching_cpcs)})")
+                    logger.debug(f"LLM response: {response_text}")
+                    continue
+                    
+        except Exception as e:
+            logger.warning(f"LLM CPC selection failed with {model}: {e}")
+            continue
+    
+    # Fallback: return first CPC with low confidence
+    logger.warning("LLM CPC selection failed, using fallback")
+    return {
+        'selected_cpc': matching_cpcs[0],
+        'confidence': 'low',
+        'reasoning': 'Fallback selection - LLM analysis failed',
+        'key_factors': ['fallback'],
+        'model_used': 'fallback'
     }
+
+
+def _prepare_context_for_cpc_selection(invoice_data: Dict[str, Any], 
+                                     bol_data: Dict[str, Any], 
+                                     arrival_notice: Dict[str, Any], 
+                                     transaction_classification: Dict[str, Any]) -> str:
+    """Prepare context data for CPC selection."""
+    
+    context_parts = []
+    
+    # Invoice context
+    if invoice_data:
+        context_parts.append("INVOICE DATA:")
+        if invoice_data.get('items'):
+            for item in invoice_data['items']:
+                context_parts.append(f"- Product: {item.get('description', 'N/A')}")
+                context_parts.append(f"  Quantity: {item.get('quantity', 'N/A')}")
+                context_parts.append(f"  Unit Price: ${item.get('unit_price', 'N/A')}")
+                context_parts.append(f"  Total Price: ${item.get('total_price', 'N/A')}")
+        
+        totals = invoice_data.get('totals', {})
+        if totals:
+            context_parts.append(f"- Total Amount: ${totals.get('total_amount', 'N/A')}")
+            context_parts.append(f"- Currency: {invoice_data.get('currency', 'N/A')}")
+    
+    # BOL context
+    if bol_data:
+        context_parts.append("\nBOL DATA:")
+        vessel_info = bol_data.get('vessel_info', {})
+        if vessel_info:
+            context_parts.append(f"- Port of Loading: {vessel_info.get('port_of_loading', 'N/A')}")
+            context_parts.append(f"- Port of Destination: {vessel_info.get('port_of_destination', 'N/A')}")
+        
+        cargo_info = bol_data.get('cargo_summary_table', {})
+        if cargo_info:
+            context_parts.append(f"- Cargo Description: {cargo_info.get('description', 'N/A')}")
+            context_parts.append(f"- Cargo Weight: {cargo_info.get('weight', 'N/A')}")
+    
+    # Arrival notice context
+    if arrival_notice:
+        context_parts.append("\nARRIVAL NOTICE DATA:")
+        context_parts.append(f"- Arrival Date: {arrival_notice.get('arrival_date', 'N/A')}")
+        context_parts.append(f"- Vessel: {arrival_notice.get('vessel_name', 'N/A')}")
+    
+    return "\n".join(context_parts)
+
+
+def main():
+    """Main function for testing with real data."""
+    # Load real data from the same files as test_esad_modules.py
+    try:
+        invoice_file = r"C:\Users\rafer\OneDrive\Desktop\projects\cuda\customs_api\processed_orders\ORD-20251015-001\invoices\invoice_ORD-20251015-001_invoice_1_extract.json"
+        bol_file = r"C:\Users\rafer\OneDrive\Desktop\projects\cuda\customs_api\processed_orders\ORD-20251015-001\bills_of_lading\bill_of_lading_ORD-20251015-001_primary_extract.json"
+        
+        with open(invoice_file, 'r', encoding='utf-8') as f:
+            test_invoice = json.load(f)
+        
+        with open(bol_file, 'r', encoding='utf-8') as f:
+            test_bol = json.load(f)
+            
+        print("📋 Testing esad_regime.py with REAL DATA")
+        print("-" * 50)
+        
+    except Exception as e:
+        print(f"❌ Error loading real data: {e}")
+        print("Using fallback test data...")
+        # Fallback to test data
+        test_invoice = {
+            "items": [{"description": "Lithium battery pack for commercial use", "total_price": 1000}],
+            "totals": {"total_amount": 1200, "subtotal": 1000, "shipping_handling": 200},
+            "currency": "USD"
+        }
+        
+        test_bol = {
+            "vessel_info": {
+                "port_of_loading": "Hong Kong",
+                "port_of_destination": "Kingston"
+            }
+        }
     
     print("🧪 Testing Regime Module...")
     processor = RegimeTypeProcessor()
@@ -437,7 +710,28 @@ def main():
         'invoice_data': test_invoice,
         'bol_data': test_bol
     })
-    print(f"📋 Result: {json.dumps(result, indent=2, ensure_ascii=False)}")
+    # Server log data is already printed by process_regime_type method
+    
+    # Test CPC selection
+    if result.get('success') and result.get('regime_type'):
+        print(f"\n🧪 Testing CPC Selection for regime: {result['regime_type']}")
+        cpc_result = select_cpc_for_regime_type(
+            result['regime_type'], 
+            test_invoice, 
+            test_bol
+        )
+        # Print CPC result in JSON format
+        if cpc_result.get('success'):
+            selected_cpc = cpc_result.get('selected_cpc', {}).get('selected_cpc', {})
+            cpc_summary = {
+                "regime_type_model": cpc_result.get('regime_type_model', 'Unknown'),
+                "cpc": selected_cpc.get('cpc', 'N/A'),
+                "description": selected_cpc.get('description', 'N/A'),
+                "reasoning": cpc_result.get('selected_cpc', {}).get('reasoning', 'No reasoning provided')
+            }
+            print(f"📋 CPC Result: {json.dumps(cpc_summary, indent=2, ensure_ascii=False)}")
+        else:
+            print(f"📋 CPC Result: {cpc_result.get('error', 'Unknown error')}")
 
 
 if __name__ == "__main__":
